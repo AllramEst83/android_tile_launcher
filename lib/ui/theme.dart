@@ -54,16 +54,17 @@ abstract final class TileMetrics {
   static const double bevel = 2;
 }
 
-/// No pixel font is bundled yet (see plan.md, Phase 1.1), so this resolves to
-/// the platform's monospace face. It is never fetched at runtime: the launcher
-/// has to draw itself at boot with no network.
-const String kMonoFontFamily = 'monospace';
+/// The one pixel font the whole app draws with, bundled as an asset (OFL 1.1,
+/// see `fonts/OFL.txt`) so the launcher can draw itself at boot with no
+/// network. Every text style in [tileLauncherTheme] goes through this
+/// constant; swapping the font later is a one-line change here.
+const String kPixelFontFamily = 'PressStart2P';
 
 ThemeData tileLauncherTheme() {
   const TextStyle base = TextStyle(
-    fontFamily: kMonoFontFamily,
+    fontFamily: kPixelFontFamily,
     color: TileColors.text,
-    height: 1.25,
+    height: 1.6,
   );
   return ThemeData(
     useMaterial3: true,
@@ -78,7 +79,7 @@ ThemeData tileLauncherTheme() {
       onSurface: C64.lightBlue,
       error: C64.lightRed,
     ),
-    fontFamily: kMonoFontFamily,
+    fontFamily: kPixelFontFamily,
     textTheme: TextTheme(
       displayLarge: base.copyWith(fontSize: 48, color: TileColors.textBright),
       headlineMedium: base.copyWith(fontSize: 24, color: TileColors.textBright),

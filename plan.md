@@ -11,10 +11,10 @@ The sibling repo `../android_terminal_launcher` already solves many of these fea
 | Phase | What it delivered |
 |---|---|
 | 0 | **Foundation.** Real name (`Tile Launcher`), description and lints; default counter app and its test removed. Launcher role in the manifest (`MAIN`+`HOME`+`DEFAULT`, `singleTask`, `<queries>` for package visibility), C64-blue launch window in both `values/` and `values-night/` so there is no flash on start. `lib/ui/theme.dart` with the VIC-II palette and grid metrics, a boot screen behind `PopScope(canPop: false)`, `messages.dart`. `README.md`, `AGENTS.md`, `CLAUDE.md` and `.agents/` (architecture, android-launcher, best practices, testing) written for this repo. Format, analyze, 2 tests and a debug APK build all clean. |
+| 1 | **The pixel font.** *Press Start 2P* (OFL 1.1, `fonts/PressStart2P-Regular.ttf` + `fonts/OFL.txt`), bundled as an asset, never fetched at runtime. A C64 face (`C64 Pro Mono`) was considered and rejected: its licence is free for non-commercial use but separately forbids "direct download from any web site," which conflicts with this repo being public on GitHub. Named behind one constant, `kPixelFontFamily` in `lib/ui/theme.dart`; every text style in `tileLauncherTheme()` goes through it. |
 
 ## Next, in order
 
-1. **Phase 1, the pixel font.** Everything visual depends on it, so settle it before building tiles. Needs a decision from the user: *Press Start 2P* (OFL, safe to bundle, very blocky) or a C64 face such as *C64 Pro Mono* (free for non-commercial use only — a licence question if this is ever published). Bundle it as an asset with its licence file; never fetch at runtime. Until then the theme uses the platform monospace face.
 2. **Phase 2, apps over a channel.** `AppRepository` (abstract) + `AndroidAppRepository` on a `MethodChannel`, with `AppsChannelHandler.kt`: list launchable apps (label, package), launch one, exclude our own package, sort case-insensitively, cache with an explicit refresh. Prove it with a plain scrolling list before any tile work. Device check: every app appears and opens.
 3. **Phase 3, the mosaic.** `Tile` (id, kind, size, colour, target), `TileSize` (1×1, 2×2, 4×2, 4×4), a pure `tile_layout.dart` that packs an ordered list into four-column rows, `TileGrid` and `TileView` with the first kind: an app tile (glyph, label bottom-left, VIC-II fill, 2px bevel). Tap launches. **This is the first usable launcher** — set it as Home and live with it.
 4. **Phase 4, the drawer.** All Apps: grouped by initial (A–Z, then Å Ä Ö, as the sibling repo sorts), a jump index, a search field, reached by swiping left from home. Long-press a row for quick actions: pin to grid, app details, uninstall (`REQUEST_DELETE_PACKAGES`).
@@ -49,10 +49,10 @@ The sibling repo `../android_terminal_launcher` already solves many of these fea
 
 ## Open questions for the user
 
-1. Which pixel font, given the licence trade-off in Phase 1?
-2. Swedish collation (Å Ä Ö last) in the drawer, as in the sibling repo — or plain A–Z?
-3. Is the C64 blue canvas the default, with pitch-black OLED as an option, or the other way round?
+1. Swedish collation (Å Ä Ö last) in the drawer, as in the sibling repo — or plain A–Z?
+2. Is the C64 blue canvas the default, with pitch-black OLED as an option, or the other way round?
 
 ## Changelog
 
 - 2026-09-27: repo bootstrapped. Phase 0 (foundation) built and verified; this plan written to replace the two-line phase sketch. Design references sorted into `design/commodore64/` (look and feel) and `design/google.stich/` (structure only — its Fluent/acrylic styling is explicitly not the target, recorded in `.agents/architecture.md`).
+- 2026-09-27: Phase 1, the pixel font: Press Start 2P (OFL 1.1) bundled, not a C64 face — `C64 Pro Mono`'s licence forbids direct web download and this repo is public on GitHub. Decision and the single `kPixelFontFamily` constant recorded in `.agents/architecture.md`.

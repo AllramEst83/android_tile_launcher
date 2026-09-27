@@ -36,6 +36,8 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # A bundled pixel font goes here once one is chosen (see plan.md, Phase 1.1).
-  # It must be bundled, never fetched at runtime: a launcher has to draw itself
-  # at boot with no network.
+  # Bundled (OFL 1.1, see fonts/OFL.txt) so the launcher works offline at boot.
+  fonts:
+    - family: PressStart2P
+      fonts:
+        - asset: fonts/PressStart2P-Regular.ttf
