@@ -1,6 +1,8 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -9,11 +11,17 @@ import 'package:flutter/material.dart';
 ///
 /// Back must never leave a launcher (there is nowhere to go), so the whole
 /// shell is wrapped in a `PopScope` that refuses to pop. The boot screen is
-/// also the loading and error state for the tile mosaic.
+/// also the loading and error state for the tile mosaic. A `PageView` holds
+/// the two pages a swipe reaches: the curated home grid, then All Apps.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.appRepository});
+  const HomeShell({
+    super.key,
+    required this.appRepository,
+    required this.gridState,
+  });
 
   final AppRepository appRepository;
+  final GridState gridState;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -21,11 +29,18 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   late Future<List<AppInfo>> _apps;
+  final PageController _pageController = PageController();
 
   @override
   void initState() {
     super.initState();
     _apps = widget.appRepository.listApps();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -38,6 +53,16 @@ class _HomeShellState extends State<HomeShell> {
     // Swallowed here: the FutureBuilder below is already watching `next` and
     // renders the error state itself once it completes.
     await next.then((_) {}, onError: (_) {});
+  }
+
+  List<AppInfo> _pinnedApps(List<AppInfo> apps) {
+    final Map<String, AppInfo> byPackage = <String, AppInfo>{
+      for (final AppInfo app in apps) app.packageName: app,
+    };
+    return <AppInfo>[
+      for (final String package in widget.gridState.pinned)
+        if (byPackage[package] case final AppInfo app) app,
+    ];
   }
 
   @override
@@ -59,10 +84,25 @@ class _HomeShellState extends State<HomeShell> {
                     }
                     final List<AppInfo>? apps = snapshot.data;
                     if (apps == null) return const _BootScreen();
-                    return AppTileGrid(
-                      apps: apps,
-                      onLaunch: widget.appRepository.launch,
-                      onRefresh: _refresh,
+                    return ListenableBuilder(
+                      listenable: widget.gridState,
+                      builder: (context, _) => PageView(
+                        controller: _pageController,
+                        children: <Widget>[
+                          _HomePage(
+                            apps: _pinnedApps(apps),
+                            onLaunch: widget.appRepository.launch,
+                            onRefresh: _refresh,
+                          ),
+                          AppDrawer(
+                            apps: apps,
+                            gridState: widget.gridState,
+                            onLaunch: widget.appRepository.launch,
+                            onOpenDetails: widget.appRepository.openAppDetails,
+                            onUninstall: widget.appRepository.uninstall,
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -71,6 +111,43 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HomePage extends StatelessWidget {
+  const _HomePage({
+    required this.apps,
+    required this.onLaunch,
+    required this.onRefresh,
+  });
+
+  final List<AppInfo> apps;
+  final ValueChanged<String> onLaunch;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        AppTileGrid(
+          apps: apps,
+          emptyMessage: Messages.nothingPinned,
+          onLaunch: onLaunch,
+          onRefresh: onRefresh,
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: TileMetrics.gutter,
+          child: Center(
+            child: Text(
+              Messages.swipeForAllApps,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

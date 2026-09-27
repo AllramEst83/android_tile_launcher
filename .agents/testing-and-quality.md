@@ -25,6 +25,7 @@ For UI/launcher behavior, also verify on a device or emulator with `flutter run`
 - Write the failing test first for bugs; add a regression test with every fix.
 - Tests must be deterministic: no wall-clock, network, or randomness without injection.
 - Online features (once there are any) are tested with a fake fetcher and real responses saved in `test/fixtures/`. Never hit a live API from a committed test.
+- `PageView`'s off-screen pages are still built (not lazily skipped), so a bare `find.text(...)` in `home_shell_test.dart` can match the same string in both the home grid and the drawer at once. Scope with `find.descendant(of: find.byType(AppTileGrid)/AppDrawer, matching: ...)` rather than asserting on the raw finder.
 
 ## Review checklist
 - [ ] No logic in widgets; packing and matching live in `model/`

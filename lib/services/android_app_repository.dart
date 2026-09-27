@@ -46,9 +46,22 @@ class AndroidAppRepository implements AppRepository {
   }
 
   @override
-  Future<bool> launch(String packageName) async {
+  Future<bool> launch(String packageName) => _invokeBool('launch', packageName);
+
+  @override
+  Future<bool> uninstall(String packageName) =>
+      _invokeBool('uninstall', packageName);
+
+  @override
+  Future<bool> openAppDetails(String packageName) =>
+      _invokeBool('openAppDetails', packageName);
+
+  /// Expected failures (no launch intent, dialog refused, no settings screen
+  /// for that package) are a `false`, not an exception, so the UI can show
+  /// them plainly instead of crashing.
+  Future<bool> _invokeBool(String method, String packageName) async {
     try {
-      final bool? result = await _channel.invokeMethod<bool>('launch', {
+      final bool? result = await _channel.invokeMethod<bool>(method, {
         'packageName': packageName,
       });
       return result ?? false;

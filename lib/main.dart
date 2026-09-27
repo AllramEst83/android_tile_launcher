@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'app.dart';
 import 'services/android_app_repository.dart';
+import 'services/grid_state.dart';
 import 'ui/theme.dart';
 
 const String _ownPackage = 'com.codedbykay.android_tile_launcher';
@@ -23,6 +24,7 @@ void main() {
   runApp(
     TileLauncherApp(
       appRepository: AndroidAppRepository(ownPackage: _ownPackage),
+      gridState: GridState(),
     ),
   );
 }

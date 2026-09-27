@@ -31,8 +31,10 @@ Application id: `com.codedbykay.android_tile_launcher`.
 - List **launchable** apps only (have a launch intent / `CATEGORY_LAUNCHER` activity), exclude this app itself, sort case-insensitively by label.
 
 ## Permissions
-The manifest declares none yet. Add each one only when the feature that needs it lands, with a comment saying which feature, and ask for the dangerous ones at runtime through a `PermissionService` (the sibling repo's `PermissionsChannelHandler` is a working pattern to copy).
-Expected as tiles arrive: `INTERNET` (weather), `ACCESS_COARSE_LOCATION` (weather here), `READ_CALENDAR` (the agenda tile), `READ_CONTACTS`/`CALL_PHONE`/`SEND_SMS` (people tiles), `REQUEST_DELETE_PACKAGES` (uninstall from the drawer), `SET_ALARM` (a timer tile).
+Add each one only when the feature that needs it lands, with a comment saying which feature, and ask for the dangerous ones at runtime through a `PermissionService` (the sibling repo's `PermissionsChannelHandler` is a working pattern to copy).
+- `REQUEST_DELETE_PACKAGES` (normal permission, API 28+, declared): the drawer's "Uninstall" quick action opens Android's own uninstall dialog (`ACTION_DELETE`) via `AppsChannelHandler.uninstall`; `true` only means the dialog opened, not that anything was removed.
+- Opening Android's "App info" screen (`Settings.ACTION_APPLICATION_DETAILS_SETTINGS`, `AppsChannelHandler.openAppDetails`) needs no permission — it's an ordinary `startActivity`.
+- Still expected as tiles arrive: `INTERNET` (weather), `ACCESS_COARSE_LOCATION` (weather here), `READ_CALENDAR` (the agenda tile), `READ_CONTACTS`/`CALL_PHONE`/`SEND_SMS` (people tiles), `SET_ALARM` (a timer tile).
 
 ## Package choice
 - `device_apps` (the obvious search result) is **discontinued** (last release 2021) and unsafe on modern AGP/Kotlin. Do not use it.

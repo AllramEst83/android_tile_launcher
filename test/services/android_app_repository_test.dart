@@ -132,4 +132,50 @@ void main() {
 
     expect(await repository().launch('pkg.clock'), isFalse);
   });
+
+  test('uninstall sends the package name on its own method', () async {
+    MethodCall? received;
+    _mockChannel((call) async {
+      received = call;
+      return true;
+    });
+
+    final started = await repository().uninstall('pkg.clock');
+
+    expect(started, isTrue);
+    expect(received?.method, 'uninstall');
+    expect(received?.arguments, {'packageName': 'pkg.clock'});
+  });
+
+  test(
+    'uninstall returns false instead of throwing on platform errors',
+    () async {
+      _mockChannel((call) async => throw PlatformException(code: 'BOOM'));
+
+      expect(await repository().uninstall('pkg.clock'), isFalse);
+    },
+  );
+
+  test('openAppDetails sends the package name on its own method', () async {
+    MethodCall? received;
+    _mockChannel((call) async {
+      received = call;
+      return true;
+    });
+
+    final opened = await repository().openAppDetails('pkg.clock');
+
+    expect(opened, isTrue);
+    expect(received?.method, 'openAppDetails');
+    expect(received?.arguments, {'packageName': 'pkg.clock'});
+  });
+
+  test(
+    'openAppDetails returns false instead of throwing on platform errors',
+    () async {
+      _mockChannel((call) async => throw PlatformException(code: 'BOOM'));
+
+      expect(await repository().openAppDetails('pkg.clock'), isFalse);
+    },
+  );
 }

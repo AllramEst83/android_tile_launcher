@@ -5,15 +5,25 @@ class FakeAppRepository implements AppRepository {
   FakeAppRepository({
     this.apps = const [],
     this.launchSucceeds = true,
+    this.uninstallSucceeds = true,
+    this.openAppDetailsSucceeds = true,
     this.listError,
   });
 
   List<AppInfo> apps;
   bool launchSucceeds;
+  bool uninstallSucceeds;
+  bool openAppDetailsSucceeds;
   Object? listError;
 
   /// Package names passed to [launch], in call order.
   final List<String> launched = [];
+
+  /// Package names passed to [uninstall], in call order.
+  final List<String> uninstalled = [];
+
+  /// Package names passed to [openAppDetails], in call order.
+  final List<String> detailsOpened = [];
   int listCalls = 0;
 
   /// How many of the [listApps] calls asked for a refresh.
@@ -32,5 +42,17 @@ class FakeAppRepository implements AppRepository {
   Future<bool> launch(String packageName) async {
     launched.add(packageName);
     return launchSucceeds;
+  }
+
+  @override
+  Future<bool> uninstall(String packageName) async {
+    uninstalled.add(packageName);
+    return uninstallSucceeds;
+  }
+
+  @override
+  Future<bool> openAppDetails(String packageName) async {
+    detailsOpened.add(packageName);
+    return openAppDetailsSucceeds;
   }
 }

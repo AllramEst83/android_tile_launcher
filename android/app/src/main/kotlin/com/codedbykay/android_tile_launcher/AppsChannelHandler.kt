@@ -4,9 +4,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -36,6 +38,9 @@ class AppsChannelHandler(
         when (call.method) {
             "listApps" -> listApps(result)
             "launch" -> launch(call.argument<String>("packageName"), result)
+            "uninstall" -> uninstall(call.argument<String>("packageName"), result)
+            "openAppDetails" ->
+                openAppDetails(call.argument<String>("packageName"), result)
             else -> result.notImplemented()
         }
     }
@@ -85,6 +90,43 @@ class AppsChannelHandler(
             return
         }
         try {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.success(false)
+        }
+    }
+
+    // Android only allows uninstalling through its own confirmation dialog, so
+    // `true` means the dialog was shown, not that anything was removed. Needs
+    // REQUEST_DELETE_PACKAGES in the manifest.
+    private fun uninstall(packageName: String?, result: MethodChannel.Result) {
+        if (packageName == null) {
+            result.success(false)
+            return
+        }
+        try {
+            val intent = Intent(Intent.ACTION_DELETE, Uri.fromParts("package", packageName, null))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.success(false)
+        }
+    }
+
+    private fun openAppDetails(packageName: String?, result: MethodChannel.Result) {
+        if (packageName == null) {
+            result.success(false)
+            return
+        }
+        try {
+            val intent =
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", packageName, null),
+                )
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
             result.success(true)
