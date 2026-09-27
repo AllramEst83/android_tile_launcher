@@ -1,16 +1,20 @@
 # Android launcher specifics
 
 Paths are relative to the repo root, which is the Flutter project.
-Application id: `com.codedbykay.android_terminal_launcher`.
+Application id: `com.codedbykay.android_tile_launcher`.
 
 ## Becoming a launcher
 - `android/app/src/main/AndroidManifest.xml` main activity needs an intent filter with `MAIN` + `HOME` + `DEFAULT` (already present). This is what makes it appear in Settings → Default apps → Home app.
 - It also has a separate `MAIN` + `LAUNCHER` filter, on purpose: it gives the app a normal drawer icon and lets `flutter run` find and start it. Because of it, this app shows up in its own app listing, so the app repository must exclude our own package.
-- Use `android:launchMode="singleTask"` (template default is `singleTop`) so pressing Home returns to the existing instance instead of stacking new ones.
-- Override back handling: a launcher must not exit on back. Use `PopScope(canPop: false)` on the terminal screen.
-- Handle `AppLifecycleState.resumed`: re-request input focus and optionally refresh the app list.
-- Home key press while already open arrives as a new intent; make sure state (log) is preserved and the input is refocused.
+- `android:launchMode="singleTask"` (the template default is `singleTop`) so pressing Home returns to the existing instance instead of stacking new ones.
+- Override back handling: a launcher must not exit on back. `PopScope(canPop: false)` wraps the shell (`lib/ui/home_shell.dart`), and a test asserts it.
+- Handle `AppLifecycleState.resumed`: refresh what tiles show, and stop their timers while paused.
+- Home key press while already open arrives as a new intent; make sure state (scroll position, grid) is preserved.
 - Test the launcher role early on a real device: Settings → Default apps → Home app.
+
+## No white flash on start
+- `values/styles.xml` **and** `values-night/styles.xml` both use `@android:style/Theme.Black.NoTitleBar`: the launcher's look does not follow the OS dark-mode setting.
+- `NormalTheme`'s window background and `drawable*/launch_background.xml` are both `@color/launch_canvas` (`values/colors.xml`), which duplicates `TileColors.canvas` in `lib/ui/theme.dart`. Change the two together or the window will show through in the wrong colour.
 
 ## Listing installed apps (package visibility)
 - Since Android 11 (API 30), apps only see packages they declare. For a launcher the right, minimal approach is a `<queries>` block:
@@ -22,46 +26,42 @@ Application id: `com.codedbykay.android_terminal_launcher`.
       </intent>
   </queries>
   ```
-  Keep the existing `PROCESS_TEXT` query the template added.
-- `INTERNET` is declared for Text TV, weather, currency rates and `mail` (a normal permission, granted at install). Everything uses HTTPS or TLS (IMAP on 993), so no cleartext-traffic exception is needed; keep it that way. The debug and profile manifests also declare it, which is why network code can work in `flutter run` and still fail in a release build if the main manifest lacks it.
-- `com.android.alarm.permission.SET_ALARM` (normal permission, granted at install) is declared for `timer` and `alarm`, which ask the phone's clock app through the `AlarmClock` intents (`ClockChannelHandler.kt`, with `EXTRA_SKIP_UI` so nothing opens). No exact-alarm permission, notification permission or boot receiver is needed because nothing in this app schedules anything: the clock app rings, vibrates and survives reboot and doze. The price: this app can set alarms and open the clock app's lists, not read or cancel them. Opening the lists needs no permission. A missing clock app is `ActivityNotFoundException` (`NO_APP`), never a crash.
-- `REQUEST_DELETE_PACKAGES` (normal permission, API 28+) is declared for the `uninstall` command. Android only lets an app open its own uninstall dialog via `ACTION_DELETE`; the app can never remove another app silently, and cannot tell whether the user confirmed.
-- `QUERY_ALL_PACKAGES` is only needed if you must see non-launchable packages. It is a Play-restricted permission; don't add it unless a feature requires it, and document why.
+  It is already there. Keep the `PROCESS_TEXT` query the template added.
+- `QUERY_ALL_PACKAGES` is only needed to see non-launchable packages. It is a Play-restricted permission; don't add it unless a feature requires it, and document why.
 - List **launchable** apps only (have a launch intent / `CATEGORY_LAUNCHER` activity), exclude this app itself, sort case-insensitively by label.
 
+## Permissions
+The manifest declares none yet. Add each one only when the feature that needs it lands, with a comment saying which feature, and ask for the dangerous ones at runtime through a `PermissionService` (the sibling repo's `PermissionsChannelHandler` is a working pattern to copy).
+Expected as tiles arrive: `INTERNET` (weather), `ACCESS_COARSE_LOCATION` (weather here), `READ_CALENDAR` (the agenda tile), `READ_CONTACTS`/`CALL_PHONE`/`SEND_SMS` (people tiles), `REQUEST_DELETE_PACKAGES` (uninstall from the drawer), `SET_ALARM` (a timer tile).
+
 ## Package choice
-- `device_apps` (named in the original plan) is **discontinued** (last release 2021) and unsafe on modern AGP/Kotlin. Do not use it.
-- Preferred: a small custom `MethodChannel` in `MainActivity.kt` using `PackageManager.queryIntentActivities` + `getLaunchIntentForPackage`. It's ~60 lines, has no dependency risk, and can later serve battery/time/etc. commands.
-- Acceptable alternative: `installed_apps` (maintained, `getInstalledApps` + `startApp`) if speed matters more than control.
+- `device_apps` (the obvious search result) is **discontinued** (last release 2021) and unsafe on modern AGP/Kotlin. Do not use it.
+- Preferred: a small custom `MethodChannel` in `MainActivity.kt` using `PackageManager.queryIntentActivities` + `getLaunchIntentForPackage`. It's ~60 lines, has no dependency risk, and can later serve battery/notification/etc. tiles.
+- Acceptable alternative: `installed_apps` (maintained) if speed matters more than control.
 - Either way it lives behind `AppRepository` (see [architecture.md](architecture.md)).
 
 ## Platform channel rules
-- Channel name: `com.codedbykay.android_terminal_launcher/apps` (namespaced).
+- Channel name: `com.codedbykay.android_tile_launcher/apps` (namespaced).
 - Do work off the main thread for large queries; reply on the main thread.
 - Return plain serializable data (`List<Map<String, Object?>>`), map it to Dart models in the repository. Handle `PlatformException` there and convert to domain errors.
-- Never crash on a missing package/launch intent; return a failure the command can print.
+- Never crash on a missing package/launch intent; return a failure the tile can show.
+
+## App icons on tiles
+A tile showing a real app icon needs the icon as bytes over the channel (`PackageManager.getApplicationIcon` → PNG). That is expensive per app: fetch lazily, cache by package name, and never do it during a scroll frame. A monochrome geometric glyph (the Commodore look) avoids the problem entirely and is the default; real icons are opt-in.
 
 ## Build config
-- `minSdk`: Flutter's default is fine. The original plan's "min SDK 21 for `QUERY_ALL_PACKAGES`" is not a requirement (that permission is API 30 and simply ignored on older versions).
-- Full-screen/immersive look: use `SystemChrome.setEnabledSystemUIMode` and set status/navigation bar colors to black to match the theme; respect insets.
-- Keep the launch theme (`styles.xml`, `values-night/styles.xml`) dark/black so there's no white flash on start.
+- `minSdk`: Flutter's default is fine.
+- Full-screen look: `SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)` is set in `main.dart`; respect insets with `SafeArea`.
 - Release builds: signing config and R8 are out of scope until the MVP works on a device.
 
 ## Device workflow
 - `flutter devices`, `flutter run -d <id>` (real phone preferred over emulator).
-- To reset the default launcher during testing: Settings → Apps → Default apps → Home app, choose the stock launcher.
-- `adb logcat -s flutter` for logs. Keep a way back to the stock launcher before testing risky changes.
-
-## Runtime permissions
-- Declared in the manifest **and** asked for at runtime through `PermissionService` / `PermissionsChannelHandler` (channel `.../permissions`). Current: `ACCESS_COARSE_LOCATION` for `weather`, `READ_CALENDAR` for `cal`, `READ_CONTACTS` for `contact`/`call`, `CALL_PHONE` for `call` (optional: without it the dialer opens), `SEND_SMS` for `sms` (no fallback). Precise location is deliberately not declared.
-- Add a capability: enum value in `lib/services/permission_service.dart`, a row in `PermissionsChannelHandler.PERMISSIONS`, the `<uses-permission>` line. Dart never sees the Android string.
-- The handler needs the *activity* (dialogs), so it is built with `this` in `MainActivity` and gets `onRequestPermissionsResult` forwarded. Other handlers keep using `applicationContext`.
-- Since Android 11 a second refusal stops the dialog appearing; that is reported as `permanentlyDenied` and the command tells the user to use Settings → Apps → this app → Permissions.
-- Test on a device: the emulator/CI can't show the dialog, and channel handlers are only compiled, not run, by `flutter test`.
-- Kotlin is not compiled by `flutter test` or `flutter analyze`; run `flutter build apk --debug` after touching `android/`. (A Kotlin class such as `ContactsContract.CommonDataKinds.Phone` cannot be assigned to a variable; import it.)
-
-## App icon
-Adaptive (Android 8+): `mipmap-anydpi-v26/ic_launcher.xml` = colour `ic_launcher_background` (`values/ic_launcher_background.xml`) + `mipmap-*/ic_launcher_foreground.png`; older Android uses the plain `mipmap-*/ic_launcher.png`. All generated by `tool/make_app_icon.py` from `icons/terminal_app_icon.jpg`; don't edit the PNGs by hand.
+- To reset the default launcher during testing: Settings → Apps → Default apps → Home app, choose the stock launcher. **Keep a way back to the stock launcher before testing risky changes.**
+- `adb logcat -s flutter` for logs.
+- Kotlin and the manifest are not compiled by `flutter test` or `flutter analyze`; run `flutter build apk --debug` after touching `android/`.
 
 ## App name
-The name Android shows (app list, Home-app chooser) is the string resource `app_name` in `android/app/src/main/res/values/strings.xml`, referenced by `android:label` in the manifest. Change it there, not in the manifest. The Dart package name and the application id stay as they are.
+The name Android shows (app list, Home-app chooser) is the string resource `app_name` in `android/app/src/main/res/values/strings.xml` (`Tile Launcher`), referenced by `android:label` in the manifest. Change it there, not in the manifest. The Dart package name (`android_tile_launcher`) and the application id stay as they are.
+
+## App icon
+Still the Flutter template's icon. Replacing it means an adaptive icon (`mipmap-anydpi-v26/ic_launcher.xml` = a colour background + a foreground PNG) plus the plain `mipmap-*/ic_launcher.png` for older Android. The sibling repo generates all of them with a script (`tool/make_app_icon.py`) rather than editing PNGs by hand; do the same here.

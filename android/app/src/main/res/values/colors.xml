@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The C64 screen blue the Flutter canvas paints, so the window behind it
+         matches and the launcher never flashes a different colour on start.
+         Keep in step with TileColors.canvas in lib/ui/theme.dart. -->
+    <color name="launch_canvas">#FF2E2C9B</color>
+</resources>

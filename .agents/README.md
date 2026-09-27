@@ -6,14 +6,15 @@ Entry points: [`../AGENTS.md`](../AGENTS.md) and [`../CLAUDE.md`](../CLAUDE.md) 
 | File | Read it when |
 |---|---|
 | [flutter-best-practices.md](flutter-best-practices.md) | Writing or reviewing any Dart/Flutter code |
-| [architecture.md](architecture.md) | Adding a feature, command, or service; deciding where code lives |
+| [architecture.md](architecture.md) | Adding a tile kind, screen, or service; deciding where code lives |
 | [android-launcher.md](android-launcher.md) | Touching the manifest, Kotlin, permissions, or app listing/launching |
 | [testing-and-quality.md](testing-and-quality.md) | Writing tests, running checks, before declaring work done |
-| [archive/](archive/plan-through-phase-9.3.md) | You want the *why* behind an old decision: the full plan and dated changelog of Phases 0–9.3. History, not instructions |
+
+The sibling repo `../../android_terminal_launcher` is the same author's other launcher and the source of these conventions. Its solutions are worth reading before inventing one, but it is a **separate product**: nothing transfers automatically.
 
 ## Precedence
 1. Direct user instructions.
-2. `../plan.md` (what is left to build, in what order, and what was left out). Agents may improve it as they go; note changes in its changelog, and archive it again once most of it is done.
+2. `../plan.md` (what is left to build, in what order, and what was left out). Agents may improve it as they go; note changes in its changelog, and archive it into `archive/` once most of it is done.
 3. These guides.
 4. Flutter/Dart defaults.
 
