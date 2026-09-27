@@ -223,7 +223,7 @@ class _HomePageState extends State<_HomePage> {
       final PinnedTile? selectedTile = _find(scratch, _selected);
       return Column(
         children: <Widget>[
-          _EditorBar(onCancel: _cancelEditing, onApply: _applyEditing),
+          _EditorBar(onCancel: _cancelEditing),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(TileMetrics.margin),
@@ -237,13 +237,15 @@ class _HomePageState extends State<_HomePage> {
               ),
             ),
           ),
-          if (selectedTile != null)
-            TileInspector(
-              label: widget.labelFor(selectedTile.packageName),
-              tile: selectedTile,
-              onSizeSelected: _resize,
-              onColourSelected: _recolor,
-            ),
+          TileInspector(
+            label: selectedTile == null
+                ? ''
+                : widget.labelFor(selectedTile.packageName),
+            tile: selectedTile,
+            onApply: _applyEditing,
+            onSizeSelected: _resize,
+            onColourSelected: _recolor,
+          ),
         ],
       );
     }
@@ -275,10 +277,9 @@ class _HomePageState extends State<_HomePage> {
 }
 
 class _EditorBar extends StatelessWidget {
-  const _EditorBar({required this.onCancel, required this.onApply});
+  const _EditorBar({required this.onCancel});
 
   final VoidCallback onCancel;
-  final VoidCallback onApply;
 
   @override
   Widget build(BuildContext context) {
@@ -289,15 +290,10 @@ class _EditorBar extends StatelessWidget {
         vertical: TileMetrics.gutter,
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
           InkWell(
             onTap: onCancel,
             child: Text(Messages.cancel, style: style),
-          ),
-          InkWell(
-            onTap: onApply,
-            child: Text(Messages.apply, style: style),
           ),
         ],
       ),

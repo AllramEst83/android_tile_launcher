@@ -5,26 +5,30 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
-/// The panel below the canvas while a tile is selected in the grid editor:
-/// its label, the four geometries, and a swatch for every colour a tile may
-/// use ([pinnableColours]).
+/// The panel below the canvas in the grid editor. The label/Apply row is
+/// always there — deleting the selected tile must not strand Apply
+/// somewhere unreachable — with the size and colour pickers underneath only
+/// while a tile ([tile]) is actually selected.
 class TileInspector extends StatelessWidget {
   const TileInspector({
     super.key,
     required this.label,
     required this.tile,
+    required this.onApply,
     required this.onSizeSelected,
     required this.onColourSelected,
   });
 
   final String label;
-  final PinnedTile tile;
+  final PinnedTile? tile;
+  final VoidCallback onApply;
   final ValueChanged<TileSize> onSizeSelected;
   final ValueChanged<C64Colour> onColourSelected;
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
+    final PinnedTile? selected = tile;
     return DecoratedBox(
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: TileColors.bezel)),
@@ -35,39 +39,52 @@ class TileInspector extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text(label.toUpperCase(), style: text.bodyMedium),
-            const SizedBox(height: TileMetrics.gutter * 2),
-            Text(Messages.tileSize, style: text.labelSmall),
-            const SizedBox(height: TileMetrics.gutter),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                for (final TileSize size in TileSize.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: TileMetrics.gutter),
-                    child: _SizeButton(
-                      size: size,
-                      selected: size == tile.size,
-                      onTap: () => onSizeSelected(size),
+                Expanded(
+                  child: Text(label.toUpperCase(), style: text.bodyMedium),
+                ),
+                InkWell(
+                  onTap: onApply,
+                  child: Text(Messages.apply, style: text.bodyMedium),
+                ),
+              ],
+            ),
+            if (selected != null) ...<Widget>[
+              const SizedBox(height: TileMetrics.gutter * 2),
+              Text(Messages.tileSize, style: text.labelSmall),
+              const SizedBox(height: TileMetrics.gutter),
+              Row(
+                children: <Widget>[
+                  for (final TileSize size in TileSize.values)
+                    Padding(
+                      padding: const EdgeInsets.only(right: TileMetrics.gutter),
+                      child: _SizeButton(
+                        size: size,
+                        selected: size == selected.size,
+                        onTap: () => onSizeSelected(size),
+                      ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: TileMetrics.gutter * 2),
-            Text(Messages.tileColour, style: text.labelSmall),
-            const SizedBox(height: TileMetrics.gutter),
-            Wrap(
-              spacing: TileMetrics.gutter,
-              runSpacing: TileMetrics.gutter,
-              children: <Widget>[
-                for (final C64Colour colour in pinnableColours)
-                  _ColourSwatch(
-                    key: ValueKey(colour),
-                    colour: colour,
-                    selected: colour == tile.colour,
-                    onTap: () => onColourSelected(colour),
-                  ),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: TileMetrics.gutter * 2),
+              Text(Messages.tileColour, style: text.labelSmall),
+              const SizedBox(height: TileMetrics.gutter),
+              Wrap(
+                spacing: TileMetrics.gutter,
+                runSpacing: TileMetrics.gutter,
+                children: <Widget>[
+                  for (final C64Colour colour in pinnableColours)
+                    _ColourSwatch(
+                      key: ValueKey(colour),
+                      colour: colour,
+                      selected: colour == selected.colour,
+                      onTap: () => onColourSelected(colour),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
