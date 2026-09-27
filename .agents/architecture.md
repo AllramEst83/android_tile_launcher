@@ -16,7 +16,8 @@ lib/
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # ordered tiles -> packed rows of the 4-column grid
     tile_content.dart        # what a tile shows now (sealed: text, metric, agenda, ...)
-    app_matcher.dart         # search and grouping for the drawer
+    alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets, shared by the app drawer (Phase 4) and the contacts tile (Phase 10)
+    app_matcher.dart         # app-specific search (label/package matching) for the drawer
   services/                  # abstractions over the platform
     app_info.dart            # AppInfo(label, packageName)
     app_repository.dart      # abstract: list launchable apps, launch(packageName)
@@ -72,3 +73,4 @@ Record decisions that future agents can't derive from code (append, newest last)
 - `AndroidAppRepository`'s `MethodChannel` is a named constructor parameter (`channel`), not `this._channel`: an initializing formal would make the parameter name the private `_channel`, which a test file (a different library) cannot pass by name. The `prefer_initializing_formals` lint is silenced at that line for this reason.
 - `AppRepository` has no `uninstall` method yet. It is added when the drawer's quick actions land (Phase 4) — permissions and interface methods are added when the feature that needs them lands, not ahead of time.
 - The boot screen (`_BootScreen` in `home_shell.dart`) doubles as the app list's loading and error state, rather than being a separate splash step. It is genuinely how the launcher starts every time: apps load, then the list (later the grid) replaces it.
+- Alphabetical grouping (A–Z, then Å Ä Ö) is a generic `groupByInitial<T>` in `model/alpha_grouping.dart`, keyed by a label extractor, not an app-specific function — the drawer (Phase 4) and the contacts tile (Phase 10) call the same code. Built when Phase 4 needs it, not before; the Swedish-collation-or-plain-A–Z choice is still an open question in plan.md.
