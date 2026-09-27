@@ -19,4 +19,9 @@ abstract final class Messages {
   static const String unpinFromGrid = 'UNPIN FROM GRID';
   static const String appDetails = 'APP DETAILS';
   static const String uninstall = 'UNINSTALL';
+
+  static const String cancel = 'CANCEL';
+  static const String apply = 'APPLY';
+  static const String tileSize = 'SIZE';
+  static const String tileColour = 'COLOUR';
 }

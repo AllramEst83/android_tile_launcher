@@ -1,0 +1,42 @@
+import 'package:android_tile_launcher/model/list_reorder.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('moveItem', () {
+    test(
+      'moving forward: the target keeps its slot, the item lands before it',
+      () {
+        final result = moveItem(['A', 'B', 'C', 'D'], from: 0, to: 2);
+
+        expect(result, ['B', 'A', 'C', 'D']);
+      },
+    );
+
+    test('moving backward: the item takes the target\'s old slot', () {
+      final result = moveItem(['A', 'B', 'C', 'D'], from: 3, to: 1);
+
+      expect(result, ['A', 'D', 'B', 'C']);
+    });
+
+    test('moving to the same index changes nothing', () {
+      final items = ['A', 'B', 'C'];
+
+      expect(identical(moveItem(items, from: 1, to: 1), items), isTrue);
+    });
+
+    test('an out-of-range index changes nothing', () {
+      final items = ['A', 'B', 'C'];
+
+      expect(moveItem(items, from: -1, to: 1), items);
+      expect(moveItem(items, from: 0, to: 5), items);
+    });
+
+    test('does not mutate the input list', () {
+      final items = ['A', 'B', 'C'];
+
+      moveItem(items, from: 0, to: 2);
+
+      expect(items, ['A', 'B', 'C']);
+    });
+  });
+}

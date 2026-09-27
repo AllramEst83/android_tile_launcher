@@ -16,7 +16,8 @@ lib/
     tile.dart                # Tile: id, kind, size, colour, appPackage; TileKind (one value so far: app)
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
-    default_tiles.dart       # tilesForApps: turns pinned AppInfo into small tiles, cycling the fill palette
+    pinned_tile.dart         # PinnedTile: packageName + size + colour, JSON (de)serialisable; pinnableColours, the fill cycle
+    list_reorder.dart        # moveItem<T>: pure ReorderableListView-style index move, for drag-to-reorder
     tile_content.dart        # what a live tile shows now (sealed: text, metric, agenda, ...)  (planned, Phase 7)
     alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets (Swedish order); shared by the app drawer and the contacts tile (Phase 10)
     app_matcher.dart         # rankApps: best-match-first search ranking, for the drawer's search field
@@ -25,7 +26,7 @@ lib/
     app_repository.dart      # abstract: list/launch/uninstall/openAppDetails
     app_repository_exception.dart
     android_app_repository.dart  # MethodChannel implementation; caches, sorts, excludes self
-    grid_state.dart          # ChangeNotifier: which packages are pinned to home, in pin order; persisted via LocalStore
+    grid_state.dart          # ChangeNotifier: pinned PinnedTiles, in pin order; pin/unpin/toggle/replaceAll, persisted via LocalStore
     local_store.dart         # abstract: read/write JSON values by key
     local_store_exception.dart
     shared_preferences_local_store.dart  # LocalStore on shared_preferences, one JSON string per key
@@ -33,9 +34,11 @@ lib/
   ui/
     theme.dart               # VIC-II palette, ThemeData, grid metrics, C64Colour -> (fill, ink)
     home_shell.dart          # the launcher shell: PopScope, boot/loading/error state, the PageView (home, drawer)
-    app_tile_grid.dart       # apps -> default tiles -> packed layout; caller-supplied empty state; pull-to-refresh
-    tile_grid.dart           # renders a packed layout Positioned by cell size; never packs itself
-    tile_view.dart           # one tile: VIC-II fill, 2px bevel, glyph, bottom-left label
+    app_tile_grid.dart       # tiles -> packed layout; caller-supplied empty state; pull-to-refresh; long-press to edit
+    tile_grid.dart           # layoutTiles/gridHeight (shared pixel math) + renders a packed layout; never packs itself
+    tile_view.dart           # one tile: VIC-II fill, 2px bevel (or a bright outline if selected), glyph, bottom-left label, an optional delete badge
+    editable_tile_grid.dart  # the grid editor's canvas: Draggable/DragTarget per tile, tap to select, delete badge
+    tile_inspector.dart      # the editor's panel for the selected tile: size buttons, colour swatches
     app_drawer.dart          # All Apps: alphabetical + jump index, or a ranked flat list while searching
     quick_actions_sheet.dart # long-press sheet: pin/unpin, app details, uninstall
 android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
@@ -92,3 +95,9 @@ Record decisions that future agents can't derive from code (append, newest last)
 - The drawer's search field shows a flat list ranked best-match-first (`rankApps`), not the alphabetical grouping, while there is a query: ranking and alphabetising are different orders, and grouping search hits by initial would bury the best match wherever its letter happens to sort.
 - The jump index scrolls with `Scrollable.ensureVisible` on a `GlobalKey` per section header, not a hand-computed pixel offset: it is correct regardless of how tall a header or row actually renders, at the cost of nothing extra to maintain.
 - Tapping "Uninstall" in the quick-actions sheet calls `AppRepository.uninstall` directly, with no extra in-app confirmation: `uninstall` only ever opens Android's own uninstall dialog (`ACTION_DELETE`), which is itself the confirmation.
+- `default_tiles.dart`/`tilesForApps` (Phase 3's placeholder, cycling colour by index on every render) is retired. `GridState` now stores a `PinnedTile` — packageName, size, colour — per pinned app; `PinnedTile.withDefaults` runs the same cycling logic exactly once, at pin time, so a tile's size/colour is a real user-changeable fact instead of being re-derived from list position on every rebuild.
+- The grid editor (long-press a home tile) stages every change — reorder, resize, recolour, delete — on a local scratch `List<PinnedTile>` inside `_HomePageState`, never touching `GridState` until "Apply" calls `GridState.replaceAll`. "Cancel" just discards the scratch copy. This is what makes Apply/Cancel possible without `GridState` needing any notion of a pending transaction.
+- Reordering is drag-a-tile-onto-another, not a `ReorderableListView` (which only handles linear lists): each tile is both a `Draggable<String>` (its package name) and a `DragTarget<String>`, and dropping one onto another calls the pure `moveItem` with their scratch-list indices. `Draggable.feedback` renders in the root `Overlay`, outside this tree's `Material` ancestor, so it's wrapped in its own `Material(type: MaterialType.transparency)` — otherwise `TileView`'s `InkWell` throws "No Material widget found" the moment a drag starts.
+- Long-pressing empty canvas space does *not* enter the editor, only long-pressing an existing tile does (which also selects it, matching the Stitch mockup's flow) — simpler than wiring a second gesture target, and there is nothing to edit on a grid with zero tiles anyway. Likewise, back-press does not cancel an in-progress edit (only the explicit Cancel button does): wiring that through `PopScope`, which lives two widgets up in `HomeShell`, was judged not worth it for this phase.
+- `_HomePageState`'s scratch copy does not defend against `GridState` changing underneath it while editing (e.g. pinning something from the drawer via the same `PageView`, mid-edit, by swiping without applying/cancelling first). Accepted as a rare-enough edge case rather than lifting edit state up to disable `PageView` swiping.
+- `Positioned`'s `key: ValueKey(tile.id)` belongs on the `Positioned` itself (the direct child of `Stack`), not nested one level down on the `TileView` inside it — only a multi-child widget's *direct* children are matched by key across rebuilds. This only started to matter once tile order could change at runtime (drag-to-reorder); `tile_grid.dart` and `editable_tile_grid.dart` both key the `Positioned`.

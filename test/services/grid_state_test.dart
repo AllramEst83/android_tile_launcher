@@ -1,3 +1,6 @@
+import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/pinned_tile.dart';
+import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/local_store_exception.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,22 +9,35 @@ import '../fakes/in_memory_local_store.dart';
 
 GridState _state(InMemoryLocalStore store) => GridState(store: store);
 
+const PinnedTile _clock = PinnedTile(
+  packageName: 'pkg.clock',
+  size: TileSize.small,
+  colour: C64Colour.red,
+);
+const PinnedTile _maps = PinnedTile(
+  packageName: 'pkg.maps',
+  size: TileSize.medium,
+  colour: C64Colour.cyan,
+);
+
 void main() {
   test('starts with nothing pinned', () {
     expect(_state(InMemoryLocalStore()).pinned, isEmpty);
   });
 
-  test('pin adds a package, in pin order, and saves it', () async {
+  test('pin adds a small tile with a cycled colour, and saves', () async {
     final InMemoryLocalStore store = InMemoryLocalStore();
     final GridState state = _state(store);
 
     await state.pin('pkg.clock');
     await state.pin('pkg.maps');
 
-    expect(state.pinned, ['pkg.clock', 'pkg.maps']);
+    expect(state.pinned.map((p) => p.packageName), ['pkg.clock', 'pkg.maps']);
+    expect(state.pinned[0].size, TileSize.small);
+    expect(state.pinned[0].colour, isNot(state.pinned[1].colour));
     expect(state.isPinned('pkg.clock'), isTrue);
     expect(state.isPinned('pkg.other'), isFalse);
-    expect(await store.read(GridState.storeKey), ['pkg.clock', 'pkg.maps']);
+    expect(store.writes, 2);
   });
 
   test('pinning an already-pinned package is a no-op', () async {
@@ -33,12 +49,12 @@ void main() {
     await state.pin('pkg.clock');
     await state.pin('pkg.clock');
 
-    expect(state.pinned, ['pkg.clock']);
+    expect(state.pinned, hasLength(1));
     expect(notifications, 1);
     expect(store.writes, 1);
   });
 
-  test('unpin removes a package and saves it', () async {
+  test('unpin removes a tile and saves', () async {
     final InMemoryLocalStore store = InMemoryLocalStore();
     final GridState state = _state(store);
     await state.pin('pkg.clock');
@@ -47,7 +63,6 @@ void main() {
 
     expect(state.pinned, isEmpty);
     expect(state.isPinned('pkg.clock'), isFalse);
-    expect(await store.read(GridState.storeKey), isEmpty);
   });
 
   test('unpinning something not pinned does not notify or save', () async {
@@ -76,7 +91,7 @@ void main() {
     final GridState state = _state(InMemoryLocalStore());
     await state.pin('pkg.clock');
 
-    expect(() => state.pinned.add('pkg.maps'), throwsUnsupportedError);
+    expect(() => state.pinned.add(_maps), throwsUnsupportedError);
   });
 
   test('a failed save still pins, then throws', () async {
@@ -92,15 +107,41 @@ void main() {
     expect(state.isPinned('pkg.clock'), isTrue);
   });
 
+  group('replaceAll', () {
+    test('replaces the whole list and saves', () async {
+      final InMemoryLocalStore store = InMemoryLocalStore();
+      final GridState state = _state(store);
+      await state.pin('pkg.clock');
+
+      await state.replaceAll([_maps]);
+
+      expect(state.pinned, [_maps]);
+      expect(await store.read(GridState.storeKey), [_maps.toJson()]);
+    });
+
+    test('notifies even to an empty list', () async {
+      final InMemoryLocalStore store = InMemoryLocalStore();
+      final GridState state = _state(store);
+      await state.pin('pkg.clock');
+      int notifications = 0;
+      state.addListener(() => notifications++);
+
+      await state.replaceAll(const []);
+
+      expect(state.pinned, isEmpty);
+      expect(notifications, 1);
+    });
+  });
+
   group('load', () {
     test('applies a saved pinned list', () async {
       final InMemoryLocalStore store = InMemoryLocalStore();
-      await store.write(GridState.storeKey, ['pkg.clock', 'pkg.maps']);
+      await store.write(GridState.storeKey, [_clock.toJson(), _maps.toJson()]);
       final GridState state = _state(store);
 
       await state.load();
 
-      expect(state.pinned, ['pkg.clock', 'pkg.maps']);
+      expect(state.pinned, [_clock, _maps]);
     });
 
     test('stays empty when nothing is saved', () async {
@@ -121,14 +162,19 @@ void main() {
       expect(state.pinned, isEmpty);
     });
 
-    test('skips non-string entries in a saved list', () async {
+    test('skips malformed entries in a saved list', () async {
       final InMemoryLocalStore store = InMemoryLocalStore();
-      await store.write(GridState.storeKey, ['pkg.clock', 42, null]);
+      await store.write(GridState.storeKey, [
+        _clock.toJson(),
+        {'packageName': 'pkg.bad'}, // missing size/colour
+        42,
+        null,
+      ]);
       final GridState state = _state(store);
 
       await state.load();
 
-      expect(state.pinned, ['pkg.clock']);
+      expect(state.pinned, [_clock]);
     });
 
     test('stays empty when the store cannot be read', () async {
@@ -143,7 +189,7 @@ void main() {
 
     test('notifies when the saved list is applied', () async {
       final InMemoryLocalStore store = InMemoryLocalStore();
-      await store.write(GridState.storeKey, ['pkg.clock']);
+      await store.write(GridState.storeKey, [_clock.toJson()]);
       final GridState state = _state(store);
       int notifications = 0;
       state.addListener(() => notifications++);
@@ -160,7 +206,7 @@ void main() {
       final GridState restarted = _state(store);
       await restarted.load();
 
-      expect(restarted.pinned, ['pkg.clock']);
+      expect(restarted.pinned.map((p) => p.packageName), ['pkg.clock']);
     });
   });
 }

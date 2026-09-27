@@ -1,10 +1,19 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/messages.dart';
+import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/list_reorder.dart';
+import 'package:android_tile_launcher/model/pinned_tile.dart';
+import 'package:android_tile_launcher/model/tile.dart';
+import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
+import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/tile_inspector.dart';
 import 'package:flutter/material.dart';
 
 /// What Android shows when Home is pressed.
@@ -55,16 +64,6 @@ class _HomeShellState extends State<HomeShell> {
     await next.then((_) {}, onError: (_) {});
   }
 
-  List<AppInfo> _pinnedApps(List<AppInfo> apps) {
-    final Map<String, AppInfo> byPackage = <String, AppInfo>{
-      for (final AppInfo app in apps) app.packageName: app,
-    };
-    return <AppInfo>[
-      for (final String package in widget.gridState.pinned)
-        if (byPackage[package] case final AppInfo app) app,
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -84,13 +83,20 @@ class _HomeShellState extends State<HomeShell> {
                     }
                     final List<AppInfo>? apps = snapshot.data;
                     if (apps == null) return const _BootScreen();
+                    final Map<String, String> labelByPackage = <String, String>{
+                      for (final AppInfo app in apps)
+                        app.packageName: app.label,
+                    };
                     return ListenableBuilder(
                       listenable: widget.gridState,
                       builder: (context, _) => PageView(
                         controller: _pageController,
                         children: <Widget>[
                           _HomePage(
-                            apps: _pinnedApps(apps),
+                            pinned: widget.gridState.pinned,
+                            labelFor: (packageName) =>
+                                labelByPackage[packageName] ?? packageName,
+                            gridState: widget.gridState,
                             onLaunch: widget.appRepository.launch,
                             onRefresh: _refresh,
                           ),
@@ -115,26 +121,142 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-class _HomePage extends StatelessWidget {
+/// Home, or — while [_scratch] is non-null — the grid editor: long-press a
+/// tile to start, drag one onto another to reorder, tap one to select it for
+/// the inspector panel, delete with its badge. Changes only reach [GridState]
+/// on Apply; Cancel discards them.
+class _HomePage extends StatefulWidget {
   const _HomePage({
-    required this.apps,
+    required this.pinned,
+    required this.labelFor,
+    required this.gridState,
     required this.onLaunch,
     required this.onRefresh,
   });
 
-  final List<AppInfo> apps;
+  final List<PinnedTile> pinned;
+  final String Function(String packageName) labelFor;
+  final GridState gridState;
   final ValueChanged<String> onLaunch;
   final Future<void> Function() onRefresh;
 
   @override
+  State<_HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<_HomePage> {
+  List<PinnedTile>? _scratch;
+  String? _selected;
+
+  bool get _editing => _scratch != null;
+
+  void _startEditing(String packageName) {
+    setState(() {
+      _scratch = List<PinnedTile>.of(widget.pinned);
+      _selected = packageName;
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _scratch = null;
+      _selected = null;
+    });
+  }
+
+  void _applyEditing() {
+    final List<PinnedTile> result = _scratch!;
+    setState(() {
+      _scratch = null;
+      _selected = null;
+    });
+    // The pin/order/size/colour changes already show on screen; only the
+    // save to disk is still pending, and there is no error surface here for
+    // it to report through if it fails (see GridState's failure contract).
+    unawaited(widget.gridState.replaceAll(result));
+  }
+
+  void _select(String packageName) => setState(() => _selected = packageName);
+
+  void _delete(String packageName) => setState(() {
+    _scratch!.removeWhere((PinnedTile p) => p.packageName == packageName);
+    if (_selected == packageName) _selected = null;
+  });
+
+  void _reorder(String moving, String target) => setState(() {
+    final List<PinnedTile> scratch = _scratch!;
+    final int from = scratch.indexWhere(
+      (PinnedTile p) => p.packageName == moving,
+    );
+    final int to = scratch.indexWhere(
+      (PinnedTile p) => p.packageName == target,
+    );
+    if (from == -1 || to == -1) return;
+    _scratch = moveItem(scratch, from: from, to: to);
+  });
+
+  void _resize(TileSize size) => _updateSelected((p) => p.copyWith(size: size));
+
+  void _recolor(C64Colour colour) =>
+      _updateSelected((p) => p.copyWith(colour: colour));
+
+  void _updateSelected(PinnedTile Function(PinnedTile) update) => setState(() {
+    final List<PinnedTile> scratch = _scratch!;
+    final int i = scratch.indexWhere(
+      (PinnedTile p) => p.packageName == _selected,
+    );
+    if (i == -1) return;
+    scratch[i] = update(scratch[i]);
+  });
+
+  PinnedTile? _find(List<PinnedTile> tiles, String? packageName) {
+    for (final PinnedTile p in tiles) {
+      if (p.packageName == packageName) return p;
+    }
+    return null;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_editing) {
+      final List<PinnedTile> scratch = _scratch!;
+      final PinnedTile? selectedTile = _find(scratch, _selected);
+      return Column(
+        children: <Widget>[
+          _EditorBar(onCancel: _cancelEditing, onApply: _applyEditing),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(TileMetrics.margin),
+              child: EditableTileGrid(
+                tiles: scratch,
+                labelFor: widget.labelFor,
+                selected: _selected,
+                onSelect: _select,
+                onDelete: _delete,
+                onReorder: _reorder,
+              ),
+            ),
+          ),
+          if (selectedTile != null)
+            TileInspector(
+              label: widget.labelFor(selectedTile.packageName),
+              tile: selectedTile,
+              onSizeSelected: _resize,
+              onColourSelected: _recolor,
+            ),
+        ],
+      );
+    }
+
     return Stack(
       children: <Widget>[
         AppTileGrid(
-          apps: apps,
+          tiles: [for (final PinnedTile p in widget.pinned) p.toTile()],
+          labelFor: (Tile tile) => widget.labelFor(tile.appPackage),
           emptyMessage: Messages.nothingPinned,
-          onLaunch: onLaunch,
-          onRefresh: onRefresh,
+          onLaunch: widget.onLaunch,
+          onLongPress: _startEditing,
+          onRefresh: widget.onRefresh,
         ),
         Positioned(
           left: 0,
@@ -148,6 +270,37 @@ class _HomePage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EditorBar extends StatelessWidget {
+  const _EditorBar({required this.onCancel, required this.onApply});
+
+  final VoidCallback onCancel;
+  final VoidCallback onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextStyle? style = Theme.of(context).textTheme.bodyMedium;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: TileMetrics.margin,
+        vertical: TileMetrics.gutter,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          InkWell(
+            onTap: onCancel,
+            child: Text(Messages.cancel, style: style),
+          ),
+          InkWell(
+            onTap: onApply,
+            child: Text(Messages.apply, style: style),
+          ),
+        ],
+      ),
     );
   }
 }
