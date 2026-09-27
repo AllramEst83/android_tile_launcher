@@ -17,18 +17,23 @@ lib/
     tile_layout.dart         # ordered tiles -> packed rows of the 4-column grid
     tile_content.dart        # what a tile shows now (sealed: text, metric, agenda, ...)
     app_matcher.dart         # search and grouping for the drawer
-  services/                  # abstractions over the platform          (planned)
+  services/                  # abstractions over the platform
     app_info.dart            # AppInfo(label, packageName)
     app_repository.dart      # abstract: list launchable apps, launch(packageName)
+    app_repository_exception.dart
     android_app_repository.dart  # MethodChannel implementation; caches, sorts, excludes self
-    local_store.dart         # abstract: read/write JSON values by key
-    tile_source.dart         # abstract: a stream of TileContent for one tile kind
+    local_store.dart         # abstract: read/write JSON values by key      (planned)
+    tile_source.dart         # abstract: a stream of TileContent for one tile kind  (planned)
   ui/
     theme.dart               # VIC-II palette, ThemeData, grid metrics
-    home_shell.dart          # the launcher shell: PopScope, boot screen, later the grid
+    home_shell.dart          # the launcher shell: PopScope, boot/loading/error state
+    app_list_view.dart       # the plain scrolling list that proves the app channel (Phase 3 replaces its body with the grid)
     tile_grid.dart           # the mosaic                              (planned)
     tile_view.dart           # one tile, dispatched by kind            (planned)
     app_drawer.dart          # the alphabet list                       (planned)
+android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
+  MainActivity.kt            # wires channel handlers into the Flutter engine
+  AppsChannelHandler.kt      # list launchable apps, launch one; runs off the main thread
 test/  # mirrors lib/; fakes/ holds FakeAppRepository
 ```
 
@@ -64,3 +69,6 @@ Record decisions that future agents can't derive from code (append, newest last)
 - The launch window colour (`android/app/src/main/res/values/colors.xml`, `launch_canvas`) duplicates `TileColors.canvas` so the launcher never flashes a different colour on start. Change both together.
 - Launch theme is `Theme.Black.NoTitleBar` in both `values/` and `values-night/`: the launcher's look does not follow the OS dark-mode setting.
 - Pixel font: **Press Start 2P** (OFL 1.1), bundled at `fonts/PressStart2P-Regular.ttf` with `fonts/OFL.txt`, named by the single constant `kPixelFontFamily` in `ui/theme.dart`. A C64 face (`C64 Pro Mono`) was rejected: it is free for non-commercial use, but its licence separately forbids "provid[ing] the font for direct download from any web site," which a public GitHub repo does via raw file URLs regardless of the app's own licence. Revisit only if the repo becomes private.
+- `AndroidAppRepository`'s `MethodChannel` is a named constructor parameter (`channel`), not `this._channel`: an initializing formal would make the parameter name the private `_channel`, which a test file (a different library) cannot pass by name. The `prefer_initializing_formals` lint is silenced at that line for this reason.
+- `AppRepository` has no `uninstall` method yet. It is added when the drawer's quick actions land (Phase 4) — permissions and interface methods are added when the feature that needs them lands, not ahead of time.
+- The boot screen (`_BootScreen` in `home_shell.dart`) doubles as the app list's loading and error state, rather than being a separate splash step. It is genuinely how the launcher starts every time: apps load, then the list (later the grid) replaces it.

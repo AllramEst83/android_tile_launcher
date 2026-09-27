@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app.dart';
+import 'services/android_app_repository.dart';
 import 'ui/theme.dart';
+
+const String _ownPackage = 'com.codedbykay.android_tile_launcher';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,5 +20,9 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const TileLauncherApp());
+  runApp(
+    TileLauncherApp(
+      appRepository: AndroidAppRepository(ownPackage: _ownPackage),
+    ),
+  );
 }
