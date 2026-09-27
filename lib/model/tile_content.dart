@@ -23,3 +23,21 @@ class ClockContent extends TileContent {
   @override
   String toString() => 'ClockContent($time, $date)';
 }
+
+/// A toggle tile's content — silent mode, vibration mode, flashlight all
+/// show the same shape, just one bool, so they share this one case rather
+/// than each getting their own.
+class ToggleContent extends TileContent {
+  const ToggleContent({required this.on});
+
+  final bool on;
+
+  @override
+  bool operator ==(Object other) => other is ToggleContent && other.on == on;
+
+  @override
+  int get hashCode => on.hashCode;
+
+  @override
+  String toString() => 'ToggleContent($on)';
+}

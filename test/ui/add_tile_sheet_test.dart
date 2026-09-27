@@ -37,6 +37,9 @@ void main() {
     await _open(tester, gridState);
 
     expect(find.text('CLOCK'), findsOneWidget);
+    expect(find.text('SILENT MODE'), findsOneWidget);
+    expect(find.text('VIBRATION MODE'), findsOneWidget);
+    expect(find.text('FLASHLIGHT'), findsOneWidget);
   });
 
   testWidgets('tapping a kind pins it and closes the sheet', (
@@ -56,7 +59,9 @@ void main() {
     WidgetTester tester,
   ) async {
     final GridState gridState = _gridState();
-    await gridState.pinSystemTile(TileKind.clock);
+    for (final TileKind kind in TileKind.values) {
+      if (kind != TileKind.app) await gridState.pinSystemTile(kind);
+    }
 
     await _open(tester, gridState);
 

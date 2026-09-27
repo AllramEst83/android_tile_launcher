@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_content.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
+import 'package:android_tile_launcher/services/system_control_service.dart';
+import 'package:android_tile_launcher/services/toggle_tile_source.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
+import 'package:android_tile_launcher/ui/toggle_tile_view.dart';
 import 'package:flutter/material.dart';
 
 /// The chrome every tile shares regardless of kind: a flat VIC-II fill with a
@@ -76,7 +81,15 @@ class TileView extends StatelessWidget {
 /// What goes inside [TileView] for [tile], dispatched by kind — the one
 /// place a new tile kind's view gets wired in (see "Adding a tile kind" in
 /// .agents/architecture.md). [labelFor] only matters for [TileKind.app].
-Widget tileContent(Tile tile, {required String Function(Tile tile) labelFor}) {
+/// [systemControl] backs every toggle kind's read and tap; [interactive]
+/// turns tap-to-toggle off in the grid editor, where a tap selects the tile
+/// instead.
+Widget tileContent(
+  Tile tile, {
+  required String Function(Tile tile) labelFor,
+  required SystemControlService systemControl,
+  bool interactive = true,
+}) {
   switch (tile.kind) {
     case TileKind.app:
       return AppTileContent(label: labelFor(tile), ink: tile.colour.ink);
@@ -84,12 +97,39 @@ Widget tileContent(Tile tile, {required String Function(Tile tile) labelFor}) {
       return TilePoller(
         source: const ClockTileSource(),
         interval: const Duration(seconds: 30),
-        builder: (context, content) => ClockTileContentView(
+        builder: (context, content, refreshNow) => ClockTileContentView(
           content: content as ClockContent,
           ink: tile.colour.ink,
         ),
       );
+    case TileKind.silentMode:
+    case TileKind.vibrationMode:
+    case TileKind.flashlight:
+      return TilePoller(
+        source: ToggleTileSource(kind: tile.kind, control: systemControl),
+        interval: const Duration(seconds: 5),
+        builder: (context, content, refreshNow) => ToggleTileContentView(
+          label: displayNameOf(tile.kind),
+          on: (content as ToggleContent).on,
+          ink: tile.colour.ink,
+          onToggle: interactive
+              ? () => unawaited(
+                  _toggle(systemControl, tile.kind, !content.on, refreshNow),
+                )
+              : null,
+        ),
+      );
   }
+}
+
+Future<void> _toggle(
+  SystemControlService control,
+  TileKind kind,
+  bool next,
+  VoidCallback refreshNow,
+) async {
+  await control.setOn(kind, next);
+  refreshNow();
 }
 
 /// An app tile's content: a monochrome glyph — its label's first letter,

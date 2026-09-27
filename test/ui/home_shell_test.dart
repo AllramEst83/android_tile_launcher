@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
@@ -9,10 +10,12 @@ import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/toggle_tile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_app_repository.dart';
+import '../fakes/fake_system_control_service.dart';
 import '../fakes/in_memory_local_store.dart';
 
 Finder _onHome(Finder matching) =>
@@ -30,12 +33,14 @@ Future<void> pumpShell(
   WidgetTester tester,
   FakeAppRepository repository, {
   GridState? gridState,
+  FakeSystemControlService? systemControlService,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
     home: HomeShell(
       appRepository: repository,
       gridState: gridState ?? _gridState(),
+      systemControlService: systemControlService ?? FakeSystemControlService(),
     ),
   ),
 );
@@ -302,6 +307,33 @@ void main() {
 
       expect(gridState.isPinned('clock'), isTrue);
       expect(_onHome(find.byType(ClockTileContentView)), findsOneWidget);
+    });
+
+    testWidgets('tapping a toggle tile flips it through the control service', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeSystemControlService control = FakeSystemControlService();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        systemControlService: control,
+      );
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('FLASHLIGHT'));
+      await tester.pumpAndSettle();
+
+      expect(_onHome(find.text('[OFF]')), findsOneWidget);
+
+      await tester.tap(_onHome(find.byType(ToggleTileContentView)));
+      await tester.pumpAndSettle();
+
+      expect(control.setCalls, [(TileKind.flashlight, true)]);
+      expect(_onHome(find.text('[ON]')), findsOneWidget);
     });
   });
 }

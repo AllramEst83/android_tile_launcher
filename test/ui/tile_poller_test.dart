@@ -11,7 +11,8 @@ class _CountingSource implements TileSource {
   int calls = 0;
 
   @override
-  TileContent read() => ClockContent(time: '${calls++}', date: '');
+  Future<TileContent> read() async =>
+      ClockContent(time: '${calls++}', date: '');
 }
 
 Future<void> _pump(WidgetTester tester, TileSource source, Duration interval) =>
@@ -20,7 +21,8 @@ Future<void> _pump(WidgetTester tester, TileSource source, Duration interval) =>
         home: TilePoller(
           source: source,
           interval: interval,
-          builder: (context, content) => Text((content as ClockContent).time),
+          builder: (context, content, refreshNow) =>
+              Text((content as ClockContent).time),
         ),
       ),
     );
@@ -32,6 +34,7 @@ void main() {
     final source = _CountingSource();
 
     await _pump(tester, source, const Duration(seconds: 1));
+    await tester.pump();
 
     expect(find.text('0'), findsOneWidget);
     expect(source.calls, 1);

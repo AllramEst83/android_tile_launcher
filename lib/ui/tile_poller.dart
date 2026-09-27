@@ -8,6 +8,9 @@ import 'package:flutter/widgets.dart';
 /// only while the launcher is resumed — a backgrounded launcher has no
 /// visible tiles, so there is nothing to refresh for. Shared by every live
 /// tile kind; a kind's own view only has to say what its content looks like.
+/// [builder]'s third argument re-reads [source] immediately, for a kind
+/// whose content view can trigger its own state change (a toggle tile,
+/// straight after a tap) and doesn't want to wait for the next tick.
 class TilePoller extends StatefulWidget {
   const TilePoller({
     super.key,
@@ -18,21 +21,26 @@ class TilePoller extends StatefulWidget {
 
   final TileSource source;
   final Duration interval;
-  final Widget Function(BuildContext context, TileContent content) builder;
+  final Widget Function(
+    BuildContext context,
+    TileContent content,
+    VoidCallback refreshNow,
+  )
+  builder;
 
   @override
   State<TilePoller> createState() => _TilePollerState();
 }
 
 class _TilePollerState extends State<TilePoller> with WidgetsBindingObserver {
-  late TileContent _content;
+  TileContent? _content;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _content = widget.source.read();
+    unawaited(_refresh());
     _startTimer();
   }
 
@@ -41,15 +49,16 @@ class _TilePollerState extends State<TilePoller> with WidgetsBindingObserver {
     _timer = Timer.periodic(widget.interval, (_) => _refresh());
   }
 
-  void _refresh() {
+  Future<void> _refresh() async {
+    final TileContent content = await widget.source.read();
     if (!mounted) return;
-    setState(() => _content = widget.source.read());
+    setState(() => _content = content);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _refresh();
+      unawaited(_refresh());
       _startTimer();
     } else {
       _timer?.cancel();
@@ -64,5 +73,9 @@ class _TilePollerState extends State<TilePoller> with WidgetsBindingObserver {
   }
 
   @override
-  Widget build(BuildContext context) => widget.builder(context, _content);
+  Widget build(BuildContext context) {
+    final TileContent? content = _content;
+    if (content == null) return const SizedBox.shrink();
+    return widget.builder(context, content, () => unawaited(_refresh()));
+  }
 }

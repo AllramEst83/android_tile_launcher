@@ -9,6 +9,7 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/ui/add_tile_sheet.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
@@ -28,10 +29,12 @@ class HomeShell extends StatefulWidget {
     super.key,
     required this.appRepository,
     required this.gridState,
+    required this.systemControlService,
   });
 
   final AppRepository appRepository;
   final GridState gridState;
+  final SystemControlService systemControlService;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -88,6 +91,15 @@ class _HomeShellState extends State<HomeShell> {
                       for (final AppInfo app in apps)
                         app.packageName: app.label,
                     };
+                    String labelFor(String id) {
+                      final String? appLabel = labelByPackage[id];
+                      if (appLabel != null) return appLabel;
+                      final TileKind? kind = tileKindNamed(id);
+                      return kind == null
+                          ? id.toUpperCase()
+                          : displayNameOf(kind);
+                    }
+
                     return ListenableBuilder(
                       listenable: widget.gridState,
                       builder: (context, _) => PageView(
@@ -95,9 +107,9 @@ class _HomeShellState extends State<HomeShell> {
                         children: <Widget>[
                           _HomePage(
                             pinned: widget.gridState.pinned,
-                            labelFor: (id) =>
-                                labelByPackage[id] ?? id.toUpperCase(),
+                            labelFor: labelFor,
                             gridState: widget.gridState,
+                            systemControlService: widget.systemControlService,
                             onLaunch: widget.appRepository.launch,
                             onRefresh: _refresh,
                           ),
@@ -132,6 +144,7 @@ class _HomePage extends StatefulWidget {
     required this.pinned,
     required this.labelFor,
     required this.gridState,
+    required this.systemControlService,
     required this.onLaunch,
     required this.onRefresh,
   });
@@ -139,6 +152,7 @@ class _HomePage extends StatefulWidget {
   final List<PinnedTile> pinned;
   final String Function(String id) labelFor;
   final GridState gridState;
+  final SystemControlService systemControlService;
   final ValueChanged<String> onLaunch;
   final Future<void> Function() onRefresh;
 
@@ -230,6 +244,7 @@ class _HomePageState extends State<_HomePage> {
               child: EditableTileGrid(
                 tiles: scratch,
                 labelFor: widget.labelFor,
+                systemControl: widget.systemControlService,
                 selected: _selected,
                 onSelect: _select,
                 onDelete: _delete,
@@ -275,6 +290,7 @@ class _HomePageState extends State<_HomePage> {
               AppTileGrid(
                 tiles: [for (final PinnedTile p in widget.pinned) p.toTile()],
                 labelFor: (Tile tile) => widget.labelFor(tile.id),
+                systemControl: widget.systemControlService,
                 emptyMessage: Messages.nothingPinned,
                 onLaunch: widget.onLaunch,
                 onLongPress: _startEditing,

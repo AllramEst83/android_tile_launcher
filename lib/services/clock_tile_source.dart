@@ -10,7 +10,7 @@ class ClockTileSource implements TileSource {
   final DateTime Function() now;
 
   @override
-  TileContent read() {
+  Future<TileContent> read() async {
     final DateTime t = now();
     return ClockContent(time: formatClockTime(t), date: formatClockDate(t));
   }

@@ -38,7 +38,7 @@ Future<void> showAddTileSheet(
           children: <Widget>[
             for (final TileKind kind in available)
               _AddTileOption(
-                label: kind.name.toUpperCase(),
+                label: displayNameOf(kind),
                 onTap: () {
                   // Already pinned and showing once this returns; only the
                   // save to disk is still pending (see GridState's failure
