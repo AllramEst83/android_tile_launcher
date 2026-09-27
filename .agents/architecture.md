@@ -16,7 +16,7 @@ lib/
     tile.dart                # Tile: id, kind, size, colour, appPackage; TileKind (one value so far: app)
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
-    default_tiles.dart       # tilesForApps: the starting layout before Phase 5 (persistence) exists
+    default_tiles.dart       # tilesForApps: turns pinned AppInfo into small tiles, cycling the fill palette
     tile_content.dart        # what a live tile shows now (sealed: text, metric, agenda, ...)  (planned, Phase 7)
     alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets (Swedish order); shared by the app drawer and the contacts tile (Phase 10)
     app_matcher.dart         # rankApps: best-match-first search ranking, for the drawer's search field
@@ -25,8 +25,10 @@ lib/
     app_repository.dart      # abstract: list/launch/uninstall/openAppDetails
     app_repository_exception.dart
     android_app_repository.dart  # MethodChannel implementation; caches, sorts, excludes self
-    grid_state.dart          # ChangeNotifier: which packages are pinned to home, in pin order (in-memory only until Phase 5)
-    local_store.dart         # abstract: read/write JSON values by key      (planned, Phase 5)
+    grid_state.dart          # ChangeNotifier: which packages are pinned to home, in pin order; persisted via LocalStore
+    local_store.dart         # abstract: read/write JSON values by key
+    local_store_exception.dart
+    shared_preferences_local_store.dart  # LocalStore on shared_preferences, one JSON string per key
     tile_source.dart         # abstract: a stream of TileContent for one tile kind  (planned, Phase 7)
   ui/
     theme.dart               # VIC-II palette, ThemeData, grid metrics, C64Colour -> (fill, ink)
@@ -74,7 +76,7 @@ Record decisions that future agents can't derive from code (append, newest last)
 - The launch window colour (`android/app/src/main/res/values/colors.xml`, `launch_canvas`) duplicates `TileColors.canvas` so the launcher never flashes a different colour on start. Change both together.
 - Launch theme is `Theme.Black.NoTitleBar` in both `values/` and `values-night/`: the launcher's look does not follow the OS dark-mode setting.
 - Pixel font: **Press Start 2P** (OFL 1.1), bundled at `fonts/PressStart2P-Regular.ttf` with `fonts/OFL.txt`, named by the single constant `kPixelFontFamily` in `ui/theme.dart`. A C64 face (`C64 Pro Mono`) was rejected: it is free for non-commercial use, but its licence separately forbids "provid[ing] the font for direct download from any web site," which a public GitHub repo does via raw file URLs regardless of the app's own licence. Revisit only if the repo becomes private.
-- `AndroidAppRepository`'s `MethodChannel` is a named constructor parameter (`channel`), not `this._channel`: an initializing formal would make the parameter name the private `_channel`, which a test file (a different library) cannot pass by name. The `prefer_initializing_formals` lint is silenced at that line for this reason.
+- `AndroidAppRepository`'s `MethodChannel` and `GridState`'s `LocalStore` are both named constructor parameters (`channel`, `store`), not `this._channel`/`this._store`: an initializing formal would make the parameter name the private field name, which a test file (a different library) cannot pass by name. The `prefer_initializing_formals` lint is silenced at each for this reason — the pattern repeats whenever a class takes a swappable collaborator by name.
 - `uninstall`/`openAppDetails` were added to `AppRepository` only once the drawer's quick actions (Phase 4) needed them, not ahead of time — the pattern this repo follows for every permission and interface method.
 - The boot screen (`_BootScreen` in `home_shell.dart`) doubles as the app list's loading and error state, rather than being a separate splash step. It is genuinely how the launcher starts every time: apps load, then the list (later the grid) replaces it.
 - Alphabetical grouping (A–Z, then Å Ä Ö) is a generic `groupByInitial<T>` in `model/alpha_grouping.dart`, keyed by a label extractor, not an app-specific function — the drawer and the contacts tile (Phase 10) call the same code, ported from the sibling terminal launcher's `terminal/tools/alphabet.dart`. The user chose Swedish order over plain A–Z when Phase 4 needed the answer.
@@ -82,8 +84,11 @@ Record decisions that future agents can't derive from code (append, newest last)
 - `Tile` keeps a `TileKind` field with a single value (`app`) rather than dropping the discriminator until a second kind exists: the approved plan already commits to clock/weather (Phase 7), an agenda (Phase 9), contacts (Phase 10) and more, so the one-line cost now avoids a breaking change to every existing `Tile` call site later.
 - The Phase 3 default layout (`default_tiles.dart`) gives every app a uniform `TileSize.small` — dense and uniform, not varied sizes — because there is no drawer yet (Phase 4): this grid is the only way to reach any app, so showing as many as possible densely matters more than mosaic variety. Phase 6's editor is what introduces different sizes, chosen by the user.
 - A tile's bevel is two `BorderSide`s lightened/darkened from its own fill by `Color.lerp` (not a fixed light/dark grey), so every VIC-II colour gets a bevel that still reads as "the same colour, raised" rather than a generic frame.
-- The home page became a curated subset once the drawer existed to reach everything else: `GridState` (a `ChangeNotifier`) holds an ordered, in-memory-only list of pinned package names; home starts empty and grows only by pinning from the drawer. Phase 5 persists the same list to disk rather than changing its shape.
-- `GridState` lives in `services/`, not `model/`, even though it holds no platform code: it's a `ChangeNotifier` (from `package:flutter/foundation.dart`), and `model/` stays free of any Flutter import so it can be unit-tested with zero widget bindings. `services/` already sets the precedent (`android_app_repository.dart` wraps a channel; `grid_state.dart` wraps nothing, but both are shared, injected, observable state).
+- The home page became a curated subset once the drawer existed to reach everything else: `GridState` (a `ChangeNotifier`) holds an ordered list of pinned package names; home starts empty and grows only by pinning from the drawer. Phase 5 persisted the same list to disk (`LocalStore`) without changing its shape.
+- `GridState` lives in `services/`, not `model/`, even though it holds no platform code: it's a `ChangeNotifier` (from `package:flutter/foundation.dart`), and `model/` stays free of any Flutter import so it can be unit-tested with zero widget bindings. `services/` already sets the precedent (`android_app_repository.dart` wraps a channel; `grid_state.dart` wraps a `LocalStore`, but both are shared, injected, observable state).
+- `GridState.pin`/`unpin`/`toggle` mutate in-memory state and `notifyListeners()` synchronously, *then* return the `Future<void>` from saving — mirroring the sibling repo's `ThemeController.select`. A save that fails still leaves the pin in effect for this run; only the returned future throws. Callers that don't need to react to a save failure use `unawaited(...)` with a one-line reason (see `quick_actions_sheet.dart`), which the `unawaited_futures` lint otherwise flags.
+- `main()` is `async` and awaits `GridState.load()` before `runApp`, rather than loading inside a widget: the saved grid is small and local, so blocking the first frame on it avoids a "nothing pinned" flash before the real layout appears. Contrast with the app list, which loads after first frame (its own `_BootScreen`/`FutureBuilder`) because a platform channel query is slower and more failure-prone than reading one `SharedPreferences` key.
+- `LocalStore`/`LocalStoreException`/`SharedPreferencesLocalStore` are ported verbatim from the sibling terminal launcher (down to `InMemoryLocalStore` and the shared `localStoreContract` test suite), since the storage problem — durable JSON under a string key, values never stale — is identical.
 - The drawer's search field shows a flat list ranked best-match-first (`rankApps`), not the alphabetical grouping, while there is a query: ranking and alphabetising are different orders, and grouping search hits by initial would bury the best match wherever its letter happens to sort.
 - The jump index scrolls with `Scrollable.ensureVisible` on a `GlobalKey` per section header, not a hand-computed pixel offset: it is correct regardless of how tall a header or row actually renders, at the cost of nothing extra to maintain.
 - Tapping "Uninstall" in the quick-actions sheet calls `AppRepository.uninstall` directly, with no extra in-app confirmation: `uninstall` only ever opens Android's own uninstall dialog (`ACTION_DELETE`), which is itself the confirmation.

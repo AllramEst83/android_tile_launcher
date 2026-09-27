@@ -6,10 +6,14 @@ import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../fakes/in_memory_local_store.dart';
+
 const List<AppInfo> _apps = [
   AppInfo(label: 'Clock', packageName: 'pkg.clock'),
   AppInfo(label: 'Maps', packageName: 'pkg.maps'),
 ];
+
+GridState _gridState() => GridState(store: InMemoryLocalStore());
 
 Future<void> _pump(
   WidgetTester tester, {
@@ -24,7 +28,7 @@ Future<void> _pump(
     home: Scaffold(
       body: AppDrawer(
         apps: apps,
-        gridState: gridState ?? GridState(),
+        gridState: gridState ?? _gridState(),
         onLaunch: onLaunch ?? (_) {},
         onOpenDetails: onOpenDetails ?? (_) async => true,
         onUninstall: onUninstall ?? (_) async => true,
@@ -91,7 +95,8 @@ void main() {
   testWidgets('long-press offers to unpin an already-pinned app', (
     tester,
   ) async {
-    final gridState = GridState()..pin('pkg.clock');
+    final gridState = _gridState();
+    await gridState.pin('pkg.clock');
     await _pump(tester, gridState: gridState);
 
     await tester.longPress(find.text('CLOCK'));
@@ -101,7 +106,7 @@ void main() {
   });
 
   testWidgets('tapping "pin to grid" pins the app', (tester) async {
-    final gridState = GridState();
+    final gridState = _gridState();
     await _pump(tester, gridState: gridState);
 
     await tester.longPress(find.text('CLOCK'));

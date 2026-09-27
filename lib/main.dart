@@ -6,11 +6,12 @@ import 'package:flutter/services.dart';
 import 'app.dart';
 import 'services/android_app_repository.dart';
 import 'services/grid_state.dart';
+import 'services/shared_preferences_local_store.dart';
 import 'ui/theme.dart';
 
 const String _ownPackage = 'com.codedbykay.android_tile_launcher';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   SystemChrome.setSystemUIOverlayStyle(
@@ -21,10 +22,14 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
+
+  final GridState gridState = GridState(store: SharedPreferencesLocalStore());
+  await gridState.load();
+
   runApp(
     TileLauncherApp(
       appRepository: AndroidAppRepository(ownPackage: _ownPackage),
-      gridState: GridState(),
+      gridState: gridState,
     ),
   );
 }

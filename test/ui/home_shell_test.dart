@@ -9,12 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_app_repository.dart';
+import '../fakes/in_memory_local_store.dart';
 
 Finder _onHome(Finder matching) =>
     find.descendant(of: find.byType(AppTileGrid), matching: matching);
 
 Finder _inDrawer(Finder matching) =>
     find.descendant(of: find.byType(AppDrawer), matching: matching);
+
+GridState _gridState() => GridState(store: InMemoryLocalStore());
 
 Future<void> pumpShell(
   WidgetTester tester,
@@ -25,7 +28,7 @@ Future<void> pumpShell(
     theme: tileLauncherTheme(),
     home: HomeShell(
       appRepository: repository,
-      gridState: gridState ?? GridState(),
+      gridState: gridState ?? _gridState(),
     ),
   ),
 );
@@ -81,7 +84,8 @@ void main() {
   testWidgets('home shows a tile for each pinned app', (
     WidgetTester tester,
   ) async {
-    final GridState gridState = GridState()..pin('pkg.clock');
+    final GridState gridState = _gridState();
+    await gridState.pin('pkg.clock');
     await pumpShell(
       tester,
       FakeAppRepository(
@@ -143,7 +147,8 @@ void main() {
   testWidgets('pulling down on home asks the repository for a refresh', (
     WidgetTester tester,
   ) async {
-    final GridState gridState = GridState()..pin('pkg.clock');
+    final GridState gridState = _gridState();
+    await gridState.pin('pkg.clock');
     final FakeAppRepository repository = FakeAppRepository(
       apps: const [AppInfo(label: 'Clock', packageName: 'pkg.clock')],
     );

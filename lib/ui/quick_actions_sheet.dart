@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
@@ -26,7 +28,10 @@ Future<void> showQuickActions(
             _QuickAction(
               label: pinned ? Messages.unpinFromGrid : Messages.pinToGrid,
               onTap: () {
-                gridState.toggle(app.packageName);
+                // The pin/unpin already took effect in memory and notified;
+                // only the save to disk is still pending, and nothing here
+                // needs to react to it failing.
+                unawaited(gridState.toggle(app.packageName));
                 Navigator.pop(sheetContext);
               },
             ),
@@ -34,14 +39,14 @@ Future<void> showQuickActions(
               label: Messages.appDetails,
               onTap: () {
                 Navigator.pop(sheetContext);
-                onOpenDetails(app.packageName);
+                unawaited(onOpenDetails(app.packageName));
               },
             ),
             _QuickAction(
               label: Messages.uninstall,
               onTap: () {
                 Navigator.pop(sheetContext);
-                onUninstall(app.packageName);
+                unawaited(onUninstall(app.packageName));
               },
             ),
           ],
