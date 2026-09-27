@@ -5,6 +5,7 @@ import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
+import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -217,10 +218,7 @@ void main() {
       await tester.tap(find.text(Messages.cancel));
       await tester.pumpAndSettle();
 
-      expect(gridState.pinned.map((p) => p.packageName), [
-        'pkg.clock',
-        'pkg.maps',
-      ]);
+      expect(gridState.pinned.map((p) => p.id), ['pkg.clock', 'pkg.maps']);
       expect(find.text(Messages.apply), findsNothing);
       expect(_onHome(find.text('CLOCK')), findsOneWidget);
     });
@@ -235,7 +233,7 @@ void main() {
       await tester.tap(find.text(Messages.apply));
       await tester.pumpAndSettle();
 
-      expect(gridState.pinned.map((p) => p.packageName), ['pkg.maps']);
+      expect(gridState.pinned.map((p) => p.id), ['pkg.maps']);
     });
 
     testWidgets('apply commits a resize', (WidgetTester tester) async {
@@ -248,9 +246,7 @@ void main() {
       await tester.tap(find.text(Messages.apply));
       await tester.pumpAndSettle();
 
-      final clock = gridState.pinned.firstWhere(
-        (p) => p.packageName == 'pkg.clock',
-      );
+      final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
       expect(clock.size, TileSize.medium);
     });
 
@@ -264,9 +260,7 @@ void main() {
       await tester.tap(find.text(Messages.apply));
       await tester.pumpAndSettle();
 
-      final clock = gridState.pinned.firstWhere(
-        (p) => p.packageName == 'pkg.clock',
-      );
+      final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
       expect(clock.colour, C64Colour.orange);
     });
 
@@ -289,10 +283,25 @@ void main() {
       await tester.tap(find.text(Messages.apply));
       await tester.pumpAndSettle();
 
-      expect(gridState.pinned.map((p) => p.packageName), [
-        'pkg.maps',
-        'pkg.clock',
-      ]);
+      expect(gridState.pinned.map((p) => p.id), ['pkg.maps', 'pkg.clock']);
+    });
+  });
+
+  group('add tile', () {
+    testWidgets('tapping + ADD TILE pins a clock tile onto home', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await pumpShell(tester, FakeAppRepository(), gridState: gridState);
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CLOCK'));
+      await tester.pumpAndSettle();
+
+      expect(gridState.isPinned('clock'), isTrue);
+      expect(_onHome(find.byType(ClockTileContentView)), findsOneWidget);
     });
   });
 }

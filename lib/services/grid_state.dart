@@ -1,9 +1,10 @@
 import 'package:android_tile_launcher/model/pinned_tile.dart';
+import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/services/local_store.dart';
 import 'package:android_tile_launcher/services/local_store_exception.dart';
 import 'package:flutter/foundation.dart';
 
-/// Which apps are on the home mosaic, each tile's size and colour, and the
+/// Which tiles are on the home mosaic, each one's size and colour, and the
 /// order they're pinned in. Kept in a [LocalStore] so it survives a restart;
 /// [load] applies whatever was last saved.
 class GridState extends ChangeNotifier {
@@ -22,8 +23,7 @@ class GridState extends ChangeNotifier {
   /// Pinned tiles, in pin order.
   List<PinnedTile> get pinned => List.unmodifiable(_pinned);
 
-  bool isPinned(String packageName) =>
-      _pinned.any((PinnedTile p) => p.packageName == packageName);
+  bool isPinned(String id) => _pinned.any((PinnedTile p) => p.id == id);
 
   /// Applies whatever was last saved. A missing, unreadable or malformed
   /// value keeps the grid empty: losing a pinned layout is never worth
@@ -47,27 +47,38 @@ class GridState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Pins [packageName] with its default size and colour, and saves. Already
-  /// in effect for this run even if the returned future throws
+  /// Pins the app [packageName] with its default size and colour, and saves.
+  /// Already in effect for this run even if the returned future throws
   /// `LocalStoreException` — only the save failed, not the pin.
-  Future<void> pin(String packageName) {
-    if (isPinned(packageName)) return Future<void>.value();
-    _pinned.add(
-      PinnedTile.withDefaults(packageName: packageName, index: _pinned.length),
-    );
+  Future<void> pin(String packageName) => _add(
+    () => PinnedTile.app(packageName: packageName, index: _pinned.length),
+  );
+
+  /// Pins a system tile (anything but [TileKind.app] — there is at most one
+  /// of each) and saves. Same failure contract as [pin].
+  Future<void> pinSystemTile(TileKind kind) =>
+      _add(() => PinnedTile.system(kind: kind, index: _pinned.length));
+
+  Future<void> _add(PinnedTile Function() tile) {
+    final PinnedTile next = tile();
+    if (isPinned(next.id)) return Future<void>.value();
+    _pinned.add(next);
     notifyListeners();
     return _persist();
   }
 
-  /// Unpins [packageName] and saves. Same failure contract as [pin].
-  Future<void> unpin(String packageName) {
+  /// Unpins the tile with this [id] (a package name, or a system kind's
+  /// name) and saves. Same failure contract as [pin].
+  Future<void> unpin(String id) {
     final int before = _pinned.length;
-    _pinned.removeWhere((PinnedTile p) => p.packageName == packageName);
+    _pinned.removeWhere((PinnedTile p) => p.id == id);
     if (_pinned.length == before) return Future<void>.value();
     notifyListeners();
     return _persist();
   }
 
+  /// Pins or unpins the app [packageName]. Used by the drawer's quick
+  /// actions; system tiles are only ever added from the add-tile sheet.
   Future<void> toggle(String packageName) =>
       isPinned(packageName) ? unpin(packageName) : pin(packageName);
 

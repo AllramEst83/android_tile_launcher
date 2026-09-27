@@ -24,4 +24,7 @@ abstract final class Messages {
   static const String apply = 'APPLY';
   static const String tileSize = 'SIZE';
   static const String tileColour = 'COLOUR';
+
+  static const String addTile = '+ ADD TILE';
+  static const String noTilesToAdd = 'NOTHING LEFT TO ADD.';
 }

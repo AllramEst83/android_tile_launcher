@@ -9,6 +9,7 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/ui/add_tile_sheet.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
@@ -94,8 +95,8 @@ class _HomeShellState extends State<HomeShell> {
                         children: <Widget>[
                           _HomePage(
                             pinned: widget.gridState.pinned,
-                            labelFor: (packageName) =>
-                                labelByPackage[packageName] ?? packageName,
+                            labelFor: (id) =>
+                                labelByPackage[id] ?? id.toUpperCase(),
                             gridState: widget.gridState,
                             onLaunch: widget.appRepository.launch,
                             onRefresh: _refresh,
@@ -124,7 +125,8 @@ class _HomeShellState extends State<HomeShell> {
 /// Home, or — while [_scratch] is non-null — the grid editor: long-press a
 /// tile to start, drag one onto another to reorder, tap one to select it for
 /// the inspector panel, delete with its badge. Changes only reach [GridState]
-/// on Apply; Cancel discards them.
+/// on Apply; Cancel discards them. [labelFor] resolves any tile id — an app's
+/// package name, or a system kind's fixed id — to what its tile should show.
 class _HomePage extends StatefulWidget {
   const _HomePage({
     required this.pinned,
@@ -135,7 +137,7 @@ class _HomePage extends StatefulWidget {
   });
 
   final List<PinnedTile> pinned;
-  final String Function(String packageName) labelFor;
+  final String Function(String id) labelFor;
   final GridState gridState;
   final ValueChanged<String> onLaunch;
   final Future<void> Function() onRefresh;
@@ -150,10 +152,10 @@ class _HomePageState extends State<_HomePage> {
 
   bool get _editing => _scratch != null;
 
-  void _startEditing(String packageName) {
+  void _startEditing(String id) {
     setState(() {
       _scratch = List<PinnedTile>.of(widget.pinned);
-      _selected = packageName;
+      _selected = id;
     });
   }
 
@@ -176,21 +178,17 @@ class _HomePageState extends State<_HomePage> {
     unawaited(widget.gridState.replaceAll(result));
   }
 
-  void _select(String packageName) => setState(() => _selected = packageName);
+  void _select(String id) => setState(() => _selected = id);
 
-  void _delete(String packageName) => setState(() {
-    _scratch!.removeWhere((PinnedTile p) => p.packageName == packageName);
-    if (_selected == packageName) _selected = null;
+  void _delete(String id) => setState(() {
+    _scratch!.removeWhere((PinnedTile p) => p.id == id);
+    if (_selected == id) _selected = null;
   });
 
   void _reorder(String moving, String target) => setState(() {
     final List<PinnedTile> scratch = _scratch!;
-    final int from = scratch.indexWhere(
-      (PinnedTile p) => p.packageName == moving,
-    );
-    final int to = scratch.indexWhere(
-      (PinnedTile p) => p.packageName == target,
-    );
+    final int from = scratch.indexWhere((PinnedTile p) => p.id == moving);
+    final int to = scratch.indexWhere((PinnedTile p) => p.id == target);
     if (from == -1 || to == -1) return;
     _scratch = moveItem(scratch, from: from, to: to);
   });
@@ -202,18 +200,20 @@ class _HomePageState extends State<_HomePage> {
 
   void _updateSelected(PinnedTile Function(PinnedTile) update) => setState(() {
     final List<PinnedTile> scratch = _scratch!;
-    final int i = scratch.indexWhere(
-      (PinnedTile p) => p.packageName == _selected,
-    );
+    final int i = scratch.indexWhere((PinnedTile p) => p.id == _selected);
     if (i == -1) return;
     scratch[i] = update(scratch[i]);
   });
 
-  PinnedTile? _find(List<PinnedTile> tiles, String? packageName) {
+  PinnedTile? _find(List<PinnedTile> tiles, String? id) {
     for (final PinnedTile p in tiles) {
-      if (p.packageName == packageName) return p;
+      if (p.id == id) return p;
     }
     return null;
+  }
+
+  void _addTile() {
+    unawaited(showAddTileSheet(context, gridState: widget.gridState));
   }
 
   @override
@@ -238,9 +238,7 @@ class _HomePageState extends State<_HomePage> {
             ),
           ),
           TileInspector(
-            label: selectedTile == null
-                ? ''
-                : widget.labelFor(selectedTile.packageName),
+            label: selectedTile == null ? '' : widget.labelFor(selectedTile.id),
             tile: selectedTile,
             onApply: _applyEditing,
             onSizeSelected: _resize,
@@ -254,11 +252,22 @@ class _HomePageState extends State<_HomePage> {
       children: <Widget>[
         AppTileGrid(
           tiles: [for (final PinnedTile p in widget.pinned) p.toTile()],
-          labelFor: (Tile tile) => widget.labelFor(tile.appPackage),
+          labelFor: (Tile tile) => widget.labelFor(tile.id),
           emptyMessage: Messages.nothingPinned,
           onLaunch: widget.onLaunch,
           onLongPress: _startEditing,
           onRefresh: widget.onRefresh,
+        ),
+        Positioned(
+          top: TileMetrics.margin,
+          right: TileMetrics.margin,
+          child: InkWell(
+            onTap: _addTile,
+            child: Text(
+              Messages.addTile,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
         ),
         Positioned(
           left: 0,

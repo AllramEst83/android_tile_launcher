@@ -1,48 +1,87 @@
 import 'package:android_tile_launcher/model/c64_colour.dart';
-import 'package:android_tile_launcher/model/tile.dart';
-import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const Tile _tile = Tile(
-  id: 'pkg.clock',
-  size: TileSize.small,
-  colour: C64Colour.red,
-  appPackage: 'pkg.clock',
-);
-
-Future<void> _pump(WidgetTester tester, {VoidCallback? onTap}) =>
-    tester.pumpWidget(
-      MaterialApp(
-        theme: tileLauncherTheme(),
-        home: Scaffold(
-          body: SizedBox(
-            width: 100,
-            height: 100,
-            child: TileView(tile: _tile, label: 'Clock', onTap: onTap ?? () {}),
-          ),
+Future<void> _pump(
+  WidgetTester tester, {
+  VoidCallback? onTap,
+  VoidCallback? onLongPress,
+  bool selected = false,
+  VoidCallback? onDelete,
+}) => tester.pumpWidget(
+  MaterialApp(
+    theme: tileLauncherTheme(),
+    home: Scaffold(
+      body: SizedBox(
+        width: 100,
+        height: 100,
+        child: TileView(
+          colour: C64Colour.red,
+          content: const Text('CONTENT'),
+          onTap: onTap,
+          onLongPress: onLongPress,
+          selected: selected,
+          onDelete: onDelete,
         ),
       ),
-    );
+    ),
+  ),
+);
 
 void main() {
-  testWidgets('shows the label uppercase and its first letter as the glyph', (
+  testWidgets('renders whatever content it is given', (
     WidgetTester tester,
   ) async {
     await _pump(tester);
 
-    expect(find.text('CLOCK'), findsOneWidget);
-    expect(find.text('C'), findsOneWidget);
+    expect(find.text('CONTENT'), findsOneWidget);
   });
 
-  testWidgets('tapping the tile calls onTap', (WidgetTester tester) async {
+  testWidgets('tapping calls onTap', (WidgetTester tester) async {
     var tapped = false;
     await _pump(tester, onTap: () => tapped = true);
 
     await tester.tap(find.byType(TileView));
 
     expect(tapped, isTrue);
+  });
+
+  testWidgets('is not tappable when onTap is null', (
+    WidgetTester tester,
+  ) async {
+    await _pump(tester);
+
+    final InkWell inkWell = tester.widget(find.byType(InkWell));
+    expect(inkWell.onTap, isNull);
+  });
+
+  testWidgets('long-pressing calls onLongPress', (WidgetTester tester) async {
+    var longPressed = false;
+    await _pump(tester, onLongPress: () => longPressed = true);
+
+    await tester.longPress(find.byType(TileView));
+
+    expect(longPressed, isTrue);
+  });
+
+  testWidgets('shows no delete badge when onDelete is null', (
+    WidgetTester tester,
+  ) async {
+    await _pump(tester);
+
+    expect(find.text('X'), findsNothing);
+  });
+
+  testWidgets('tapping the delete badge calls onDelete', (
+    WidgetTester tester,
+  ) async {
+    var deleted = false;
+    await _pump(tester, onDelete: () => deleted = true);
+
+    await tester.tap(find.text('X'));
+
+    expect(deleted, isTrue);
   });
 }

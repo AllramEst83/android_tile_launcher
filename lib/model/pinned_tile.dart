@@ -2,47 +2,59 @@ import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 
-/// A pinned app's place on the home mosaic: which app, how big, what colour.
-/// The unit `GridState` saves and the grid editor (Phase 6) changes; [toTile]
-/// is the read-only view of it that the grid actually renders.
+/// A pinned tile's place on the home mosaic: which one, how big, what
+/// colour. The unit `GridState` saves and the grid editor (Phase 6) changes;
+/// [toTile] is the read-only view of it that the grid actually renders.
 class PinnedTile {
   const PinnedTile({
-    required this.packageName,
+    required this.id,
     required this.size,
     required this.colour,
+    this.kind = TileKind.app,
   });
 
-  /// A freshly-pinned tile's starting size and colour: always small, cycling
-  /// through [pinnableColours] by [index] (how many tiles were already
-  /// pinned).
-  factory PinnedTile.withDefaults({
-    required String packageName,
-    required int index,
-  }) => PinnedTile(
-    packageName: packageName,
-    size: TileSize.small,
-    colour: pinnableColours[index % pinnableColours.length],
-  );
+  /// A freshly-pinned app tile's starting size and colour: always small,
+  /// cycling through [pinnableColours] by [index] (how many tiles were
+  /// already pinned).
+  factory PinnedTile.app({required String packageName, required int index}) =>
+      PinnedTile(
+        id: packageName,
+        size: TileSize.small,
+        colour: pinnableColours[index % pinnableColours.length],
+      );
 
-  final String packageName;
+  /// A freshly-pinned system tile (anything but [TileKind.app]): wide, so an
+  /// oversized numeral has room, cycling colour the same way an app tile
+  /// does.
+  factory PinnedTile.system({required TileKind kind, required int index}) {
+    assert(kind != TileKind.app, 'use PinnedTile.app for an app tile');
+    return PinnedTile(
+      id: kind.name,
+      kind: kind,
+      size: TileSize.wide,
+      colour: pinnableColours[index % pinnableColours.length],
+    );
+  }
+
+  /// A package name for [TileKind.app]; a fixed id (`"clock"`) for a system
+  /// kind.
+  final String id;
+  final TileKind kind;
   final TileSize size;
   final C64Colour colour;
 
   PinnedTile copyWith({TileSize? size, C64Colour? colour}) => PinnedTile(
-    packageName: packageName,
+    id: id,
+    kind: kind,
     size: size ?? this.size,
     colour: colour ?? this.colour,
   );
 
-  Tile toTile() => Tile(
-    id: packageName,
-    size: size,
-    colour: colour,
-    appPackage: packageName,
-  );
+  Tile toTile() => Tile(id: id, kind: kind, size: size, colour: colour);
 
   Map<String, Object?> toJson() => <String, Object?>{
-    'packageName': packageName,
+    'id': id,
+    'kind': kind.name,
     'size': size.name,
     'colour': colour.name,
   };
@@ -50,25 +62,29 @@ class PinnedTile {
   /// `null` for anything malformed — a bad entry is dropped, not fatal.
   static PinnedTile? fromJson(Object? json) {
     if (json is! Map) return null;
-    final Object? packageName = json['packageName'];
+    final Object? id = json['id'];
+    final TileKind? kind = _kindByName[json['kind']];
     final TileSize? size = _sizeByName[json['size']];
     final C64Colour? colour = _colourByName[json['colour']];
-    if (packageName is! String || size == null || colour == null) return null;
-    return PinnedTile(packageName: packageName, size: size, colour: colour);
+    if (id is! String || kind == null || size == null || colour == null) {
+      return null;
+    }
+    return PinnedTile(id: id, kind: kind, size: size, colour: colour);
   }
 
   @override
   bool operator ==(Object other) =>
       other is PinnedTile &&
-      other.packageName == packageName &&
+      other.id == id &&
+      other.kind == kind &&
       other.size == size &&
       other.colour == colour;
 
   @override
-  int get hashCode => Object.hash(packageName, size, colour);
+  int get hashCode => Object.hash(id, kind, size, colour);
 
   @override
-  String toString() => 'PinnedTile($packageName, $size, $colour)';
+  String toString() => 'PinnedTile($id, $kind, $size, $colour)';
 }
 
 /// Colours a tile may use: the sixteen VIC-II colours minus blue and light
@@ -89,6 +105,10 @@ const List<C64Colour> pinnableColours = <C64Colour>[
   C64Colour.darkGrey,
   C64Colour.lightGrey,
 ];
+
+final Map<String, TileKind> _kindByName = <String, TileKind>{
+  for (final TileKind kind in TileKind.values) kind.name: kind,
+};
 
 final Map<String, TileSize> _sizeByName = <String, TileSize>{
   for (final TileSize size in TileSize.values) size.name: size,

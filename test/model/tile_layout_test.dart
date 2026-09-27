@@ -5,7 +5,7 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Tile _tile(String id, TileSize size) =>
-    Tile(id: id, size: size, colour: C64Colour.red, appPackage: id);
+    Tile(id: id, size: size, colour: C64Colour.red);
 
 void main() {
   group('packTiles', () {

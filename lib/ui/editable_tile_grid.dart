@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/model/pinned_tile.dart';
+import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_layout.dart';
 import 'package:android_tile_launcher/ui/tile_grid.dart';
 import 'package:android_tile_launcher/ui/tile_view.dart';
@@ -19,7 +20,7 @@ class EditableTileGrid extends StatelessWidget {
   });
 
   final List<PinnedTile> tiles;
-  final String Function(String packageName) labelFor;
+  final String Function(String id) labelFor;
   final String? selected;
   final ValueChanged<String> onSelect;
   final ValueChanged<String> onDelete;
@@ -48,26 +49,28 @@ class EditableTileGrid extends StatelessWidget {
   }
 
   Widget _slot(TileRect r) {
-    final String packageName = r.tile.appPackage;
+    final Tile tile = r.tile;
+    final String id = tile.id;
     final Widget view = TileView(
-      tile: r.tile,
-      label: labelFor(packageName),
-      selected: packageName == selected,
-      onTap: () => onSelect(packageName),
-      onDelete: () => onDelete(packageName),
+      colour: tile.colour,
+      content: tileContent(tile, labelFor: (t) => labelFor(t.id)),
+      selected: id == selected,
+      onTap: () => onSelect(id),
+      onDelete: () => onDelete(id),
+      deleteKey: ValueKey('delete-$id'),
     );
 
     return Positioned(
-      key: ValueKey(r.tile.id),
+      key: ValueKey(id),
       left: r.left,
       top: r.top,
       width: r.width,
       height: r.height,
       child: DragTarget<String>(
-        onWillAcceptWithDetails: (details) => details.data != packageName,
-        onAcceptWithDetails: (details) => onReorder(details.data, packageName),
+        onWillAcceptWithDetails: (details) => details.data != id,
+        onAcceptWithDetails: (details) => onReorder(details.data, id),
         builder: (context, candidate, rejected) => Draggable<String>(
-          data: packageName,
+          data: id,
           // The feedback widget renders in the root Overlay, outside this
           // tree's Material ancestor -- TileView's InkWell needs its own.
           feedback: Material(

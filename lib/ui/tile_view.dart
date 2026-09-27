@@ -1,38 +1,45 @@
+import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/tile.dart';
+import 'package:android_tile_launcher/model/tile_content.dart';
+import 'package:android_tile_launcher/services/clock_tile_source.dart';
+import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/tile_poller.dart';
 import 'package:flutter/material.dart';
 
-/// One tile: a flat VIC-II fill with a 2px light-top-left/dark-bottom-right
-/// bevel (never a shadow or gradient), a monochrome glyph — its label's first
-/// letter, since no real app icons are drawn yet (plan.md, "Not implemented")
-/// — and the label itself along the bottom edge. In the grid editor,
-/// [selected] draws a bright outline instead of the bevel and [onDelete]
-/// shows a small badge in the corner.
+/// The chrome every tile shares regardless of kind: a flat VIC-II fill with a
+/// 2px light-top-left/dark-bottom-right bevel (never a shadow or gradient),
+/// or — in the grid editor — a bright outline if [selected] and a delete
+/// badge if [onDelete] is given. [content] draws whatever the tile's kind
+/// wants inside that frame; see [tileContent].
 class TileView extends StatelessWidget {
   const TileView({
     super.key,
-    required this.tile,
-    required this.label,
+    required this.colour,
+    required this.content,
     required this.onTap,
     this.onLongPress,
     this.selected = false,
     this.onDelete,
+    this.deleteKey,
   });
 
-  final Tile tile;
-  final String label;
-  final VoidCallback onTap;
+  final C64Colour colour;
+  final Widget content;
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool selected;
   final VoidCallback? onDelete;
 
+  /// Key for the delete badge, so a test can target one tile's badge among
+  /// several. Only meaningful when [onDelete] is given.
+  final Key? deleteKey;
+
   @override
   Widget build(BuildContext context) {
-    final Color fill = tile.colour.fill;
-    final Color ink = tile.colour.ink;
+    final Color fill = colour.fill;
     final Color light = Color.lerp(fill, C64.white, 0.35)!;
     final Color dark = Color.lerp(fill, C64.black, 0.35)!;
-    final String glyph = label.isEmpty ? '?' : label[0].toUpperCase();
 
     return InkWell(
       onTap: onTap,
@@ -52,39 +59,75 @@ class TileView extends StatelessWidget {
         padding: const EdgeInsets.all(TileMetrics.gutter / 2),
         child: Stack(
           children: <Widget>[
-            Center(
-              child: FittedBox(
-                child: Text(
-                  glyph,
-                  style: TextStyle(fontFamily: kPixelFontFamily, color: ink),
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: Text(
-                label.toUpperCase(),
-                style: TextStyle(
-                  fontFamily: kPixelFontFamily,
-                  fontSize: 8,
-                  color: ink,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            content,
             if (onDelete != null)
               Positioned(
                 top: 0,
                 right: 0,
-                child: _DeleteBadge(
-                  key: ValueKey('delete-${tile.id}'),
-                  onTap: onDelete!,
-                ),
+                child: _DeleteBadge(key: deleteKey, onTap: onDelete!),
               ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// What goes inside [TileView] for [tile], dispatched by kind — the one
+/// place a new tile kind's view gets wired in (see "Adding a tile kind" in
+/// .agents/architecture.md). [labelFor] only matters for [TileKind.app].
+Widget tileContent(Tile tile, {required String Function(Tile tile) labelFor}) {
+  switch (tile.kind) {
+    case TileKind.app:
+      return AppTileContent(label: labelFor(tile), ink: tile.colour.ink);
+    case TileKind.clock:
+      return TilePoller(
+        source: const ClockTileSource(),
+        interval: const Duration(seconds: 30),
+        builder: (context, content) => ClockTileContentView(
+          content: content as ClockContent,
+          ink: tile.colour.ink,
+        ),
+      );
+  }
+}
+
+/// An app tile's content: a monochrome glyph — its label's first letter,
+/// since no real app icons are drawn yet (plan.md, "Not implemented") — and
+/// the label itself along the bottom edge.
+class AppTileContent extends StatelessWidget {
+  const AppTileContent({super.key, required this.label, required this.ink});
+
+  final String label;
+  final Color ink;
+
+  @override
+  Widget build(BuildContext context) {
+    final String glyph = label.isEmpty ? '?' : label[0].toUpperCase();
+    return Stack(
+      children: <Widget>[
+        Center(
+          child: FittedBox(
+            child: Text(
+              glyph,
+              style: TextStyle(fontFamily: kPixelFontFamily, color: ink),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomLeft,
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontFamily: kPixelFontFamily,
+              fontSize: 8,
+              color: ink,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

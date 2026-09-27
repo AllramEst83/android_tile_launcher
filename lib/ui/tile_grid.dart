@@ -60,7 +60,9 @@ double _cellSize(double maxWidth) =>
 
 /// Renders a layout [packTiles] already worked out. Cell size comes from the
 /// available width, so every tile is a whole number of square base cells;
-/// this widget only lays out what it is given, it never packs.
+/// this widget only lays out what it is given, it never packs. [onLaunch]
+/// only fires for a tile with a [launchTargetOf] — a system kind's tile just
+/// isn't tappable outside the editor.
 class TileGrid extends StatelessWidget {
   const TileGrid({
     super.key,
@@ -95,12 +97,15 @@ class TileGrid extends StatelessWidget {
                   width: r.width,
                   height: r.height,
                   child: TileView(
-                    tile: r.tile,
-                    label: labelFor(r.tile),
-                    onTap: () => onLaunch(r.tile.appPackage),
+                    colour: r.tile.colour,
+                    content: tileContent(r.tile, labelFor: labelFor),
+                    onTap: switch (launchTargetOf(r.tile)) {
+                      final String target => () => onLaunch(target),
+                      null => null,
+                    },
                     onLongPress: onLongPress == null
                         ? null
-                        : () => onLongPress!(r.tile.appPackage),
+                        : () => onLongPress!(r.tile.id),
                   ),
                 ),
             ],

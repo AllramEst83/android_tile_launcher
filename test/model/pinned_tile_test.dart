@@ -1,19 +1,22 @@
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
+import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('PinnedTile.withDefaults', () {
-    test('always starts small', () {
-      final tile = PinnedTile.withDefaults(packageName: 'pkg.clock', index: 0);
+  group('PinnedTile.app', () {
+    test('always starts small, and is a TileKind.app', () {
+      final tile = PinnedTile.app(packageName: 'pkg.clock', index: 0);
 
       expect(tile.size, TileSize.small);
+      expect(tile.kind, TileKind.app);
+      expect(tile.id, 'pkg.clock');
     });
 
     test('cycles colours by index', () {
-      final first = PinnedTile.withDefaults(packageName: 'a', index: 0);
-      final wrapped = PinnedTile.withDefaults(
+      final first = PinnedTile.app(packageName: 'a', index: 0);
+      final wrapped = PinnedTile.app(
         packageName: 'b',
         index: pinnableColours.length,
       );
@@ -24,7 +27,7 @@ void main() {
     test('never uses the canvas, bezel, or black/white colours', () {
       final colours = {
         for (int i = 0; i < pinnableColours.length; i++)
-          PinnedTile.withDefaults(packageName: '$i', index: i).colour,
+          PinnedTile.app(packageName: '$i', index: i).colour,
       };
 
       expect(colours, isNot(contains(C64Colour.blue)));
@@ -34,10 +37,27 @@ void main() {
     });
   });
 
+  group('PinnedTile.system', () {
+    test('always starts wide, keyed by the kind\'s own name', () {
+      final tile = PinnedTile.system(kind: TileKind.clock, index: 0);
+
+      expect(tile.size, TileSize.wide);
+      expect(tile.kind, TileKind.clock);
+      expect(tile.id, 'clock');
+    });
+
+    test('rejects TileKind.app', () {
+      expect(
+        () => PinnedTile.system(kind: TileKind.app, index: 0),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+  });
+
   group('copyWith', () {
     test('changes only what is given', () {
       const tile = PinnedTile(
-        packageName: 'pkg.clock',
+        id: 'pkg.clock',
         size: TileSize.small,
         colour: C64Colour.red,
       );
@@ -45,7 +65,7 @@ void main() {
       expect(
         tile.copyWith(size: TileSize.wide),
         const PinnedTile(
-          packageName: 'pkg.clock',
+          id: 'pkg.clock',
           size: TileSize.wide,
           colour: C64Colour.red,
         ),
@@ -53,18 +73,29 @@ void main() {
       expect(
         tile.copyWith(colour: C64Colour.cyan),
         const PinnedTile(
-          packageName: 'pkg.clock',
+          id: 'pkg.clock',
           size: TileSize.small,
           colour: C64Colour.cyan,
         ),
       );
     });
+
+    test('preserves kind', () {
+      const tile = PinnedTile(
+        id: 'clock',
+        kind: TileKind.clock,
+        size: TileSize.wide,
+        colour: C64Colour.red,
+      );
+
+      expect(tile.copyWith(size: TileSize.large).kind, TileKind.clock);
+    });
   });
 
   group('toTile', () {
-    test('targets its own package, by the same id', () {
+    test('carries id, kind, size and colour straight across', () {
       const tile = PinnedTile(
-        packageName: 'pkg.clock',
+        id: 'pkg.clock',
         size: TileSize.medium,
         colour: C64Colour.green,
       );
@@ -72,7 +103,7 @@ void main() {
       final t = tile.toTile();
 
       expect(t.id, 'pkg.clock');
-      expect(t.appPackage, 'pkg.clock');
+      expect(t.kind, TileKind.app);
       expect(t.size, TileSize.medium);
       expect(t.colour, C64Colour.green);
     });
@@ -81,9 +112,20 @@ void main() {
   group('JSON', () {
     test('round-trips through toJson/fromJson', () {
       const tile = PinnedTile(
-        packageName: 'pkg.clock',
+        id: 'pkg.clock',
         size: TileSize.large,
         colour: C64Colour.purple,
+      );
+
+      expect(PinnedTile.fromJson(tile.toJson()), tile);
+    });
+
+    test('round-trips a system tile, kind included', () {
+      const tile = PinnedTile(
+        id: 'clock',
+        kind: TileKind.clock,
+        size: TileSize.wide,
+        colour: C64Colour.orange,
       );
 
       expect(PinnedTile.fromJson(tile.toJson()), tile);
@@ -94,14 +136,24 @@ void main() {
       expect(PinnedTile.fromJson('not a map'), isNull);
       expect(PinnedTile.fromJson(<String, Object?>{}), isNull);
       expect(
-        PinnedTile.fromJson({'packageName': 'pkg.clock', 'size': 'huge'}),
+        PinnedTile.fromJson({'id': 'pkg.clock', 'kind': 'app', 'size': 'huge'}),
         isNull,
       );
       expect(
         PinnedTile.fromJson({
-          'packageName': 'pkg.clock',
+          'id': 'pkg.clock',
+          'kind': 'app',
           'size': 'small',
           'colour': 'neon',
+        }),
+        isNull,
+      );
+      expect(
+        PinnedTile.fromJson({
+          'id': 'pkg.clock',
+          'kind': 'spreadsheet',
+          'size': 'small',
+          'colour': 'red',
         }),
         isNull,
       );

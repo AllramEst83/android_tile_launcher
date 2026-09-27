@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
+import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/local_store_exception.dart';
@@ -10,12 +11,12 @@ import '../fakes/in_memory_local_store.dart';
 GridState _state(InMemoryLocalStore store) => GridState(store: store);
 
 const PinnedTile _clock = PinnedTile(
-  packageName: 'pkg.clock',
+  id: 'pkg.clock',
   size: TileSize.small,
   colour: C64Colour.red,
 );
 const PinnedTile _maps = PinnedTile(
-  packageName: 'pkg.maps',
+  id: 'pkg.maps',
   size: TileSize.medium,
   colour: C64Colour.cyan,
 );
@@ -32,7 +33,7 @@ void main() {
     await state.pin('pkg.clock');
     await state.pin('pkg.maps');
 
-    expect(state.pinned.map((p) => p.packageName), ['pkg.clock', 'pkg.maps']);
+    expect(state.pinned.map((p) => p.id), ['pkg.clock', 'pkg.maps']);
     expect(state.pinned[0].size, TileSize.small);
     expect(state.pinned[0].colour, isNot(state.pinned[1].colour));
     expect(state.isPinned('pkg.clock'), isTrue);
@@ -166,7 +167,7 @@ void main() {
       final InMemoryLocalStore store = InMemoryLocalStore();
       await store.write(GridState.storeKey, [
         _clock.toJson(),
-        {'packageName': 'pkg.bad'}, // missing size/colour
+        {'id': 'pkg.bad'}, // missing kind/size/colour
         42,
         null,
       ]);
@@ -206,7 +207,41 @@ void main() {
       final GridState restarted = _state(store);
       await restarted.load();
 
-      expect(restarted.pinned.map((p) => p.packageName), ['pkg.clock']);
+      expect(restarted.pinned.map((p) => p.id), ['pkg.clock']);
+    });
+  });
+
+  group('pinSystemTile', () {
+    test('adds a wide tile keyed by the kind\'s own name, and saves', () async {
+      final InMemoryLocalStore store = InMemoryLocalStore();
+      final GridState state = _state(store);
+
+      await state.pinSystemTile(TileKind.clock);
+
+      expect(state.pinned, hasLength(1));
+      expect(state.pinned.single.id, 'clock');
+      expect(state.pinned.single.kind, TileKind.clock);
+      expect(state.pinned.single.size, TileSize.wide);
+      expect(state.isPinned('clock'), isTrue);
+      expect(store.writes, 1);
+    });
+
+    test('pinning the same system kind twice is a no-op', () async {
+      final GridState state = _state(InMemoryLocalStore());
+
+      await state.pinSystemTile(TileKind.clock);
+      await state.pinSystemTile(TileKind.clock);
+
+      expect(state.pinned, hasLength(1));
+    });
+
+    test('an app tile and a system tile can coexist', () async {
+      final GridState state = _state(InMemoryLocalStore());
+
+      await state.pin('pkg.clock');
+      await state.pinSystemTile(TileKind.clock);
+
+      expect(state.pinned.map((p) => p.id), ['pkg.clock', 'clock']);
     });
   });
 }
