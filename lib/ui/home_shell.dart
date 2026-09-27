@@ -248,36 +248,50 @@ class _HomePageState extends State<_HomePage> {
       );
     }
 
-    return Stack(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        AppTileGrid(
-          tiles: [for (final PinnedTile p in widget.pinned) p.toTile()],
-          labelFor: (Tile tile) => widget.labelFor(tile.id),
-          emptyMessage: Messages.nothingPinned,
-          onLaunch: widget.onLaunch,
-          onLongPress: _startEditing,
-          onRefresh: widget.onRefresh,
-        ),
-        Positioned(
-          top: TileMetrics.margin,
-          right: TileMetrics.margin,
-          child: InkWell(
-            onTap: _addTile,
-            child: Text(
-              Messages.addTile,
-              style: Theme.of(context).textTheme.labelSmall,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            TileMetrics.margin,
+            TileMetrics.gutter,
+            TileMetrics.margin,
+            TileMetrics.gutter,
+          ),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: InkWell(
+              onTap: _addTile,
+              child: Text(
+                Messages.addTile,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
             ),
           ),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: TileMetrics.gutter,
-          child: Center(
-            child: Text(
-              Messages.swipeForAllApps,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
+        Expanded(
+          child: Stack(
+            children: <Widget>[
+              AppTileGrid(
+                tiles: [for (final PinnedTile p in widget.pinned) p.toTile()],
+                labelFor: (Tile tile) => widget.labelFor(tile.id),
+                emptyMessage: Messages.nothingPinned,
+                onLaunch: widget.onLaunch,
+                onLongPress: _startEditing,
+                onRefresh: widget.onRefresh,
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: TileMetrics.gutter,
+                child: Center(
+                  child: Text(
+                    Messages.swipeForAllApps,
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],

@@ -50,6 +50,53 @@ void main() {
     expect(find.text('M'), findsNWidgets(2));
   });
 
+  testWidgets('dragging down the jump index scrubs through later letters', (
+    WidgetTester tester,
+  ) async {
+    final List<AppInfo> manyApps = [
+      for (final String label in [
+        'Apple',
+        'Banana',
+        'Cherry',
+        'Date',
+        'Elder',
+        'Fig',
+        'Grape',
+        'Honey',
+        'Iris',
+        'Jam',
+        'Kiwi',
+        'Lime',
+        'Mango',
+        'Nut',
+        'Olive',
+      ])
+        AppInfo(label: label, packageName: 'pkg.${label.toLowerCase()}'),
+    ];
+    await _pump(tester, apps: manyApps);
+
+    final ScrollableState scrollable = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byType(ListView),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final double before = scrollable.position.pixels;
+
+    final Rect jumpRect = tester.getRect(find.byKey(const Key('jump-index')));
+    final TestGesture gesture = await tester.startGesture(
+      Offset(jumpRect.center.dx, jumpRect.top + 5),
+    );
+    await tester.pump();
+    await gesture.moveTo(Offset(jumpRect.center.dx, jumpRect.bottom - 5));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final double after = scrollable.position.pixels;
+    expect(after, greaterThan(before));
+  });
+
   testWidgets('typing switches to a ranked flat list with no jump index', (
     tester,
   ) async {
