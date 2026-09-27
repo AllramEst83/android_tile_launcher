@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:flutter/material.dart';
 
 /// The VIC-II palette the Commodore 64 could draw, in Pepto's calibration.
@@ -52,6 +53,49 @@ abstract final class TileMetrics {
   /// Hard edges. The Commodore look has bevels, not rounded corners.
   static const double radius = 0;
   static const double bevel = 2;
+}
+
+/// Turns a [C64Colour] selector into an actual fill and a contrasting ink
+/// colour, so a tile never has to guess whether black or white text reads on
+/// its own background. The only place a `C64Colour` becomes a `Color`.
+extension C64ColourSwatch on C64Colour {
+  Color get fill => switch (this) {
+    C64Colour.black => C64.black,
+    C64Colour.white => C64.white,
+    C64Colour.red => C64.red,
+    C64Colour.cyan => C64.cyan,
+    C64Colour.purple => C64.purple,
+    C64Colour.green => C64.green,
+    C64Colour.blue => C64.blue,
+    C64Colour.yellow => C64.yellow,
+    C64Colour.orange => C64.orange,
+    C64Colour.brown => C64.brown,
+    C64Colour.lightRed => C64.lightRed,
+    C64Colour.darkGrey => C64.darkGrey,
+    C64Colour.grey => C64.grey,
+    C64Colour.lightGreen => C64.lightGreen,
+    C64Colour.lightBlue => C64.lightBlue,
+    C64Colour.lightGrey => C64.lightGrey,
+  };
+
+  Color get ink => switch (this) {
+    C64Colour.white ||
+    C64Colour.cyan ||
+    C64Colour.yellow ||
+    C64Colour.lightRed ||
+    C64Colour.grey ||
+    C64Colour.lightGreen ||
+    C64Colour.lightGrey => C64.black,
+    C64Colour.black ||
+    C64Colour.red ||
+    C64Colour.purple ||
+    C64Colour.green ||
+    C64Colour.blue ||
+    C64Colour.orange ||
+    C64Colour.brown ||
+    C64Colour.darkGrey ||
+    C64Colour.lightBlue => C64.white,
+  };
 }
 
 /// The one pixel font the whole app draws with, bundled as an asset (OFL 1.1,

@@ -11,13 +11,15 @@ lib/
   main.dart                  # runApp only + DI wiring
   app.dart                   # MaterialApp, theme
   messages.dart              # user-facing strings
-  model/                     # pure Dart: no Flutter, no platform      (planned)
-    tile.dart                # Tile: id, kind, size, colour, target
+  model/                     # pure Dart: no Flutter, no platform
+    c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
+    tile.dart                # Tile: id, kind, size, colour, appPackage; TileKind (one value so far: app)
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
-    tile_layout.dart         # ordered tiles -> packed rows of the 4-column grid
-    tile_content.dart        # what a tile shows now (sealed: text, metric, agenda, ...)
-    alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets, shared by the app drawer (Phase 4) and the contacts tile (Phase 10)
-    app_matcher.dart         # app-specific search (label/package matching) for the drawer
+    tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
+    default_tiles.dart       # tilesForApps: the starting layout before Phase 5 (persistence) exists
+    tile_content.dart        # what a live tile shows now (sealed: text, metric, agenda, ...)  (planned, Phase 7)
+    alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets, shared by the app drawer (Phase 4) and the contacts tile (Phase 10)  (planned, Phase 4)
+    app_matcher.dart         # app-specific search (label/package matching) for the drawer  (planned, Phase 4)
   services/                  # abstractions over the platform
     app_info.dart            # AppInfo(label, packageName)
     app_repository.dart      # abstract: list launchable apps, launch(packageName)
@@ -26,12 +28,12 @@ lib/
     local_store.dart         # abstract: read/write JSON values by key      (planned)
     tile_source.dart         # abstract: a stream of TileContent for one tile kind  (planned)
   ui/
-    theme.dart               # VIC-II palette, ThemeData, grid metrics
+    theme.dart               # VIC-II palette, ThemeData, grid metrics, C64Colour -> (fill, ink)
     home_shell.dart          # the launcher shell: PopScope, boot/loading/error state
-    app_list_view.dart       # the plain scrolling list that proves the app channel (Phase 3 replaces its body with the grid)
-    tile_grid.dart           # the mosaic                              (planned)
-    tile_view.dart           # one tile, dispatched by kind            (planned)
-    app_drawer.dart          # the alphabet list                       (planned)
+    app_tile_grid.dart       # apps -> default tiles -> packed layout; empty state; pull-to-refresh
+    tile_grid.dart           # renders a packed layout Positioned by cell size; never packs itself
+    tile_view.dart           # one tile: VIC-II fill, 2px bevel, glyph, bottom-left label
+    app_drawer.dart          # the alphabet list                       (planned, Phase 4)
 android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   MainActivity.kt            # wires channel handlers into the Flutter engine
   AppsChannelHandler.kt      # list launchable apps, launch one; runs off the main thread
@@ -74,3 +76,7 @@ Record decisions that future agents can't derive from code (append, newest last)
 - `AppRepository` has no `uninstall` method yet. It is added when the drawer's quick actions land (Phase 4) — permissions and interface methods are added when the feature that needs them lands, not ahead of time.
 - The boot screen (`_BootScreen` in `home_shell.dart`) doubles as the app list's loading and error state, rather than being a separate splash step. It is genuinely how the launcher starts every time: apps load, then the list (later the grid) replaces it.
 - Alphabetical grouping (A–Z, then Å Ä Ö) is a generic `groupByInitial<T>` in `model/alpha_grouping.dart`, keyed by a label extractor, not an app-specific function — the drawer (Phase 4) and the contacts tile (Phase 10) call the same code. Built when Phase 4 needs it, not before; the Swedish-collation-or-plain-A–Z choice is still an open question in plan.md.
+- `packTiles` uses a skyline (per-column heightmap) algorithm, not one full-width row per tile: it tracks the next free row of each column and places each tile in the leftmost gap that lets it sit highest, so a short tile doesn't leave a hole under a taller neighbour. Chosen over simpler row-based packing because Phase 6's grid editor will mix tile sizes freely, and a real mosaic look needs tiles to interlock rather than stack one-per-row.
+- `Tile` keeps a `TileKind` field with a single value (`app`) rather than dropping the discriminator until a second kind exists: the approved plan already commits to clock/weather (Phase 7), an agenda (Phase 9), contacts (Phase 10) and more, so the one-line cost now avoids a breaking change to every existing `Tile` call site later.
+- The Phase 3 default layout (`default_tiles.dart`) gives every app a uniform `TileSize.small` — dense and uniform, not varied sizes — because there is no drawer yet (Phase 4): this grid is the only way to reach any app, so showing as many as possible densely matters more than mosaic variety. Phase 6's editor is what introduces different sizes, chosen by the user.
+- A tile's bevel is two `BorderSide`s lightened/darkened from its own fill by `Color.lerp` (not a fixed light/dark grey), so every VIC-II colour gets a bevel that still reads as "the same colour, raised" rather than a generic frame.

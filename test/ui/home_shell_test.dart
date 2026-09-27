@@ -34,7 +34,9 @@ void main() {
     );
   });
 
-  testWidgets('shows the loaded apps, uppercased', (WidgetTester tester) async {
+  testWidgets('shows a tile per app, labelled uppercase', (
+    WidgetTester tester,
+  ) async {
     await pumpShell(
       tester,
       FakeAppRepository(
@@ -67,7 +69,7 @@ void main() {
     expect(find.text(Messages.appListError), findsOneWidget);
   });
 
-  testWidgets('tapping a row launches its package', (
+  testWidgets('tapping a tile launches its package', (
     WidgetTester tester,
   ) async {
     final FakeAppRepository repository = FakeAppRepository(
@@ -90,7 +92,11 @@ void main() {
     await pumpShell(tester, repository);
     await tester.pump();
 
-    await tester.fling(find.byType(ListView), const Offset(0, 300), 1000);
+    await tester.fling(
+      find.byType(SingleChildScrollView),
+      const Offset(0, 300),
+      1000,
+    );
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 

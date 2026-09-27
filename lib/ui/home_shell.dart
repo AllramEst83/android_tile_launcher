@@ -1,7 +1,7 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
-import 'package:android_tile_launcher/ui/app_list_view.dart';
+import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
@@ -9,8 +9,7 @@ import 'package:flutter/material.dart';
 ///
 /// Back must never leave a launcher (there is nowhere to go), so the whole
 /// shell is wrapped in a `PopScope` that refuses to pop. The boot screen is
-/// also the loading state for the app list; the tile mosaic replaces the list
-/// in a later phase (plan.md, Phase 3).
+/// also the loading and error state for the tile mosaic.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.appRepository});
 
@@ -60,7 +59,7 @@ class _HomeShellState extends State<HomeShell> {
                     }
                     final List<AppInfo>? apps = snapshot.data;
                     if (apps == null) return const _BootScreen();
-                    return AppListView(
+                    return AppTileGrid(
                       apps: apps,
                       onLaunch: widget.appRepository.launch,
                       onRefresh: _refresh,
