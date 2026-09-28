@@ -8,6 +8,7 @@ import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/contacts_service.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/ui/grouped_list.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
@@ -16,8 +17,10 @@ const Key contactSearchKey = ValueKey<String>('contact-search');
 Key contactRowKey(String key) => ValueKey<String>('contact-row-$key');
 
 /// The sheet behind "+ ADD TILE" > CONTACT: everyone in the phone book with a
-/// number, searchable by name; tapping one pins them as a tile and closes.
-/// Opening it is what asks for contacts access, if that has not been given.
+/// number, filed A to Z then Å Ä Ö with a jump index like the app drawer, or a
+/// flat list while the search field has text; tapping one pins them as a tile
+/// and closes. Opening it is what asks for contacts access, if that has not
+/// been given.
 Future<void> showContactPicker(
   BuildContext context, {
   required ContactsRepository contacts,
@@ -34,7 +37,7 @@ Future<void> showContactPicker(
       final MediaQueryData media = MediaQuery.of(sheetContext);
       // Never taller than the room between the status bar and the keyboard: a
       // sheet a fixed share of the screen tall, pushed up by the keyboard,
-      // ran up under the status bar with the search field on top of the clock.
+      // ran up under the status bar with the search field over the clock.
       final double room =
           media.size.height -
           media.viewInsets.bottom -
@@ -43,10 +46,11 @@ Future<void> showContactPicker(
       return Padding(
         // Keep the list and the search field above the keyboard.
         padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: math.min(media.size.height * 0.8, room),
-          ),
+        // A fixed height, not "as tall as the list": the sheet would otherwise
+        // shrink and grow as the search narrows the list, and the jump index
+        // needs a definite height to lay its letters out in.
+        child: SizedBox(
+          height: math.min(media.size.height * 0.8, room),
           child: _ContactPicker(contacts: contacts, gridState: gridState),
         ),
       );
@@ -65,26 +69,8 @@ class _ContactPicker extends StatefulWidget {
 }
 
 class _ContactPickerState extends State<_ContactPicker> {
-  late final Future<ContactsResult> _result = widget.contacts.all().then(
-    _inPhoneBookOrder,
-  );
+  late final Future<ContactsResult> _result = widget.contacts.all();
   String _query = '';
-
-  /// By name as a Swedish phone book files it, the way the app drawer does
-  /// (A to Z, then Å, Ä, Ö), not in the provider's own order, which puts Ä
-  /// among the A's.
-  static ContactsResult _inPhoneBookOrder(ContactsResult result) {
-    if (result is! ContactsRead) return result;
-    final List<(String, int, Contact)> keyed = <(String, int, Contact)>[
-      for (final (int i, Contact c) in result.contacts.indexed)
-        (alphabeticalKey(c.name), i, c),
-    ];
-    keyed.sort((a, b) {
-      final int byName = a.$1.compareTo(b.$1);
-      return byName != 0 ? byName : a.$2.compareTo(b.$2);
-    });
-    return ContactsRead(<Contact>[for (final (_, _, c) in keyed) c]);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +80,6 @@ class _ContactPickerState extends State<_ContactPicker> {
       child: Padding(
         padding: const EdgeInsets.all(TileMetrics.margin),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             TextField(
@@ -116,7 +101,7 @@ class _ContactPickerState extends State<_ContactPicker> {
               ),
             ),
             const SizedBox(height: TileMetrics.gutter),
-            Flexible(
+            Expanded(
               child: FutureBuilder<ContactsResult>(
                 future: _result,
                 builder: (context, snapshot) {
@@ -173,31 +158,63 @@ class _ContactPickerState extends State<_ContactPicker> {
         style: text.bodyMedium,
       );
     }
-    return ListView.builder(
-      shrinkWrap: true,
-      itemCount: shown.length,
-      itemBuilder: (BuildContext context, int index) {
-        final Contact contact = shown[index];
-        return InkWell(
-          key: contactRowKey(contact.key),
-          onTap: () {
-            // In effect at once; only the save is still pending.
-            unawaited(
-              widget.gridState.pinContact(key: contact.key, name: contact.name),
-            );
-            Navigator.pop(context);
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Text(
-              contact.name.toUpperCase(),
-              style: text.bodyMedium?.copyWith(color: TileColors.textBright),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+    if (query.isEmpty) {
+      return GroupedList<Contact>(
+        items: shown,
+        label: (Contact c) => c.name,
+        rowBuilder: _row,
+      );
+    }
+    // Searching: a flat list, in phone-book order, without headers or index.
+    return ListView(
+      children: <Widget>[
+        for (final Contact c in _inPhoneBookOrder(shown)) _row(context, c),
+      ],
+    );
+  }
+
+  /// By name as a Swedish phone book files it (A to Z, then Å, Ä, Ö), the way
+  /// `GroupedList` does, for the flat search results.
+  static List<Contact> _inPhoneBookOrder(List<Contact> contacts) {
+    final List<(String, int, Contact)> keyed = <(String, int, Contact)>[
+      for (final (int i, Contact c) in contacts.indexed)
+        (alphabeticalKey(c.name), i, c),
+    ];
+    keyed.sort((a, b) {
+      final int byName = a.$1.compareTo(b.$1);
+      return byName != 0 ? byName : a.$2.compareTo(b.$2);
+    });
+    return <Contact>[for (final (_, _, c) in keyed) c];
+  }
+
+  Widget _row(BuildContext context, Contact contact) {
+    final TextTheme text = Theme.of(context).textTheme;
+    return InkWell(
+      key: contactRowKey(contact.key),
+      onTap: () {
+        // In effect at once; only the save is still pending.
+        unawaited(
+          widget.gridState.pinContact(key: contact.key, name: contact.name),
         );
+        Navigator.pop(context);
       },
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(
+          horizontal: TileMetrics.margin,
+          vertical: TileMetrics.gutter,
+        ),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: TileColors.bezel)),
+        ),
+        child: Text(
+          contact.name.toUpperCase(),
+          style: text.bodyMedium?.copyWith(color: TileColors.textBright),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
     );
   }
 }
