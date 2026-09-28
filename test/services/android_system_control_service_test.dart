@@ -40,7 +40,7 @@ void main() {
   test('isOn returns false instead of throwing on platform errors', () async {
     _mockChannel((call) async => throw PlatformException(code: 'BOOM'));
 
-    expect(await service.isOn(TileKind.doNotDisturb), isFalse);
+    expect(await service.isOn(TileKind.flashlight), isFalse);
   });
 
   test('setOn sends the kind name and the requested state', () async {
@@ -50,10 +50,10 @@ void main() {
       return null;
     });
 
-    await service.setOn(TileKind.doNotDisturb, true);
+    await service.setOn(TileKind.flashlight, true);
 
     expect(received?.method, 'setOn');
-    expect(received?.arguments, {'kind': 'doNotDisturb', 'on': true});
+    expect(received?.arguments, {'kind': 'flashlight', 'on': true});
   });
 
   test('setOn does not throw on platform errors', () async {

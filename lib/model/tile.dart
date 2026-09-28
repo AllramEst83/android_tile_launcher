@@ -6,22 +6,21 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 /// fixed identity (`"clock"`) instead. More arrive one phase at a time (a
 /// device tile in Phase 8, weather in Phase 9, ...) — see "Adding a tile
 /// kind" in .agents/architecture.md.
-enum TileKind { app, clock, soundMode, doNotDisturb, flashlight }
+enum TileKind { app, clock, soundMode, flashlight }
 
 /// The app package [tile] launches when tapped, or `null` for a tile with no
 /// launch target (every kind but [TileKind.app]).
 String? launchTargetOf(Tile tile) => tile.kind == TileKind.app ? tile.id : null;
 
-/// A human label for a system kind — "DO NOT DISTURB" for [TileKind.doNotDisturb]
+/// A human label for a system kind — "SOUND" for [TileKind.soundMode]
 /// — used wherever one is shown (the add-tile sheet, the grid editor's
 /// inspector, a toggle tile's own label) instead of formatting [TileKind.name]
 /// itself, which reads fine for one word (`CLOCK`) but not several
-/// (`DONOTDISTURB`).
+/// words.
 String displayNameOf(TileKind kind) => switch (kind) {
   TileKind.app => '',
   TileKind.clock => 'CLOCK',
   TileKind.soundMode => 'SOUND',
-  TileKind.doNotDisturb => 'DO NOT DISTURB',
   TileKind.flashlight => 'FLASHLIGHT',
 };
 

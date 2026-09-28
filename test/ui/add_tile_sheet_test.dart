@@ -38,7 +38,6 @@ void main() {
 
     expect(find.text('CLOCK'), findsOneWidget);
     expect(find.text('SOUND'), findsOneWidget);
-    expect(find.text('DO NOT DISTURB'), findsOneWidget);
     expect(find.text('FLASHLIGHT'), findsOneWidget);
   });
 

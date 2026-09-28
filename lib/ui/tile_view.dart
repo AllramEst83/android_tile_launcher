@@ -125,7 +125,6 @@ Widget tileContent(
           );
         },
       );
-    case TileKind.doNotDisturb:
     case TileKind.flashlight:
       return TilePoller(
         source: ToggleTileSource(kind: tile.kind, control: systemControl),

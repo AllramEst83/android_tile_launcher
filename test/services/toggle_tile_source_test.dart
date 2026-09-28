@@ -24,13 +24,13 @@ void main() {
   test('a fresh read reflects a state change made elsewhere', () async {
     final control = FakeSystemControlService();
     final source = ToggleTileSource(
-      kind: TileKind.doNotDisturb,
+      kind: TileKind.flashlight,
       control: control,
     );
 
     expect((await source.read() as ToggleContent).on, isFalse);
 
-    await control.setOn(TileKind.doNotDisturb, true);
+    await control.setOn(TileKind.flashlight, true);
 
     expect((await source.read() as ToggleContent).on, isTrue);
   });

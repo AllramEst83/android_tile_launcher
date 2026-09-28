@@ -13,8 +13,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Reads and changes three device-wide controls for the Dart `AndroidSystemControlService`:
- * the ringer mode (normal/vibrate/silent), Do Not Disturb and the torch.
+ * Reads and changes two device-wide controls for the Dart `AndroidSystemControlService`:
+ * the ringer mode (normal/vibrate/silent) and the torch.
  *
  * Ringer-mode and torch queries are cheap main-thread system calls, unlike
  * [AppsChannelHandler]'s package-manager query, so everything here runs on
@@ -64,9 +64,6 @@ class SystemControlChannelHandler(
         cameraManager.unregisterTorchCallback(torchCallback)
     }
 
-    // While Do Not Disturb is on, Android reports the ringer as silent whatever
-    // it was set to -- this is what the phone is actually doing, so it is what
-    // the tile shows.
     private fun soundMode(): String =
         when (audioManager.ringerMode) {
             AudioManager.RINGER_MODE_SILENT -> "silent"
@@ -74,58 +71,47 @@ class SystemControlChannelHandler(
             else -> "normal"
         }
 
-    private fun isOn(kind: String?): Boolean =
-        when (kind) {
-            "doNotDisturb" ->
-                notificationManager.currentInterruptionFilter !=
-                    NotificationManager.INTERRUPTION_FILTER_ALL
-            "flashlight" -> torchOn
-            else -> false
-        }
+    private fun isOn(kind: String?): Boolean = kind == "flashlight" && torchOn
 
     private fun setOn(kind: String?, on: Boolean) {
-        when (kind) {
-            "doNotDisturb" ->
-                withPolicyAccess {
-                    notificationManager.setInterruptionFilter(
-                        if (on) NotificationManager.INTERRUPTION_FILTER_PRIORITY
-                        else NotificationManager.INTERRUPTION_FILTER_ALL,
+        if (kind == "flashlight") setTorch(on)
+    }
+
+    // Silent is reached the way the volume rocker reaches it -- lowering the
+    // ring volume while in vibrate -- not with setRingerMode(SILENT): an app's
+    // silent request is treated as "turn Do Not Disturb on" and leaves the
+    // ringer at vibrate, so the system's crossed-bell state is never entered.
+    private fun setSoundMode(mode: String?) {
+        val current = audioManager.ringerMode
+        when (mode) {
+            "normal" ->
+                withPolicyAccess(needed = current == AudioManager.RINGER_MODE_SILENT) {
+                    audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
+                }
+            "vibrate" ->
+                withPolicyAccess(needed = current == AudioManager.RINGER_MODE_SILENT) {
+                    audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
+                }
+            "silent" ->
+                withPolicyAccess(needed = true) {
+                    if (current != AudioManager.RINGER_MODE_VIBRATE) {
+                        audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
+                    }
+                    audioManager.adjustStreamVolume(
+                        AudioManager.STREAM_RING,
+                        AudioManager.ADJUST_LOWER,
+                        0,
                     )
                 }
-            "flashlight" -> setTorch(on)
         }
     }
 
-    // Clears Do Not Disturb first: it masks the ringer (reads as silent), and
-    // leaving silent only lifts "alarms only"/"total silence" DND on some
-    // versions, so without this a tap could appear to do nothing.
-    private fun setSoundMode(mode: String?) {
-        val ringer =
-            when (mode) {
-                "vibrate" -> AudioManager.RINGER_MODE_VIBRATE
-                "silent" -> AudioManager.RINGER_MODE_SILENT
-                "normal" -> AudioManager.RINGER_MODE_NORMAL
-                else -> return
-            }
-        withPolicyAccess {
-            if (notificationManager.currentInterruptionFilter !=
-                NotificationManager.INTERRUPTION_FILTER_ALL
-            ) {
-                notificationManager.setInterruptionFilter(
-                    NotificationManager.INTERRUPTION_FILTER_ALL,
-                )
-            }
-            audioManager.ringerMode = ringer
-        }
-    }
-
-    // Changing the ringer to/from silent and changing Do Not Disturb both need
-    // notification policy access -- a special permission granted only via
-    // Settings, never a runtime dialog. Without it these throw
-    // SecurityException on some OEMs and silently no-op on others; route to that
-    // Settings screen instead of failing either way.
-    private fun withPolicyAccess(change: () -> Unit) {
-        if (!notificationManager.isNotificationPolicyAccessGranted) {
+    // Entering or leaving silent needs notification policy access -- a special
+    // permission granted only via Settings, never a runtime dialog. Without it
+    // this throws SecurityException on some OEMs and silently no-ops on others;
+    // route to that Settings screen instead of failing either way.
+    private fun withPolicyAccess(needed: Boolean, change: () -> Unit) {
+        if (needed && !notificationManager.isNotificationPolicyAccessGranted) {
             val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
