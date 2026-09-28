@@ -59,8 +59,17 @@ class TextTvTileContentView extends StatelessWidget {
   }
 }
 
-TextStyle _text(Color ink, double size) =>
-    TextStyle(fontFamily: kPixelFontFamily, fontSize: size, color: ink);
+/// The box one line of tile text sits in, as a multiple of its type size. Set
+/// here rather than left to the font, so a row's height is known from its type
+/// size alone and a wrapped line sits exactly one row below the one above it.
+const double _leading = 1.45;
+
+TextStyle _text(Color ink, double size) => TextStyle(
+  fontFamily: kPixelFontFamily,
+  fontSize: size,
+  height: _leading,
+  color: ink,
+);
 
 class _Plain extends StatelessWidget {
   const _Plain({required this.lines, required this.ink});
@@ -77,7 +86,7 @@ class _Plain extends StatelessWidget {
         Text(Messages.textTvTitle, style: _text(ink, 10)),
         const SizedBox(height: 6),
         for (final String line in lines)
-          Text(line, style: _text(ink, 8), softWrap: true),
+          Text(line, style: _text(ink, 9), softWrap: true),
       ],
     );
   }
@@ -96,9 +105,46 @@ class _Headlines extends StatelessWidget {
   final double width;
   final double height;
 
+  /// Under this a tile has room for the name and the page number, no more.
   static const double _compact = 120;
-  static const double _lineHeight = 16;
-  static const double _headerHeight = 24;
+
+  /// Headline type, and the box one line of it sits in. Big enough to read at
+  /// arm's length: a headline nobody can read is worth no tile space at all.
+  static const double _headline = 11;
+  static const double _lineHeight = _headline * _leading;
+
+  /// Air between two headlines, so the list reads as separate stories rather
+  /// than one block of text.
+  static const double _gap = 5;
+
+  /// Room for the header line: taller than the title's own text needs, so
+  /// there is a clear step down to the first headline below it, the way the
+  /// mail tile's header (sized to fit its big unread count) leaves under
+  /// `MAIL`.
+  static const double _headerHeight = 28;
+
+  /// How far a headline sits in from the tile's left edge: the same indent
+  /// the mail tile's messages have under `MAIL` (there, room for the unread
+  /// marker; here, just to match it), so the two list tiles read alike.
+  static const double _indent = 14;
+
+  /// The most lines the headline at [index] may wrap to: the lead story, the
+  /// one the page leads with, gets an extra one over the rest.
+  int _cap(int index) => index == 0 ? 3 : 2;
+
+  /// How many lines [text] actually needs to read in full at [width], up to
+  /// [cap]: a short headline costs one line, so the tile fits more of them; a
+  /// long one wraps rather than being cut, as far as there is room for.
+  int _linesNeeded(BuildContext context, String text, int cap, double width) {
+    final TextPainter painter = TextPainter(
+      text: TextSpan(text: text, style: _text(ink, _headline)),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: width);
+    final int lines = painter.computeLineMetrics().length;
+    painter.dispose();
+    return lines.clamp(1, cap);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,10 +164,43 @@ class _Headlines extends StatelessWidget {
       );
     }
     final List<String> headlines = textTvHeadlines(page);
-    final int fit = ((height - _headerHeight) / _lineHeight).floor().clamp(
-      0,
-      headlines.length,
-    );
+    final double room = height - _headerHeight;
+    final double textWidth = width - _indent;
+    final List<Widget> rows = <Widget>[];
+    double used = 0;
+    for (final (int i, String line) in headlines.indexed) {
+      if (i == 0 && room <= 0) break;
+      final int wanted = _linesNeeded(
+        context,
+        line.toUpperCase(),
+        _cap(i),
+        textWidth,
+      );
+      // The lead story is shown even on a tile too short for all its lines,
+      // with however many of them fit; every later one is all or nothing.
+      final int lines = i == 0
+          ? (room / _lineHeight).floor().clamp(1, wanted)
+          : wanted;
+      final double needed = lines * _lineHeight + (i == 0 ? 0 : _gap);
+      if (i > 0 && used + needed > room) break;
+      rows.add(
+        Padding(
+          key: textTvHeadlineKey(i),
+          padding: EdgeInsets.only(top: i == 0 ? 0 : _gap, left: _indent),
+          child: SizedBox(
+            width: textWidth,
+            height: lines * _lineHeight,
+            child: Text(
+              line.toUpperCase(),
+              style: _text(ink, _headline),
+              maxLines: lines,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      );
+      used += needed;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -131,21 +210,11 @@ class _Headlines extends StatelessWidget {
             children: <Widget>[
               Text(Messages.textTvTitle, style: _text(ink, 10)),
               const Spacer(),
-              Text('${page.number}', style: _text(ink, 8)),
+              Text('${page.number}', style: _text(ink, 10)),
             ],
           ),
         ),
-        for (final (int i, String line) in headlines.take(fit).indexed)
-          SizedBox(
-            key: textTvHeadlineKey(i),
-            height: _lineHeight,
-            child: Text(
-              line.toUpperCase(),
-              style: _text(ink, 8),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+        ...rows,
       ],
     );
   }
