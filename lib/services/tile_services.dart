@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/weather_repository.dart';
@@ -10,9 +11,11 @@ class TileServices {
     required this.systemControl,
     required this.device,
     required this.weather,
+    required this.agenda,
   });
 
   final SystemControlService systemControl;
   final DeviceRepository device;
   final WeatherRepository weather;
+  final AgendaRepository agenda;
 }

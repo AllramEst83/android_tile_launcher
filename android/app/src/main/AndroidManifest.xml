@@ -9,6 +9,7 @@
     <!-- ...for roughly where the phone is. Coarse only: a forecast needs no
          more, and precise location is never requested. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 
     <!-- Lets the silent-mode/vibration-mode tiles query and (once the user
          grants Do-Not-Disturb access via Settings) set the ringer mode. -->

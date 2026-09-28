@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
@@ -76,6 +77,19 @@ class DeviceContent extends TileContent {
 
   @override
   String toString() => 'DeviceContent($status)';
+}
+
+/// The agenda tile's content: the coming events, or the reason there are none
+/// to show, and the moment they were read (what "now" and "today" mean to the
+/// view, so it never asks the clock itself).
+class AgendaContent extends TileContent {
+  const AgendaContent({required this.snapshot, required this.now});
+
+  final AgendaSnapshot snapshot;
+  final DateTime now;
+
+  @override
+  String toString() => 'AgendaContent($snapshot, $now)';
 }
 
 /// The weather tile's content: a forecast, or the reason there is none.

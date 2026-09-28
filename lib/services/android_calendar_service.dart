@@ -1,0 +1,109 @@
+import 'dart:async';
+
+import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/services/calendar_service.dart';
+import 'package:flutter/services.dart';
+
+/// [CalendarService] backed by the Kotlin `CalendarChannelHandler`. The only
+/// file that knows about the channel. Never asks for permission itself.
+class AndroidCalendarService implements CalendarService {
+  const AndroidCalendarService({
+    this.channel = const MethodChannel(channelName),
+    this.timeout = const Duration(seconds: 15),
+  });
+
+  static const String channelName =
+      'com.codedbykay.android_tile_launcher/calendar';
+
+  final MethodChannel channel;
+
+  /// Only guards against a reply that never comes.
+  final Duration timeout;
+
+  @override
+  Future<CalendarResult> events({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    try {
+      // All-day events are stored as UTC midnights, so near the edge of the
+      // range one can sit up to a day outside it in UTC terms. Ask for a day
+      // either side and filter properly once the times are local.
+      final List<Map<Object?, Object?>>? raw = await channel
+          .invokeListMethod<Map<Object?, Object?>>('events', <String, Object?>{
+            'begin': from
+                .subtract(const Duration(days: 1))
+                .millisecondsSinceEpoch,
+            'end': to.add(const Duration(days: 1)).millisecondsSinceEpoch,
+          })
+          .timeout(timeout);
+      final List<CalendarEvent> events =
+          <CalendarEvent>[
+              for (final Map<Object?, Object?> entry
+                  in raw ?? const <Map<Object?, Object?>>[])
+                ?_parse(entry),
+            ].where((CalendarEvent e) => _overlaps(e, from, to)).toList()
+            ..sort(_byStart);
+      return CalendarEvents(List<CalendarEvent>.unmodifiable(events));
+    } on PlatformException catch (error) {
+      return switch (error.code) {
+        'NO_PERMISSION' => const CalendarNoAccess(),
+        _ => const CalendarUnavailable('could not read the calendar'),
+      };
+    } on MissingPluginException {
+      return const CalendarUnavailable('calendar is not supported here');
+    } on TimeoutException {
+      return const CalendarUnavailable('the calendar did not answer');
+    }
+  }
+
+  static CalendarEvent? _parse(Map<Object?, Object?> entry) {
+    final Object? id = entry['id'];
+    final Object? begin = entry['begin'];
+    final Object? end = entry['end'];
+    if (id is! int || begin is! int || end is! int) return null;
+    final bool allDay = entry['allDay'] == true;
+    final DateTime start = _local(begin, allDay);
+    DateTime stop = _local(end, allDay);
+    // A broken range would never show; make it the shortest sensible one.
+    if (stop.isBefore(start)) {
+      stop = allDay ? DateTime(start.year, start.month, start.day + 1) : start;
+    }
+    final Object? title = entry['title'];
+    final Object? location = entry['location'];
+    return CalendarEvent(
+      id: id,
+      title: title is String ? title.trim() : '',
+      start: start,
+      end: stop,
+      allDay: allDay,
+      location: location is String && location.trim().isNotEmpty
+          ? location.trim()
+          : null,
+    );
+  }
+
+  /// A timed event is an instant; an all-day one is a *date*, stored as UTC
+  /// midnight, whose calendar day must not shift with the time zone.
+  static DateTime _local(int millis, bool allDay) {
+    if (!allDay) return DateTime.fromMillisecondsSinceEpoch(millis);
+    final DateTime utc = DateTime.fromMillisecondsSinceEpoch(
+      millis,
+      isUtc: true,
+    );
+    return DateTime(utc.year, utc.month, utc.day);
+  }
+
+  static bool _overlaps(CalendarEvent event, DateTime from, DateTime to) =>
+      event.start.isBefore(to) &&
+      (event.end.isAfter(from) ||
+          // An event with no length is a moment: it is in range if it is in it.
+          (event.end == event.start && !event.start.isBefore(from)));
+
+  static int _byStart(CalendarEvent a, CalendarEvent b) {
+    final int byStart = a.start.compareTo(b.start);
+    if (byStart != 0) return byStart;
+    if (a.allDay != b.allDay) return a.allDay ? -1 : 1;
+    return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+  }
+}

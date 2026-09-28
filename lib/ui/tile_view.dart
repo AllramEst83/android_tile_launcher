@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_content.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
+import 'package:android_tile_launcher/services/agenda_repository.dart';
+import 'package:android_tile_launcher/services/agenda_tile_source.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
 import 'package:android_tile_launcher/services/sound_mode_tile_source.dart';
@@ -13,6 +16,8 @@ import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/services/toggle_tile_source.dart';
 import 'package:android_tile_launcher/services/weather_repository.dart';
 import 'package:android_tile_launcher/services/weather_tile_source.dart';
+import 'package:android_tile_launcher/ui/agenda_sheet.dart';
+import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
@@ -139,6 +144,28 @@ Widget tileContent(
           );
         },
       );
+    case TileKind.agenda:
+      final AgendaRepository agenda = services.agenda;
+      return TilePoller(
+        source: AgendaTileSource(repository: agenda),
+        interval: const Duration(minutes: 1),
+        builder: (context, content, refreshNow) {
+          final AgendaContent agendaContent = content as AgendaContent;
+          return AgendaTileContentView(
+            snapshot: agendaContent.snapshot,
+            now: agendaContent.now,
+            ink: tile.colour.ink,
+            onTap: interactive
+                ? () => _agendaTap(
+                    context,
+                    agenda,
+                    agendaContent.snapshot,
+                    refreshNow,
+                  )
+                : null,
+          );
+        },
+      );
     case TileKind.soundMode:
       return TilePoller(
         source: SoundModeTileSource(control: systemControl),
@@ -208,6 +235,28 @@ Future<void> _weatherTap(WeatherRepository weather, WeatherSnapshot snapshot) {
     WeatherLocationUnavailable() => weather.locate(),
     WeatherReady() || WeatherOffline() => weather.current(force: true),
   };
+}
+
+/// What a tap on the agenda tile does: open the day and week when there are
+/// events to show; otherwise fix what is in the way (ask for the calendar, or
+/// read it again). Nothing when Android has stopped asking — the tile says
+/// where the setting is.
+void _agendaTap(
+  BuildContext context,
+  AgendaRepository agenda,
+  AgendaSnapshot snapshot,
+  VoidCallback refreshNow,
+) {
+  switch (snapshot) {
+    case AgendaReady():
+      unawaited(showAgendaSheet(context, repository: agenda));
+    case AgendaDenied(permanent: true):
+      break;
+    case AgendaNeedsPermission() || AgendaDenied():
+      unawaited(_act(agenda.allow, refreshNow));
+    case AgendaUnavailable():
+      refreshNow();
+  }
 }
 
 /// An app tile's content: a monochrome glyph — its label's first letter,

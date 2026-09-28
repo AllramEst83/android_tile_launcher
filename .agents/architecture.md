@@ -13,18 +13,21 @@ lib/
   messages.dart              # user-facing strings
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
-    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed
+    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     list_reorder.dart        # moveItem<T>: pure ReorderableListView-style index move, for drag-to-reorder
+    calendar_event.dart      # CalendarEvent: id, title, start/end (local; all-day = half-open dates), allDay, location
+    agenda_snapshot.dart     # AgendaSnapshot (sealed): AgendaReady(events) / NeedsPermission / Denied(permanent) / Unavailable(reason)
+    agenda_format.dart       # startOfDay/addDays, occursOn, groupByDay, nextEvent, formatDayHeading/formatWhen/formatSpan
     weather.dart             # Place, Conditions, DayForecast, Forecast; WeatherKind + weatherKind(code); describeWeather(code) (WMO codes, upper case)
     weather_snapshot.dart    # WeatherSnapshot (sealed): WeatherReady(forecast, stale) / NeedsPlace / LocationDenied / LocationUnavailable / Offline
     weather_format.dart      # formatDegrees, weekdayAbbreviation
     device_status.dart       # DeviceStatus: battery %, charging, storage free/total (each nullable); free/battery fractions for the bars
     device_format.dart       # formatBattery/formatStorageFree: DeviceStatus -> the tile's strings
     sound_mode.dart          # SoundMode (normal/vibrate/silent): the ringer, with its tap cycle and label
-    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, WeatherContent, SoundContent, ToggleContent)
+    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, WeatherContent, AgendaContent, SoundContent, ToggleContent)
     clock_format.dart        # formatClockTime/formatClockDate: DateTime -> the tile's display strings
     alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets (Swedish order); shared by the app drawer and the contacts tile (Phase 11)
     app_matcher.dart         # rankApps: best-match-first search ranking, for the drawer's search field
@@ -53,7 +56,12 @@ lib/
     android_location_service.dart  # asks PermissionService for location, then the Kotlin channel
     permission_service.dart  # abstract: request(AppPermission) -> granted / denied / permanentlyDenied (only `location` so far)
     android_permission_service.dart  # MethodChannel implementation
-    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather), bundled
+    calendar_service.dart    # abstract read-only: events(from, to) -> CalendarEvents / CalendarNoAccess / CalendarUnavailable; never asks for permission
+    android_calendar_service.dart  # MethodChannel implementation: all-day UTC midnights -> local dates, range filter, sort
+    agenda_repository.dart   # abstract: between(from, to) -> AgendaSnapshot; allow() asks for calendar access (tap only)
+    live_agenda_repository.dart  # LiveAgendaRepository: CalendarService + PermissionService; remembers a refusal until a read succeeds
+    agenda_tile_source.dart  # AgendaTileSource: now .. end of the 7th day, with the moment it read (AgendaContent.now)
+    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather, agenda), bundled
     device_repository.dart   # abstract: Future<DeviceStatus> status(); never throws
     android_device_repository.dart  # MethodChannel implementation
     device_tile_source.dart  # DeviceTileSource: the repository's status as DeviceContent
@@ -67,6 +75,8 @@ lib/
     tile_view.dart           # chrome shell (fill, bevel/selection, delete badge) + tileContent(tile) dispatcher + AppTileContent
     tile_poller.dart         # TilePoller: rebuilds from a TileSource on an interval, paused while backgrounded; builder gets a refreshNow to re-read early
     clock_tile_view.dart     # ClockTileContentView: the clock's content -- time large, date small
+    agenda_tile_view.dart    # AgendaTileContentView: fits its size (small: when+title; medium: +place, +N more; wide: as many one-line events as the height holds)
+    agenda_sheet.dart        # showAgendaSheet: DAY / WEEK toggle, events under a heading per day (opened by tapping a ready agenda tile)
     weather_tile_view.dart   # WeatherTileContentView: fits its size (small: sky+temp; medium: +words/place/source; wide: +5 days); states without a forecast say why
     weather_icon.dart        # WeatherIcon: 12x12 pixel-block sky pictures, drawn from bitmaps in the tile's ink
     device_tile_view.dart    # DeviceTileContentView: battery and free storage, each a label + value + flat bar
@@ -79,6 +89,7 @@ lib/
 android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   MainActivity.kt            # wires channel handlers into the Flutter engine
   AppsChannelHandler.kt      # list/launch/uninstall/openAppDetails; listing runs off the main thread
+  CalendarChannelHandler.kt  # read-only CalendarContract.Instances query (visible calendars, not cancelled), raw times, off the main thread
   LocationChannelHandler.kt  # coarse position from the network (else fused) provider, named by Android's geocoder when it can
   PermissionsChannelHandler.kt  # runtime permission requests; MainActivity forwards onRequestPermissionsResult
   DeviceChannelHandler.kt    # battery (sticky broadcast) and storage (StatFs); no permissions
@@ -168,3 +179,8 @@ Record decisions that future agents can't derive from code (append, newest last)
 - Location is coarse only (`ACCESS_COARSE_LOCATION`; the system dialog offers "approximate" only). The Kotlin handler uses the network provider if enabled, else the fused provider (Android 12+); the port used the network provider alone, so a phone without one (no Play services, Google Location Accuracy off) reported "location is switched off" while it was on. GPS is never used: it needs precise location. `INTERNET` is now in the main manifest (it was only in debug/profile), which a release build needs.
 - The weather tile chooses its layout from the width it is given (`_compact` 120, `_wide` 260 logical px), not from `TileSize`, so it follows the grid's cell maths and any future size: small shows the sky and temperature; medium adds the words, place and source (SMHI's licence is CC BY, so the source is always credited); wide adds five day columns. Sky pictures are 12x12 pixel-block bitmaps painted with anti-aliasing off (hairline seams otherwise), not the sibling's anti-aliased line drawings, to keep the hard-edged look.
 - Testing location on the emulator needs a mock provider: the emulator's `geo fix` feeds only GPS, which a coarse-only app cannot use, so the fused provider returns "no location fix". `adb -s emulator-5554 shell appops set com.android.shell android:mock_location allow`, then `cmd location providers add-test-provider network`, `set-test-provider-enabled network true`, `set-test-provider-location network --location 57.70,11.97 --accuracy 500` (and `remove-test-provider` + `appops ... deny` afterwards) gives the app a position.
+- Phase 10's calendar reading is a trimmed port of the sibling's `CalendarService`/`CalendarChannelHandler` (read only: no writable calendars, add/edit/delete, colour or description; those come with the write phase). One difference that matters: the sibling's `AndroidCalendarService` asks for permission itself, this one never does. It reports `CalendarNoAccess` and `LiveAgendaRepository.allow()` (a tap) asks `PermissionService`, so a dialog can never appear on its own, the same rule as the weather tile.
+- Android reports "no access" the same way whether the user was never asked or refused, so `LiveAgendaRepository` remembers the outcome of `allow()` (`AgendaDenied(permanent)`) and shows it until a read succeeds. A read that succeeds clears it, so allowing the calendar in Android's settings heals the tile at the next poll (found and shown on the emulator with `pm grant`); a later loss of access is "not asked" again, not "refused".
+- The agenda tile leads with the first *timed* event (`nextEvent`), not the first event: all-day entries such as birthdays sort first and would hide the meeting. The wide list keeps provider order. `AgendaContent` carries the `now` it was read at, so views and formatting never read the clock (`formatWhen` says NOW for an event under way, a bare time today, `TUE 09:00` later). Layout follows the width and height it is given, like the weather tile: small < 120, medium < 260, then a list with as many one-line rows as the height allows and a `+N` for the rest.
+- A tap on a ready agenda tile opens `showAgendaSheet` (DAY = today, WEEK = seven days), the only tile so far whose tap opens a view rather than acting; any other state's tap fixes what is in the way (ask, retry, nothing when permanently refused). `groupByDay` lists a multi-day event under every day it touches and drops empty days; `formatSpan` words the hours per day (`09:00-10:30`, `FROM 22:00`, `UNTIL 02:00`, `ALL DAY`). Days are always built from the calendar date (`addDays`), never by adding 24 hours. The hours sit on their own line above the title: a side column wrapped `12:43-13:13` on the emulator.
+- Testing the calendar on the emulator needs a local account: insert into `content://com.android.calendar/calendars?caller_is_syncadapter=true&account_name=tiletest&account_type=LOCAL` (calendar_access_level 700, visible 1, sync_events 1), then rows into `.../events` with `calendar_id`, `dtstart`/`dtend` (epoch ms), `eventTimezone`; delete the calendar the same way afterwards. `adb shell pm grant <pkg> android.permission.READ_CALENDAR` stands in for allowing it in Settings.

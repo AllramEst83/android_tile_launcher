@@ -36,4 +36,15 @@ abstract final class Messages {
   static const String weatherTapToRetry = 'TAP TO RETRY';
   static const String weatherOffline = 'NO CONNECTION.';
   static const String weatherOld = 'OLD';
+
+  static const String agendaTitle = 'AGENDA';
+  static const String agendaTapToAllow = 'TAP TO ALLOW CALENDAR';
+  static const String agendaAllowInSettings =
+      'ALLOW CALENDAR IN ANDROID SETTINGS';
+  static const String agendaTapToRetry = 'TAP TO RETRY';
+  static const String agendaNothingPlanned = 'NOTHING PLANNED.';
+  static const String agendaNothingToday = 'NOTHING TODAY.';
+  static const String agendaDay = 'DAY';
+  static const String agendaWeek = 'WEEK';
+  static const String agendaUntitled = '(NO TITLE)';
 }

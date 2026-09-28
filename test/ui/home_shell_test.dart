@@ -1,5 +1,7 @@
 import 'package:android_tile_launcher/messages.dart';
+import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
@@ -9,6 +11,8 @@ import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
+import 'package:android_tile_launcher/ui/agenda_sheet.dart';
+import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
@@ -21,6 +25,7 @@ import 'package:android_tile_launcher/ui/weather_tile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../fakes/fake_agenda_repository.dart';
 import '../fakes/fake_app_repository.dart';
 import '../fakes/fake_device_repository.dart';
 import '../fakes/fake_system_control_service.dart';
@@ -45,6 +50,7 @@ Future<void> pumpShell(
   FakeSystemControlService? systemControlService,
   FakeDeviceRepository? deviceRepository,
   FakeWeatherRepository? weatherRepository,
+  FakeAgendaRepository? agendaRepository,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
@@ -55,6 +61,7 @@ Future<void> pumpShell(
         systemControl: systemControlService ?? FakeSystemControlService(),
         device: deviceRepository ?? FakeDeviceRepository(),
         weather: weatherRepository ?? FakeWeatherRepository(),
+        agenda: agendaRepository ?? FakeAgendaRepository(),
       ),
     ),
   ),
@@ -431,6 +438,112 @@ void main() {
       expect(weather.locateCalls, 0);
       expect(
         _onHome(find.text(Messages.weatherAllowInSettings)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'tapping the agenda tile asks for the calendar, then shows it',
+      (WidgetTester tester) async {
+        final GridState gridState = _gridState();
+        final DateTime today = DateTime.now();
+        final FakeAgendaRepository agenda = FakeAgendaRepository(
+          const AgendaNeedsPermission(),
+          AgendaReady(<CalendarEvent>[
+            CalendarEvent(
+              id: 1,
+              title: 'Holiday',
+              start: DateTime(today.year, today.month, today.day),
+              end: DateTime(today.year, today.month, today.day + 1),
+              allDay: true,
+            ),
+          ]),
+        );
+        await pumpShell(
+          tester,
+          FakeAppRepository(),
+          gridState: gridState,
+          agendaRepository: agenda,
+        );
+        await tester.pump();
+        await gridState.pinSystemTile(TileKind.agenda);
+        await tester.pumpAndSettle();
+
+        expect(_onHome(find.text(Messages.agendaTapToAllow)), findsOneWidget);
+
+        await tester.tap(_onHome(find.byType(AgendaTileContentView)));
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 500));
+
+        expect(agenda.allowCalls, 1);
+        expect(_onHome(find.text('HOLIDAY')), findsOneWidget);
+      },
+    );
+
+    testWidgets('tapping an agenda tile with events opens the day and week', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final DateTime today = DateTime.now();
+      final FakeAgendaRepository agenda = FakeAgendaRepository(
+        AgendaReady(<CalendarEvent>[
+          CalendarEvent(
+            id: 1,
+            title: 'Holiday',
+            start: DateTime(today.year, today.month, today.day),
+            end: DateTime(today.year, today.month, today.day + 1),
+            allDay: true,
+          ),
+        ]),
+      );
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        agendaRepository: agenda,
+      );
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.agenda);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.byType(AgendaTileContentView)));
+      await tester.pumpAndSettle();
+
+      expect(agenda.allowCalls, 0);
+      expect(find.byKey(agendaWeekToggleKey), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text('HOLIDAY'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a permanently refused agenda tile is not asked again', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeAgendaRepository agenda = FakeAgendaRepository(
+        const AgendaDenied(permanent: true),
+      );
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        agendaRepository: agenda,
+      );
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.agenda);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.byType(AgendaTileContentView)));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(agenda.allowCalls, 0);
+      expect(
+        _onHome(find.text(Messages.agendaAllowInSettings)),
         findsOneWidget,
       );
     });

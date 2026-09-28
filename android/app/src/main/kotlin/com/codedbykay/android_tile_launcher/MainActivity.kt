@@ -9,6 +9,7 @@ class MainActivity : FlutterActivity() {
     private var deviceChannel: DeviceChannelHandler? = null
     private var permissionsChannel: PermissionsChannelHandler? = null
     private var locationChannel: LocationChannelHandler? = null
+    private var calendarChannel: CalendarChannelHandler? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -20,6 +21,7 @@ class MainActivity : FlutterActivity() {
         // needs `this`, not the application context.
         permissionsChannel = PermissionsChannelHandler(this, messenger)
         locationChannel = LocationChannelHandler(applicationContext, messenger)
+        calendarChannel = CalendarChannelHandler(applicationContext, messenger)
     }
 
     override fun onRequestPermissionsResult(
@@ -45,6 +47,8 @@ class MainActivity : FlutterActivity() {
         permissionsChannel = null
         locationChannel?.dispose()
         locationChannel = null
+        calendarChannel?.dispose()
+        calendarChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }
