@@ -2,45 +2,72 @@ import 'package:android_tile_launcher/model/list_reorder.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('moveItem', () {
-    test('moving forward: the item takes the target\'s slot', () {
-      final result = moveItem(['A', 'B', 'C', 'D'], from: 0, to: 2);
+  group('moveBeside', () {
+    List<String> move(int from, int target, {required bool after}) =>
+        moveBeside(
+          ['A', 'B', 'C', 'D'],
+          from: from,
+          target: target,
+          after: after,
+        );
 
-      expect(result, ['B', 'C', 'A', 'D']);
+    test('before a later item', () {
+      expect(move(0, 2, after: false), ['B', 'A', 'C', 'D']);
     });
 
-    test('moving backward: the item takes the target\'s slot', () {
-      final result = moveItem(['A', 'B', 'C', 'D'], from: 3, to: 1);
-
-      expect(result, ['A', 'D', 'B', 'C']);
+    test('after a later item', () {
+      expect(move(0, 2, after: true), ['B', 'C', 'A', 'D']);
     });
 
-    test('dropping on the next neighbour swaps the two', () {
-      expect(moveItem(['A', 'B', 'C'], from: 0, to: 1), ['B', 'A', 'C']);
-      expect(moveItem(['A', 'B', 'C'], from: 1, to: 0), ['B', 'A', 'C']);
+    test('before an earlier item', () {
+      expect(move(3, 1, after: false), ['A', 'D', 'B', 'C']);
     });
 
-    test('dropping on the last item puts the moved one last', () {
-      expect(moveItem(['A', 'B', 'C'], from: 0, to: 2), ['B', 'C', 'A']);
+    test('after an earlier item', () {
+      expect(move(3, 1, after: true), ['A', 'B', 'D', 'C']);
     });
 
-    test('moving to the same index changes nothing', () {
+    test('after the last item puts it last', () {
+      expect(move(0, 3, after: true), ['B', 'C', 'D', 'A']);
+    });
+
+    test('before the first item puts it first', () {
+      expect(move(3, 0, after: false), ['D', 'A', 'B', 'C']);
+    });
+
+    test('the far side of a neighbour is the near side of the next', () {
+      expect(move(0, 1, after: true), move(0, 2, after: false));
+      expect(move(3, 2, after: false), move(3, 1, after: true));
+    });
+
+    test(
+      'beside its own neighbour on the side it already is changes nothing',
+      () {
+        expect(move(1, 2, after: false), ['A', 'B', 'C', 'D']);
+        expect(move(1, 0, after: true), ['A', 'B', 'C', 'D']);
+      },
+    );
+
+    test('onto itself changes nothing', () {
       final items = ['A', 'B', 'C'];
 
-      expect(identical(moveItem(items, from: 1, to: 1), items), isTrue);
+      expect(
+        identical(moveBeside(items, from: 1, target: 1, after: true), items),
+        isTrue,
+      );
     });
 
     test('an out-of-range index changes nothing', () {
       final items = ['A', 'B', 'C'];
 
-      expect(moveItem(items, from: -1, to: 1), items);
-      expect(moveItem(items, from: 0, to: 5), items);
+      expect(moveBeside(items, from: -1, target: 1, after: false), items);
+      expect(moveBeside(items, from: 0, target: 5, after: true), items);
     });
 
     test('does not mutate the input list', () {
       final items = ['A', 'B', 'C'];
 
-      moveItem(items, from: 0, to: 2);
+      moveBeside(items, from: 0, target: 2, after: true);
 
       expect(items, ['A', 'B', 'C']);
     });

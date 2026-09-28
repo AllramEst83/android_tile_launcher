@@ -9,9 +9,13 @@ import 'package:android_tile_launcher/ui/tile_grid.dart';
 import 'package:android_tile_launcher/ui/tile_view.dart';
 import 'package:flutter/material.dart';
 
-/// The grid editor's canvas: hold a tile and drag it onto another to put it in
-/// that tile's place, tap one to select it (for the inspector panel below), or
-/// delete it. Never launches an app — that only happens outside edit mode.
+/// The grid editor's canvas: hold a tile and drag it to another to move it
+/// there, tap one to select it (for the inspector panel below), or delete it.
+/// Never launches an app — that only happens outside edit mode.
+///
+/// While a tile is held over another, a line down that tile's left or right
+/// edge shows where it will go: before it if the finger is on its left half,
+/// after it if on its right half.
 ///
 /// A tile is picked up by holding it, not by dragging it straight away, so a
 /// plain drag still scrolls a grid taller than the screen; and while one is
@@ -35,7 +39,9 @@ class EditableTileGrid extends StatefulWidget {
   final String? selected;
   final ValueChanged<String> onSelect;
   final ValueChanged<String> onDelete;
-  final void Function(String moving, String target) onReorder;
+
+  /// [after] is which side of [target] the moved tile goes on.
+  final void Function(String moving, String target, bool after) onReorder;
 
   /// How long a tile is held before it comes off the grid.
   static const Duration pickUpDelay = Duration(milliseconds: 200);
@@ -50,8 +56,20 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   static const double _edge = 96;
   static const double _maxStep = 18;
 
+  /// Width of the insertion line; it sits in the gutter between two tiles.
+  static const double _lineWidth = 6;
+
+  final GlobalKey _gridKey = GlobalKey();
   Timer? _scrollTimer;
-  double _pointerY = 0;
+  Offset _pointer = Offset.zero;
+
+  /// The size of the tile being held. The ghost is anchored by its middle, so
+  /// the finger is that far in from the ghost's top-left corner.
+  Size _heldSize = Size.zero;
+
+  /// The tile a held one is over and which side of it the drop would be on,
+  /// or null when it is over none.
+  ({String id, bool after})? _drop;
 
   @override
   void dispose() {
@@ -60,7 +78,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   }
 
   void _dragMoved(Offset globalPosition) {
-    _pointerY = globalPosition.dy;
+    _pointer = globalPosition;
     _scrollTimer ??= Timer.periodic(
       const Duration(milliseconds: 16),
       (_) => _scrollTowardsPointer(),
@@ -70,6 +88,33 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   void _dragEnded() {
     _scrollTimer?.cancel();
     _scrollTimer = null;
+    _clearDrop();
+  }
+
+  /// Whether the finger is on the right half of [r], the tile it is over.
+  /// [ghostTopLeft] is where the drag details put the held tile's ghost; the
+  /// finger is read from that rather than from the drag's own updates, which
+  /// can arrive after the target's.
+  bool _onRightHalf(TileRect r, Offset ghostTopLeft) {
+    final RenderObject? grid = _gridKey.currentContext?.findRenderObject();
+    if (grid is! RenderBox || !grid.attached) return false;
+    final Offset finger = ghostTopLeft + _heldSize.center(Offset.zero);
+    return grid.globalToLocal(finger).dx > r.left + r.width / 2;
+  }
+
+  void _hoverOver(TileRect r, Offset ghostTopLeft) {
+    final ({String id, bool after}) next = (
+      id: r.tile.id,
+      after: _onRightHalf(r, ghostTopLeft),
+    );
+    if (_drop == next) return;
+    setState(() => _drop = next);
+  }
+
+  void _clearDrop([String? onlyIfOver]) {
+    final ({String id, bool after})? drop = _drop;
+    if (drop == null || (onlyIfOver != null && drop.id != onlyIfOver)) return;
+    if (mounted) setState(() => _drop = null);
   }
 
   void _scrollTowardsPointer() {
@@ -80,11 +125,12 @@ class _EditableTileGridState extends State<EditableTileGrid> {
 
     final Rect view = box.localToGlobal(Offset.zero) & box.size;
     double step = 0;
-    if (_pointerY < view.top + _edge) {
-      step = -_maxStep * ((view.top + _edge - _pointerY) / _edge).clamp(0, 1);
-    } else if (_pointerY > view.bottom - _edge) {
+    if (_pointer.dy < view.top + _edge) {
+      step = -_maxStep * ((view.top + _edge - _pointer.dy) / _edge).clamp(0, 1);
+    } else if (_pointer.dy > view.bottom - _edge) {
       step =
-          _maxStep * ((_pointerY - (view.bottom - _edge)) / _edge).clamp(0, 1);
+          _maxStep *
+          ((_pointer.dy - (view.bottom - _edge)) / _edge).clamp(0, 1);
     }
     if (step == 0) return;
 
@@ -109,13 +155,41 @@ class _EditableTileGridState extends State<EditableTileGrid> {
           maxWidth: constraints.maxWidth,
         );
         return SizedBox(
+          key: _gridKey,
           height: gridHeight(placed, maxWidth: constraints.maxWidth),
           child: Stack(
-            children: <Widget>[for (final TileRect r in rects) _slot(r)],
+            // The line in the outermost gutter sticks out past the grid.
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              for (final TileRect r in rects) _slot(r),
+              ?_dropLine(rects),
+            ],
           ),
         );
       },
     );
+  }
+
+  /// The line down the edge of the tile a held one is over, on the side it
+  /// would be dropped on; in the gutter, so it never covers a tile.
+  Widget? _dropLine(List<TileRect> rects) {
+    final ({String id, bool after})? drop = _drop;
+    if (drop == null) return null;
+    for (final TileRect r in rects) {
+      if (r.tile.id != drop.id) continue;
+      final double edge = drop.after
+          ? r.left + r.width + TileMetrics.gutter / 2
+          : r.left - TileMetrics.gutter / 2;
+      return Positioned(
+        key: const ValueKey('drop-line'),
+        left: edge - _lineWidth / 2,
+        top: r.top,
+        width: _lineWidth,
+        height: r.height,
+        child: const IgnorePointer(child: ColoredBox(color: C64.yellow)),
+      );
+    }
+    return null;
   }
 
   Widget _slot(TileRect r) {
@@ -143,15 +217,30 @@ class _EditableTileGridState extends State<EditableTileGrid> {
       height: r.height,
       child: DragTarget<String>(
         onWillAcceptWithDetails: (details) => details.data != id,
-        onAcceptWithDetails: (details) => widget.onReorder(details.data, id),
+        onMove: (details) {
+          // Every tile under the finger is told about a move, the held one
+          // included; only another tile is somewhere to go.
+          if (details.data == id) {
+            _clearDrop();
+          } else {
+            _hoverOver(r, details.offset);
+          }
+        },
+        onLeave: (_) => _clearDrop(id),
+        onAcceptWithDetails: (details) {
+          final bool after = _onRightHalf(r, details.offset);
+          _clearDrop();
+          widget.onReorder(details.data, id, after);
+        },
         builder: (context, candidate, rejected) => LongPressDraggable<String>(
           data: id,
           delay: EditableTileGrid.pickUpDelay,
+          onDragStarted: () => _heldSize = Size(r.width, r.height),
           onDragUpdate: (details) => _dragMoved(details.globalPosition),
           onDragEnd: (_) => _dragEnded(),
-          // Held by its middle wherever it was grabbed, so the tile it lands
-          // on is the one under the middle of the ghost, which is where the
-          // eye puts it, not under the corner it happened to be picked up by.
+          // Held by its middle wherever it was grabbed, so the tile it goes
+          // beside is the one under the middle of the ghost, which is where
+          // the eye puts it, not under the corner it was picked up by.
           dragAnchorStrategy: (draggable, context, position) =>
               Offset(r.width / 2, r.height / 2),
           // The feedback widget renders in the root Overlay, outside this
@@ -165,16 +254,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
             ),
           ),
           childWhenDragging: Opacity(opacity: 0.3, child: view),
-          // The tile a held one is over takes a yellow frame: that is the
-          // place the held one will land in if let go now.
-          child: candidate.isEmpty
-              ? view
-              : Container(
-                  foregroundDecoration: BoxDecoration(
-                    border: Border.all(color: C64.yellow, width: 4),
-                  ),
-                  child: view,
-                ),
+          child: view,
         ),
       ),
     );

@@ -1,21 +1,26 @@
-/// Moves the item at [from] into the slot of the item at [to]: the moved item
-/// ends up at index [to] and everything between the two shifts one place
-/// towards the slot it left. Dropping a tile on its neighbour therefore always
-/// swaps their places, in either direction (the `ReorderableListView` rule,
-/// where moving forward lands the item *before* the target, makes that a
-/// no-op and cannot put a tile last by dropping on the one that is). Pure;
-/// out-of-range or equal indices return [items] unchanged. Used by the grid
-/// editor's drag-to-reorder.
-List<T> moveItem<T>(List<T> items, {required int from, required int to}) {
-  if (from == to ||
+/// Moves the item at [from] to sit right beside the item at [target]: just
+/// before it, or just after it if [after]. The order of everything else is
+/// kept. Dropping a tile on the far side of its neighbour and on the near side
+/// of the one beyond are the same move, which is what the grid editor's
+/// insertion line shows. Pure; out-of-range indices, or [from] equal to
+/// [target], return [items] unchanged.
+List<T> moveBeside<T>(
+  List<T> items, {
+  required int from,
+  required int target,
+  required bool after,
+}) {
+  if (from == target ||
       from < 0 ||
       from >= items.length ||
-      to < 0 ||
-      to >= items.length) {
+      target < 0 ||
+      target >= items.length) {
     return items;
   }
   final List<T> next = List<T>.of(items);
   final T item = next.removeAt(from);
-  next.insert(to, item);
+  // Taking the item out shifts everything after it one place back.
+  final int targetNow = target > from ? target - 1 : target;
+  next.insert(after ? targetNow + 1 : targetNow, item);
   return next;
 }

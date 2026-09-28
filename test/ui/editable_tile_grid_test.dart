@@ -35,7 +35,7 @@ List<PinnedTile> _tiles(int count, {TileSize size = TileSize.large}) =>
 Future<ScrollController> _pump(
   WidgetTester tester,
   List<PinnedTile> tiles,
-  List<(String, String)> reorders,
+  List<(String, String, bool)> reorders,
 ) async {
   final ScrollController controller = ScrollController();
   addTearDown(controller.dispose);
@@ -58,8 +58,8 @@ Future<ScrollController> _pump(
                 selected: null,
                 onSelect: (_) {},
                 onDelete: (_) {},
-                onReorder: (String moving, String target) =>
-                    reorders.add((moving, target)),
+                onReorder: (String moving, String target, bool after) =>
+                    reorders.add((moving, target, after)),
               ),
             ),
           ),
@@ -75,52 +75,174 @@ Future<void> _hold(WidgetTester tester, TestGesture gesture) => tester.pump(
 );
 
 void main() {
-  testWidgets('holding a tile and dropping it on another reorders', (
+  /// Holds `from` and moves the finger to [target]'s left or right side.
+  Future<TestGesture> holdAndHover(
+    WidgetTester tester, {
+    required String from,
+    required String target,
+    required bool rightSide,
+  }) async {
+    final TestGesture gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(ValueKey(from))),
+    );
+    await _hold(tester, gesture);
+    final Rect rect = tester.getRect(find.byKey(ValueKey(target)));
+    await gesture.moveTo(
+      Offset(rightSide ? rect.right - 8 : rect.left + 8, rect.center.dy),
+    );
+    await tester.pump();
+    return gesture;
+  }
+
+  testWidgets('dropped on the right half of a tile: goes after it', (
     WidgetTester tester,
   ) async {
-    final List<(String, String)> reorders = <(String, String)>[];
+    final List<(String, String, bool)> reorders = <(String, String, bool)>[];
     await _pump(tester, _tiles(2, size: TileSize.small), reorders);
 
-    final TestGesture gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(const ValueKey('app0'))),
+    final TestGesture gesture = await holdAndHover(
+      tester,
+      from: 'app0',
+      target: 'app1',
+      rightSide: true,
     );
-    await _hold(tester, gesture);
-    await gesture.moveTo(tester.getCenter(find.byKey(const ValueKey('app1'))));
-    await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
 
-    expect(reorders, <(String, String)>[('app0', 'app1')]);
+    expect(reorders, <(String, String, bool)>[('app0', 'app1', true)]);
   });
 
-  testWidgets('the tile a held one is over is framed, and only then', (
+  testWidgets('dropped on the left half of a tile: goes before it', (
     WidgetTester tester,
   ) async {
-    await _pump(tester, _tiles(2, size: TileSize.small), <(String, String)>[]);
-    Finder framed() => find.byWidgetPredicate(
-      (Widget w) => w is Container && w.foregroundDecoration != null,
+    final List<(String, String, bool)> reorders = <(String, String, bool)>[];
+    await _pump(tester, _tiles(2, size: TileSize.small), reorders);
+
+    final TestGesture gesture = await holdAndHover(
+      tester,
+      from: 'app1',
+      target: 'app0',
+      rightSide: false,
     );
-    expect(framed(), findsNothing);
-
-    final TestGesture gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(const ValueKey('app0'))),
-    );
-    await _hold(tester, gesture);
-    await gesture.moveTo(tester.getCenter(find.byKey(const ValueKey('app1'))));
-    await tester.pump();
-
-    expect(framed(), findsOneWidget);
-
     await gesture.up();
     await tester.pumpAndSettle();
 
-    expect(framed(), findsNothing);
+    expect(reorders, <(String, String, bool)>[('app1', 'app0', false)]);
+  });
+
+  group('the insertion line', () {
+    Finder line() => find.byKey(const ValueKey('drop-line'));
+
+    testWidgets('is on the near side of the tile, in the gutter', (
+      WidgetTester tester,
+    ) async {
+      await _pump(
+        tester,
+        _tiles(3, size: TileSize.small),
+        <(String, String, bool)>[],
+      );
+      expect(line(), findsNothing);
+      final Rect target = tester.getRect(find.byKey(const ValueKey('app1')));
+
+      final TestGesture gesture = await holdAndHover(
+        tester,
+        from: 'app0',
+        target: 'app1',
+        rightSide: false,
+      );
+
+      expect(line(), findsOneWidget);
+      expect(
+        tester.getCenter(line()).dx,
+        closeTo(target.left - TileMetrics.gutter / 2, 0.5),
+      );
+      expect(tester.getSize(line()).height, target.height);
+
+      await gesture.moveTo(Offset(target.right - 8, target.center.dy));
+      await tester.pump();
+
+      expect(line(), findsOneWidget);
+      expect(
+        tester.getCenter(line()).dx,
+        closeTo(target.right + TileMetrics.gutter / 2, 0.5),
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('goes when the tile is dropped', (WidgetTester tester) async {
+      await _pump(
+        tester,
+        _tiles(2, size: TileSize.small),
+        <(String, String, bool)>[],
+      );
+
+      final TestGesture gesture = await holdAndHover(
+        tester,
+        from: 'app0',
+        target: 'app1',
+        rightSide: true,
+      );
+      expect(line(), findsOneWidget);
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(line(), findsNothing);
+    });
+
+    testWidgets('goes when the held tile leaves every tile', (
+      WidgetTester tester,
+    ) async {
+      await _pump(
+        tester,
+        _tiles(2, size: TileSize.small),
+        <(String, String, bool)>[],
+      );
+
+      final TestGesture gesture = await holdAndHover(
+        tester,
+        from: 'app0',
+        target: 'app1',
+        rightSide: true,
+      );
+      // Into the empty canvas to the right of both tiles.
+      await gesture.moveTo(const Offset(380, 300));
+      await tester.pump();
+
+      expect(line(), findsNothing);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('is not shown over the tile being held itself', (
+      WidgetTester tester,
+    ) async {
+      await _pump(
+        tester,
+        _tiles(2, size: TileSize.small),
+        <(String, String, bool)>[],
+      );
+
+      final TestGesture gesture = await holdAndHover(
+        tester,
+        from: 'app0',
+        target: 'app0',
+        rightSide: true,
+      );
+
+      expect(line(), findsNothing);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
   });
 
   testWidgets('a plain drag scrolls the grid and moves nothing', (
     WidgetTester tester,
   ) async {
-    final List<(String, String)> reorders = <(String, String)>[];
+    final List<(String, String, bool)> reorders = <(String, String, bool)>[];
     final ScrollController controller = await _pump(
       tester,
       _tiles(4),
@@ -137,7 +259,7 @@ void main() {
   testWidgets('a held tile near the bottom edge scrolls the grid down', (
     WidgetTester tester,
   ) async {
-    final List<(String, String)> reorders = <(String, String)>[];
+    final List<(String, String, bool)> reorders = <(String, String, bool)>[];
     final ScrollController controller = await _pump(
       tester,
       _tiles(4),
@@ -170,7 +292,7 @@ void main() {
     final ScrollController controller = await _pump(
       tester,
       _tiles(4),
-      <(String, String)>[],
+      <(String, String, bool)>[],
     );
     controller.jumpTo(600);
     await tester.pump();
@@ -195,7 +317,7 @@ void main() {
     final ScrollController controller = await _pump(
       tester,
       _tiles(4),
-      <(String, String)>[],
+      <(String, String, bool)>[],
     );
 
     final TestGesture gesture = await tester.startGesture(

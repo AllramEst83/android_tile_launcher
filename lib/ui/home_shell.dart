@@ -199,12 +199,12 @@ class _HomePageState extends State<_HomePage> {
     if (_selected == id) _selected = null;
   });
 
-  void _reorder(String moving, String target) => setState(() {
+  void _reorder(String moving, String target, bool after) => setState(() {
     final List<PinnedTile> scratch = _scratch!;
     final int from = scratch.indexWhere((PinnedTile p) => p.id == moving);
     final int to = scratch.indexWhere((PinnedTile p) => p.id == target);
     if (from == -1 || to == -1) return;
-    _scratch = moveItem(scratch, from: from, to: to);
+    _scratch = moveBeside(scratch, from: from, target: to, after: after);
   });
 
   void _resize(TileSize size) => _updateSelected((p) => p.copyWith(size: size));

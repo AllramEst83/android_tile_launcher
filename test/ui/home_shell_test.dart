@@ -300,7 +300,11 @@ void main() {
       await tester.pumpAndSettle();
 
       final Offset from = tester.getCenter(_inEditor(find.text('MAPS')));
-      final Offset to = tester.getCenter(_inEditor(find.text('CLOCK')));
+      // The left half of the clock tile: the map tile goes before it.
+      final Rect clock = tester.getRect(
+        _inEditor(find.byKey(const ValueKey('pkg.clock'))),
+      );
+      final Offset to = Offset(clock.left + 10, clock.center.dy);
       final TestGesture gesture = await tester.startGesture(from);
       // A tile comes off the grid once it has been held for a moment.
       await tester.pump(
