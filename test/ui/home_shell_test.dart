@@ -333,6 +333,7 @@ void main() {
       for (final SoundMode expected in [SoundMode.vibrate, SoundMode.silent]) {
         await tester.tap(_onHome(find.byType(StateTileContentView)));
         await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 500));
         expect(_onHome(find.text(expected.label)), findsOneWidget);
       }
       expect(control.soundCalls, [SoundMode.vibrate, SoundMode.silent]);
@@ -360,6 +361,7 @@ void main() {
 
       await tester.tap(_onHome(find.byType(StateTileContentView)));
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(control.setCalls, [(TileKind.flashlight, true)]);
       expect(_onHome(find.text('[ON]')), findsOneWidget);

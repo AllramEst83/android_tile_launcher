@@ -21,36 +21,40 @@ class StateTileContentView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget body = Padding(
-      padding: const EdgeInsets.all(TileMetrics.gutter / 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: kPixelFontFamily,
-              fontSize: 10,
-              color: ink,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              state,
+    // Fill the tile: without this the body is only as wide as its text, and a
+    // tap anywhere else on the tile (most of it, for a short state) is dead.
+    final Widget body = SizedBox.expand(
+      child: Padding(
+        padding: const EdgeInsets.all(TileMetrics.gutter / 2),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Text(
+              label,
               style: TextStyle(
                 fontFamily: kPixelFontFamily,
-                fontSize: 28,
+                fontSize: 10,
                 color: ink,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                state,
+                style: TextStyle(
+                  fontFamily: kPixelFontFamily,
+                  fontSize: 28,
+                  color: ink,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
     final VoidCallback? tap = onTap;

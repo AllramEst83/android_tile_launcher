@@ -44,6 +44,37 @@ void main() {
     expect(toggled, isTrue);
   });
 
+  testWidgets('a tap anywhere on the tile counts, not just on the text', (
+    WidgetTester tester,
+  ) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: tileLauncherTheme(),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 300,
+              height: 200,
+              child: StateTileContentView(
+                label: 'SOUND',
+                state: '[RING]',
+                ink: Colors.white,
+                onTap: () => taps++,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final Rect tile = tester.getRect(find.byType(StateTileContentView));
+    await tester.tapAt(tile.centerRight - const Offset(5, 0));
+    await tester.tapAt(tile.bottomLeft + const Offset(5, -5));
+
+    expect(taps, 2);
+  });
+
   testWidgets('is not tappable when onTap is null', (
     WidgetTester tester,
   ) async {

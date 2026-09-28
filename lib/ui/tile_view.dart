@@ -147,12 +147,17 @@ Widget tileContent(
 }
 
 /// Runs a state-changing [action], then re-reads the tile so it shows the
-/// result at once instead of at the next poll.
+/// result at once instead of at the next poll — and again shortly after,
+/// because the platform applies some changes (ringer mode, torch) just after
+/// the call returns, and a stale first read would show the old state (and
+/// invite a second tap based on it) until the next poll.
 Future<void> _act(
   Future<void> Function() action,
   VoidCallback refreshNow,
 ) async {
   await action();
+  refreshNow();
+  await Future<void>.delayed(const Duration(milliseconds: 400));
   refreshNow();
 }
 

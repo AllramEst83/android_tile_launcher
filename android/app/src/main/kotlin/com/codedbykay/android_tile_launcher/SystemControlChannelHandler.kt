@@ -97,6 +97,16 @@ class SystemControlChannelHandler(
                     if (current != AudioManager.RINGER_MODE_VIBRATE) {
                         audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
                     }
+                    // The system only enters silent on a lower press that follows a
+                    // press in another direction, and it remembers the last one, so
+                    // a lower after an earlier lower is ignored for good. A raise
+                    // (vibrate -> normal) resets that; then back to vibrate and lower.
+                    audioManager.adjustStreamVolume(
+                        AudioManager.STREAM_RING,
+                        AudioManager.ADJUST_RAISE,
+                        0,
+                    )
+                    audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
                     audioManager.adjustStreamVolume(
                         AudioManager.STREAM_RING,
                         AudioManager.ADJUST_LOWER,
