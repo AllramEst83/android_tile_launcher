@@ -265,6 +265,39 @@ void main() {
     });
   });
 
+  group('room to breathe', () {
+    testWidgets('the letters rest clear of the edge of the screen', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+
+      // The strip is at the right edge of a 400 px screen; the column of
+      // letters keeps the margin, and the letter is in the middle of it.
+      final double fromEdge = 400 - _x(tester, 'A');
+      expect(
+        fromEdge,
+        closeTo(JumpIndex.edgeMargin + JumpIndex.width / 2, 0.5),
+      );
+      expect(JumpIndex.edgeMargin, greaterThanOrEqualTo(8));
+    });
+
+    testWidgets('the touch area still reaches the edge of the screen', (
+      WidgetTester tester,
+    ) async {
+      final List<int> jumps = await _pump(tester);
+      final Offset top = tester.getTopLeft(find.byKey(_strip));
+
+      await tester.tapAt(Offset(399, top.dy + _at(9)));
+      await tester.pump();
+
+      expect(jumps, <int>[9]);
+      expect(
+        tester.getSize(find.byKey(_strip)).width,
+        JumpIndex.width + JumpIndex.edgeMargin,
+      );
+    });
+  });
+
   group('pushed out while touched', () {
     testWidgets('the whole strip slides out from under the finger', (
       WidgetTester tester,
@@ -362,6 +395,67 @@ void main() {
       expect(two, lessThan(under));
       await finger.up();
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('letters either side are pushed apart, away from the finger', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+      final double restK = _y(tester, 'K');
+      final double restL = _y(tester, 'L');
+      final double restN = _y(tester, 'N');
+      final double restO = _y(tester, 'O');
+      final double restZ = _y(tester, 'Z');
+      final Offset top = tester.getTopLeft(find.byKey(_strip));
+
+      final TestGesture finger = await tester.startGesture(
+        Offset(top.dx + 12, top.dy + _at(12)),
+      );
+      await _settleWave(tester);
+
+      // M is under the finger; K and L above it move up, N and O below move
+      // down; a letter beyond the reach stays put.
+      expect(_y(tester, 'L'), lessThan(restL));
+      expect(_y(tester, 'K'), lessThan(restK));
+      expect(_y(tester, 'N'), greaterThan(restN));
+      expect(_y(tester, 'O'), greaterThan(restO));
+      expect(_y(tester, 'Z'), restZ);
+      expect(
+        (_y(tester, 'L') - restL).abs(),
+        lessThanOrEqualTo(JumpIndex.waveSpread + 0.01),
+      );
+      await finger.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('the letter under the finger takes the accent colour', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+      Color colourOf(String letter) =>
+          tester.widget<Text>(find.text(letter)).style!.color!;
+      final Color rest = colourOf('M');
+      final Offset top = tester.getTopLeft(find.byKey(_strip));
+
+      final TestGesture finger = await tester.startGesture(
+        Offset(top.dx + 12, top.dy + _at(12)),
+      );
+      await _settleWave(tester);
+
+      expect(colourOf('M'), isNot(rest));
+      expect(colourOf('Z'), rest);
+      await finger.up();
+      await tester.pumpAndSettle();
+      expect(colourOf('M'), rest);
+    });
+
+    testWidgets('the wave is a good deal more than a nudge', (
+      WidgetTester tester,
+    ) async {
+      expect(JumpIndex.waveSwing, greaterThanOrEqualTo(20));
+      expect(JumpIndex.waveGrowth, greaterThanOrEqualTo(1));
+      expect(JumpIndex.waveReach, greaterThanOrEqualTo(5));
+      expect(JumpIndex.pushOut, greaterThanOrEqualTo(40));
     });
 
     testWidgets('it follows the finger along the strip', (

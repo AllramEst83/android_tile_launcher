@@ -119,8 +119,9 @@ class SectionHeader extends StatelessWidget {
 /// up) would make them tiny, so it uses more of its height, down to
 /// [minRowHeight] a letter, and if even that does not fit, all of it.
 ///
-/// While a finger is down the whole strip slides [pushOut] to the left, out from
-/// under the finger, and back when it lifts.
+/// At rest the letters keep [edgeMargin] clear of the screen's edge. While a
+/// finger is down the whole strip slides [pushOut] to the left, out from under
+/// the finger, and back when it lifts.
 class JumpIndex extends StatefulWidget {
   const JumpIndex({super.key, required this.initials, required this.onTap});
 
@@ -134,16 +135,25 @@ class JumpIndex extends StatefulWidget {
   static const double minRowHeight = 14;
 
   /// How far the strip slides out from under the finger while it is touched.
-  static const double pushOut = 30;
+  static const double pushOut = 44;
 
-  /// How wide the strip is (the wave swings out past it, to the left).
+  /// The room left between the letters and the edge of the screen at rest (the
+  /// touch area still reaches the edge).
+  static const double edgeMargin = 12;
+
+  /// How wide the column of letters is (the wave swings out past it, to the
+  /// left); the strip is [edgeMargin] wider, on its right.
   static const double width = 24;
 
   /// How many letters either side of the finger take part in the wave, how far
   /// the nearest one swings out, and how much bigger it grows.
-  static const int waveReach = 4;
-  static const double waveSwing = 12;
-  static const double waveGrowth = 0.7;
+  static const int waveReach = 5;
+  static const double waveSwing = 22;
+  static const double waveGrowth = 1.0;
+
+  /// How far, up or down, the letters either side of the finger are pushed
+  /// apart at most, so the ones under it have room to grow.
+  static const double waveSpread = 6;
 
   final List<String> initials;
   final ValueChanged<int> onTap;
@@ -211,6 +221,16 @@ class _JumpIndexState extends State<JumpIndex>
     return c * c;
   }
 
+  /// Up or down the letter at [index] is pushed apart from the finger, before
+  /// the wave's strength is applied: nothing under it or at the reach's end,
+  /// most about half way, and away from the finger on each side.
+  double _spread(int index) {
+    final double away = index - _position;
+    if (away.abs() >= JumpIndex.waveReach) return 0;
+    return JumpIndex.waveSpread *
+        math.sin(away / JumpIndex.waveReach * math.pi);
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -243,7 +263,7 @@ class _JumpIndexState extends State<JumpIndex>
                 _handleAt(d.localPosition.dy, top, rowHeight),
             onVerticalDragEnd: (_) => _lift(),
             child: SizedBox(
-              width: JumpIndex.width,
+              width: JumpIndex.width + JumpIndex.edgeMargin,
               child: AnimatedBuilder(
                 animation: _wave,
                 builder: (BuildContext context, Widget? _) => Stack(
@@ -255,7 +275,8 @@ class _JumpIndexState extends State<JumpIndex>
                           Curves.easeOut.transform(_wave.value),
                       right:
                           JumpIndex.pushOut *
-                          Curves.easeOut.transform(_wave.value),
+                              Curves.easeOut.transform(_wave.value) +
+                          JumpIndex.edgeMargin,
                       top: top,
                       child: Column(
                         children: <Widget>[
@@ -267,6 +288,7 @@ class _JumpIndexState extends State<JumpIndex>
                                 initial: initial,
                                 fontSize: fontSize,
                                 wave: _weight(i) * _wave.value,
+                                spread: _spread(i) * _wave.value,
                               ),
                             ),
                         ],
@@ -279,7 +301,8 @@ class _JumpIndexState extends State<JumpIndex>
                             Curves.easeOut.transform(_wave.value),
                         right:
                             JumpIndex.pushOut *
-                            Curves.easeOut.transform(_wave.value),
+                                Curves.easeOut.transform(_wave.value) +
+                            JumpIndex.edgeMargin,
                         top: top + _active! * rowHeight + rowHeight - 2,
                         child: Container(
                           height: 2,
@@ -297,23 +320,28 @@ class _JumpIndexState extends State<JumpIndex>
   }
 }
 
-/// One letter of the strip, swung out to the left and grown by [wave] (0 to 1).
+/// One letter of the strip, swung out to the left, grown, pushed off its row
+/// and coloured by [wave] (0 to 1).
 class _Letter extends StatelessWidget {
   const _Letter({
     required this.initial,
     required this.fontSize,
     required this.wave,
+    required this.spread,
   });
 
   final String initial;
   final double fontSize;
   final double wave;
 
+  /// How far up (negative) or down it is pushed off its row.
+  final double spread;
+
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Transform.translate(
-        offset: Offset(-JumpIndex.waveSwing * wave, 0),
+        offset: Offset(-JumpIndex.waveSwing * wave, spread),
         child: Transform.scale(
           scale: 1 + JumpIndex.waveGrowth * wave,
           child: Text(
@@ -321,7 +349,12 @@ class _Letter extends StatelessWidget {
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               fontSize: fontSize,
               height: 1,
-              color: TileColors.textBright,
+              // Warms to the accent colour under the finger.
+              color: Color.lerp(
+                TileColors.textBright,
+                TileColors.accent,
+                wave * wave,
+              ),
             ),
           ),
         ),
