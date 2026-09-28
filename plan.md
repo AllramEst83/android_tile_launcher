@@ -40,7 +40,8 @@ The sibling repo `../android_terminal_launcher` already solves many of these fea
 
 ## Next, in order
 
-(Nothing is queued. Add the next phase here.)
+12. **Phase 25, Improve readability of email and text tv tile text** 
+How can we make a small visual improvement to the Text TV and email tiles? How do you think we can make it easier to view the emails and Text TV news displayed on its tile?
 
 ## Deliberately different from the terminal launcher
 
