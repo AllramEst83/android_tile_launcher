@@ -13,6 +13,9 @@ class FakeAlarmService implements AlarmService {
   int timerLists = 0;
   int alarmLists = 0;
 
+  /// What [next] answers.
+  DateTime? nextAlarm;
+
   @override
   Future<AlarmResult> setTimer(Duration length, {String? label}) async {
     timers.add(length);
@@ -41,4 +44,7 @@ class FakeAlarmService implements AlarmService {
     alarmLists++;
     return result;
   }
+
+  @override
+  Future<DateTime?> next() async => nextAlarm;
 }
