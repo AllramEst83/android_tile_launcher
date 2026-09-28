@@ -62,6 +62,8 @@ class _CalcSheetState extends State<_CalcSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
+            // So the tab row is not flush against the sheet's own top edge.
+            const SizedBox(height: TileMetrics.gutter),
             Row(
               children: <Widget>[
                 Expanded(
