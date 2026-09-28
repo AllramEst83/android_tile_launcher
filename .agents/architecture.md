@@ -13,11 +13,13 @@ lib/
   messages.dart              # user-facing strings
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
-    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, contact, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed, contactTileId/contactKeyOf; Tile.label
+    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, contact, mail, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed, contactTileId/contactKeyOf; Tile.label
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder
+    mail.dart                # MailMessage, MailResult (MailMessages / MailNotSetUp / MailUnavailable), MailAccountInfo, MailMoveResult (MailMoved / MailGone / MailMoveNotSetUp / MailMoveFailed)
+    mail_format.dart         # guessImapHost(email), formatMailDate
     contact.dart             # PhoneNumber, Contact(key, name, numbers, preferredNumber), dialable, whatsAppNumber (default country code 46), findContact
     calendar_event.dart      # CalendarEvent: id, title, start/end (local; all-day = half-open dates), allDay, location
     agenda_snapshot.dart     # AgendaSnapshot (sealed): AgendaReady(events) / NeedsPermission / Denied(permanent) / Unavailable(reason)
@@ -28,7 +30,7 @@ lib/
     device_status.dart       # DeviceStatus: battery %, charging, storage free/total (each nullable); free/battery fractions for the bars
     device_format.dart       # formatBattery/formatStorageFree: DeviceStatus -> the tile's strings
     sound_mode.dart          # SoundMode (normal/vibrate/silent): the ringer, with its tap cycle and label
-    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, WeatherContent, AgendaContent, SoundContent, ToggleContent)
+    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, WeatherContent, AgendaContent, MailContent, SoundContent, ToggleContent)
     clock_format.dart        # formatClockTime/formatClockDate: DateTime -> the tile's display strings
     alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets (Swedish order); shared by the app drawer and the contacts tile (Phase 11)
     app_matcher.dart         # rankApps: best-match-first search ranking, for the drawer's search field
@@ -57,6 +59,13 @@ lib/
     android_location_service.dart  # asks PermissionService for location, then the Kotlin channel
     permission_service.dart  # abstract: request(AppPermission) -> granted / denied / permanentlyDenied (only `location` so far)
     android_permission_service.dart  # MethodChannel implementation
+    secret_store.dart        # abstract SecretStore: read/write/delete plain strings kept encrypted by the platform (secrets only, never settings)
+    flutter_secret_store.dart  # SecretStore on flutter_secure_storage (Android Keystore); the only file that knows the package
+    mail_account.dart        # MailAccount(email, host, port, password) as one value, and MailAccountStore over a SecretStore
+    mail_service.dart        # abstract MailService: account / setUp / forget / latest({count, fresh}) / moveToTrash; never throws
+    imap_mail_service.dart   # ImapMailService on enough_mail (the only file that knows it): envelope-only listing, move to Trash, never a delete
+    cached_mail_service.dart # CachedMailService: reuses a good inbox listing for 3 min; setUp / forget / moveToTrash drop it
+    mail_tile_source.dart    # MailTileSource: the newest ten + the moment they were read
     contacts_service.dart    # abstract read-only: all() -> ContactsRead / ContactsNoAccess / ContactsDenied / ContactsUnavailable
     android_contacts_service.dart  # MethodChannel implementation: rows grouped per lookup key, same number written two ways merged
     contacts_repository.dart # abstract: all() — asks for READ_CONTACTS itself when there is no access (only called from a tap)
@@ -72,7 +81,7 @@ lib/
     agenda_repository.dart   # abstract: between(from, to) -> AgendaSnapshot; allow() asks for calendar access (tap only)
     live_agenda_repository.dart  # LiveAgendaRepository: CalendarService + PermissionService; remembers a refusal until a read succeeds
     agenda_tile_source.dart  # AgendaTileSource: now .. end of the 7th day, with the moment it read (AgendaContent.now)
-    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather, agenda, contacts, phone, sms, whatsApp), bundled
+    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather, agenda, contacts, phone, sms, whatsApp, mail), bundled
     device_repository.dart   # abstract: Future<DeviceStatus> status(); never throws
     android_device_repository.dart  # MethodChannel implementation
     device_tile_source.dart  # DeviceTileSource: the repository's status as DeviceContent
@@ -87,6 +96,9 @@ lib/
     tile_poller.dart         # TilePoller: rebuilds from a TileSource on an interval, paused while backgrounded; builder gets a refreshNow to re-read early
     clock_tile_view.dart     # ClockTileContentView: the clock's content -- time large, date small
     grouped_list.dart        # GroupedList<T> (headers per initial + jump index, shared by the app drawer and the contact picker), SectionHeader, JumpIndex (rows shrink to fit a short strip)
+    mail_tile_view.dart      # MailTileContentView: fits its size (small: unread count; medium: +newest message; wide: +as many one-line messages as fit, unread marked *)
+    mail_setup_sheet.dart    # showMailSetupSheet: address, IMAP server (guessed from the address until typed over), app password (obscured); CONNECT logs in, then saves
+    mail_sheet.dart          # showMailSheet: newest 20, tap a message for TRASH (asks again), REFRESH, FORGET ACCOUNT (asks first)
     contact_picker.dart      # showContactPicker: phone book grouped like the drawer (flat while searching), tap pins the person; opening it asks for contacts
     contact_sheet.dart       # showContactSheet: numbers + CALL / SMS / WHATSAPP; every action its own tap, a text typed and SENT
     agenda_tile_view.dart    # AgendaTileContentView: fits its size (small: when+title; medium: +place, +N more; wide: as many one-line events as the height holds)
@@ -214,3 +226,8 @@ Record decisions that future agents can't derive from code (append, newest last)
 - Sheets with a text field (the contact picker, the contact sheet's message field) are shown with `useSafeArea: true`. Found on the phone: the picker was a fixed 80% of the screen tall and, pushed up by the keyboard, ran up under the status bar with the search field over the clock. Without `useSafeArea` Flutter also strips the status-bar padding from the sheet's own context, so measuring room from inside it reads zero; with it the sheet is laid out below the status bar, and the picker's height is `min(80% of the screen, screen - keyboard - status bar - margin)`. The contact sheet scrolls when the keyboard leaves too little room. The picker's search field is not `isDense` (16px vertical padding): a thin field was hard to hit. The app drawer's search field still is dense.
 - The app drawer's search field got the same roomy padding as the contact picker's at the user's request (it was `isDense`), and its hint colour went from the dim grey to light grey for contrast on the blue.
 - The app drawer's browse list (headers per initial, proportional-jump `ScrollController`, `_JumpIndex`) moved out of `app_drawer.dart` into `ui/grouped_list.dart` (`GroupedList<T>`, `SectionHeader`, `JumpIndex`) so the contact picker groups its names exactly the same way (asked for by the user); the drawer's own tests pass unchanged. `JumpIndex` now measures its strip (`LayoutBuilder`) and shrinks its rows below 20px when there is less room than 26 letters need, which happens in the picker with the keyboard up. The picker's sheet has a fixed height (the cap it already had) instead of "as tall as the list", so it does not grow and shrink as the search narrows and the index has a definite height; search results are a flat list in the same order, like the drawer's search mode.
+- Phase 13's mail is a port of the sibling's mail stack (`SecretStore`/`FlutterSecretStore`, `MailAccount(Store)`, `ImapMailService` on `enough_mail`, and its fake IMAP server + tests, which pass here unchanged apart from names). Changes: the value types moved to `model/mail.dart` so `MailContent` (a tile content) depends on the model only; `MailService.latest` gained `fresh`; and `CachedMailService` wraps the IMAP one, because the tile polls and `TilePoller` also reads on every return to the launcher, and each read is a TLS connection and a login that servers rate-limit. Only a good listing is cached (3 min); `setUp`, `forget` and `moveToTrash` drop it; the inbox sheet always reads `fresh`.
+- Credentials: the account (address, server, port and the app password) is one JSON value in the Android Keystore through `flutter_secure_storage`, never in `LocalStore`/SharedPreferences. The password is typed by the user into the set-up sheet (obscured, no autocorrect or suggestions; spaces removed, since Google shows app passwords in groups); it is never logged, and errors from the server or library are scrubbed of it (`ImapMailService._scrub`). CONNECT logs in first and saves only if that worked. Tests use a fake IMAP server and an in-memory secret store, so no real account is involved anywhere in the tests or the emulator checks. `android:allowBackup="false"`: the Keystore key never leaves the phone, so an auto-restored copy of the encrypted file could not be read. If a saved account is unreadable anyway, `latest` reports `MailUnavailable` and tapping the tile (when `account()` is null) opens the set-up sheet again instead of a dead end.
+- Mail is read-only apart from one change, moving a message to the server's Trash (`moveToTrash`, guarded by the inbox's `UIDVALIDITY` from the listing the user is looking at; never a delete, and no Trash folder means nothing is touched). "Anything that acts asks first": tapping a message only reveals TRASH, TRASH asks `MOVE TO TRASH?` and only YES moves it; FORGET ACCOUNT asks too. No message bodies are fetched (envelope only), no sending. The tile shows the unread count (`MailMessages.unread`, from IMAP `STATUS UNSEEN`) as a big number, which is the "badge".
+- The IMAP server is guessed from the address by `guessImapHost` (Gmail, Outlook/Hotmail, iCloud, Yahoo, else `imap.<domain>`) so the user types less; once the field has been typed in, the guess stops overwriting it. Port 993 with TLS unless the field says `host:port`.
+- The emulator has almost no free storage: the larger APK (mail libraries) failed `INSTALL_FAILED_INSUFFICIENT_STORAGE` even after uninstalling the old build; `adb shell pm trim-caches 2G` freed enough. The user checked mail on their own phone, so the emulator was not used past installing.

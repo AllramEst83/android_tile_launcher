@@ -13,8 +13,10 @@ environment:
   sdk: ^3.13.0
 
 dependencies:
+  enough_mail: ^2.1.7
   flutter:
     sdk: flutter
+  flutter_secure_storage: ^11.2.0
   shared_preferences: ^2.5.5
 
 dev_dependencies:

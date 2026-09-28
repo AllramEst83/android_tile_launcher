@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_content.dart';
@@ -10,6 +11,8 @@ import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/agenda_tile_source.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
+import 'package:android_tile_launcher/services/mail_service.dart';
+import 'package:android_tile_launcher/services/mail_tile_source.dart';
 import 'package:android_tile_launcher/services/sound_mode_tile_source.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
@@ -21,6 +24,9 @@ import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/contact_sheet.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
+import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_tile_view.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
@@ -189,6 +195,26 @@ Widget tileContent(
           child: SizedBox.expand(child: person),
         ),
       );
+    case TileKind.mail:
+      final MailService mail = services.mail;
+      return TilePoller(
+        source: MailTileSource(service: mail),
+        // The service keeps a listing for a few minutes, so coming back to the
+        // launcher between polls costs no login.
+        interval: const Duration(minutes: 5),
+        builder: (context, content, refreshNow) {
+          final MailContent mailContent = content as MailContent;
+          return MailTileContentView(
+            result: mailContent.result,
+            ink: tile.colour.ink,
+            onTap: interactive
+                ? () => unawaited(
+                    _mailTap(context, mail, mailContent.result, refreshNow),
+                  )
+                : null,
+          );
+        },
+      );
     case TileKind.soundMode:
       return TilePoller(
         source: SoundModeTileSource(control: systemControl),
@@ -280,6 +306,30 @@ void _agendaTap(
     case AgendaUnavailable():
       refreshNow();
   }
+}
+
+/// What a tap on the mail tile does: set mail up when there is no account,
+/// open the inbox when there is one, read again when the last read failed.
+/// The tile reads again once a sheet closes, since either may have changed it.
+Future<void> _mailTap(
+  BuildContext context,
+  MailService mail,
+  MailResult result,
+  VoidCallback refreshNow,
+) async {
+  switch (result) {
+    case MailNotSetUp():
+      await showMailSetupSheet(context, mail: mail);
+    case MailMessages():
+      await showMailSheet(context, mail: mail);
+    case MailUnavailable():
+      // A saved account that cannot be read (its key is gone) never will be:
+      // set it up again. Anything else is worth another try.
+      if (await mail.account() == null && context.mounted) {
+        await showMailSetupSheet(context, mail: mail);
+      }
+  }
+  refreshNow();
 }
 
 /// An app tile's content: a monochrome glyph — its label's first letter,

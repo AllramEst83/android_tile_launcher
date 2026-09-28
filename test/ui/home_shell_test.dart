@@ -4,6 +4,7 @@ import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
+import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
@@ -21,6 +22,9 @@ import 'package:android_tile_launcher/ui/contact_sheet.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
+import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_tile_view.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/weather_tile_view.dart';
@@ -31,6 +35,7 @@ import '../fakes/fake_agenda_repository.dart';
 import '../fakes/fake_app_repository.dart';
 import '../fakes/fake_contacts.dart';
 import '../fakes/fake_device_repository.dart';
+import '../fakes/fake_mail_service.dart';
 import '../fakes/fake_system_control_service.dart';
 import '../fakes/fake_tile_services.dart';
 import '../fakes/fake_weather_repository.dart';
@@ -59,6 +64,7 @@ Future<void> pumpShell(
   FakePhoneService? phoneService,
   FakeSmsService? smsService,
   FakeWhatsAppService? whatsAppService,
+  FakeMailService? mailService,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
@@ -74,6 +80,7 @@ Future<void> pumpShell(
         phone: phoneService,
         sms: smsService,
         whatsApp: whatsAppService,
+        mail: mailService,
       ),
     ),
   ),
@@ -654,6 +661,97 @@ void main() {
       expect(find.byKey(contactCallKey), findsNothing);
       expect(find.text('ANNA ANDERSSON'), findsWidgets);
     });
+
+    testWidgets('an unset-up mail tile sets mail up, then shows the inbox', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeMailService mail = FakeMailService();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        mailService: mail,
+      );
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.mail);
+      await tester.pumpAndSettle();
+      expect(_onHome(find.text(Messages.mailTapToSetUp)), findsOneWidget);
+
+      await tester.tap(_onHome(find.byType(MailTileContentView)));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailEmailKey), 'kay@gmail.com');
+      await tester.enterText(find.byKey(mailPasswordKey), 'secret');
+      await tester.pump();
+      // Once the account is saved the tile reads an inbox.
+      mail.result = const MailMessages(<MailMessage>[], total: 0, unread: 3);
+      await tester.tap(find.byKey(mailConnectKey));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(mail.setUps, hasLength(1));
+      expect(_onHome(find.text('3')), findsOneWidget);
+    });
+
+    testWidgets('a mail tile with an inbox opens the inbox on tap', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeMailService mail = FakeMailService(
+        const MailMessages(
+          <MailMessage>[
+            MailMessage(uid: 9, from: 'Anna', subject: 'Hello', unread: true),
+          ],
+          total: 1,
+          unread: 1,
+          validity: 1,
+        ),
+      )..saved = const MailAccountInfo(email: 'kay@gmail.com', host: 'h');
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        mailService: mail,
+      );
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.mail);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.byType(MailTileContentView)));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailMessageKey(9)), findsOneWidget);
+      expect(find.byKey(mailForgetKey), findsOneWidget);
+      // Nothing was moved or forgotten by opening it.
+      expect(mail.moves, isEmpty);
+      expect(mail.forgets, 0);
+    });
+
+    testWidgets(
+      'a mail tile that cannot read its account offers set up again',
+      (WidgetTester tester) async {
+        final GridState gridState = _gridState();
+        // No saved account visible (as when the stored one cannot be read), yet
+        // the read failed rather than saying "not set up".
+        final FakeMailService mail = FakeMailService(
+          const MailUnavailable('the saved mail account is unreadable'),
+        );
+        await pumpShell(
+          tester,
+          FakeAppRepository(),
+          gridState: gridState,
+          mailService: mail,
+        );
+        await tester.pump();
+        await gridState.pinSystemTile(TileKind.mail);
+        await tester.pumpAndSettle();
+
+        await tester.tap(_onHome(find.byType(MailTileContentView)));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(mailConnectKey), findsOneWidget);
+      },
+    );
 
     testWidgets('tapping the sound tile cycles normal, vibrate, silent', (
       WidgetTester tester,

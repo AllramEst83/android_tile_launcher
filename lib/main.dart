@@ -14,11 +14,15 @@ import 'services/android_phone_service.dart';
 import 'services/android_sms_service.dart';
 import 'services/android_system_control_service.dart';
 import 'services/android_whatsapp_service.dart';
+import 'services/cached_mail_service.dart';
+import 'services/flutter_secret_store.dart';
 import 'services/grid_state.dart';
+import 'services/imap_mail_service.dart';
 import 'services/io_http_fetcher.dart';
 import 'services/live_agenda_repository.dart';
 import 'services/live_contacts_repository.dart';
 import 'services/live_weather_repository.dart';
+import 'services/mail_account.dart';
 import 'services/shared_preferences_local_store.dart';
 import 'services/smhi.dart';
 import 'services/tile_services.dart';
@@ -60,6 +64,11 @@ Future<void> main() async {
         ),
         sms: const AndroidSmsService(permissions: AndroidPermissionService()),
         whatsApp: const AndroidWhatsAppService(),
+        mail: CachedMailService(
+          inner: ImapMailService(
+            accounts: MailAccountStore(FlutterSecretStore()),
+          ),
+        ),
         agenda: LiveAgendaRepository(
           calendar: const AndroidCalendarService(),
           permissions: const AndroidPermissionService(),

@@ -1,0 +1,32 @@
+import 'package:android_tile_launcher/model/mail.dart';
+
+/// The user's inbox, read over IMAP with an app password kept on the device.
+abstract interface class MailService {
+  /// The account that is set up, or null.
+  Future<MailAccountInfo?> account();
+
+  /// Logs in with [password] and, only if that works, remembers all three so
+  /// later calls need no typing. Returns null on success, else why it failed
+  /// (nothing is saved then). Never throws.
+  Future<String?> setUp({
+    required String email,
+    required String host,
+    required String password,
+  });
+
+  /// Forgets the account and its password, and says whether there was
+  /// anything to forget (a damaged saved account counts).
+  Future<bool> forget();
+
+  /// The [count] newest messages in the inbox. Never throws. A recent answer
+  /// may be reused (the tile polls, and coming back to the launcher must not
+  /// log in to the server every time); [fresh] insists on asking the server.
+  Future<MailResult> latest({int count = 20, bool fresh = false});
+
+  /// Moves the inbox message with [uid] to the server's Trash folder: never
+  /// deletes it outright, so it can be got back. If [validity] is given and
+  /// the server's differs, the ids have been renumbered since the list was
+  /// read, so nothing is touched. Never throws, and changes nothing unless it
+  /// returns [MailMoved].
+  Future<MailMoveResult> moveToTrash(int uid, {int? validity});
+}

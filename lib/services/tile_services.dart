@@ -1,6 +1,7 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
+import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
 import 'package:android_tile_launcher/services/sms_service.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
@@ -20,6 +21,7 @@ class TileServices {
     required this.phone,
     required this.sms,
     required this.whatsApp,
+    required this.mail,
   });
 
   final SystemControlService systemControl;
@@ -30,4 +32,5 @@ class TileServices {
   final PhoneService phone;
   final SmsService sms;
   final WhatsAppService whatsApp;
+  final MailService mail;
 }

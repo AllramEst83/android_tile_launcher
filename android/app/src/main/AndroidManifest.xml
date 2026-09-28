@@ -21,9 +21,13 @@
          grants Do-Not-Disturb access via Settings) set the ringer mode. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- No auto-backup: the mail account is kept encrypted with a key that
+         lives only in this phone's Keystore, so a restored copy of the
+         encrypted file could never be read. -->
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
