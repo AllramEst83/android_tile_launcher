@@ -99,7 +99,7 @@ class TvRow extends StatelessWidget {
   /// is to fill a screen taller than that asks for more: backgrounds and block
   /// graphics grow with the row, and the letters are stretched upright with
   /// it (real teletext characters are twice as tall as they are wide), by as
-  /// much as the row allows, up to twice.
+  /// much as the row allows (about two thirds of it), up to twice.
   final double? rowHeight;
 
   /// Runs the command of a tapped link. Links are not tappable without it.
@@ -128,11 +128,11 @@ class TvRow extends StatelessWidget {
         final naturalHeight = cell.height;
         cell.dispose();
         final rowHeight = math.max(this.rowHeight ?? 0, naturalHeight);
-        // The letters fill about four fifths of a row that is taller than the
-        // font's own.
+        // The letters fill about two thirds of a row that is taller than the
+        // font's own, which leaves air between lines of text.
         final stretch = this.rowHeight == null
             ? 1.0
-            : (rowHeight / (cellWidth * 1.25)).clamp(1.0, 2.0);
+            : (rowHeight / (cellWidth * 1.45)).clamp(1.0, 2.0);
         // A headline row is two rows tall and its glyphs are stretched to fit.
         final tall = runs.any((run) => run.tall);
 

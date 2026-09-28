@@ -149,6 +149,31 @@ void main() {
       expect(pageHeight(tester), greaterThan(area * 0.9));
     });
 
+    testWidgets('leaves air above the first row and below the last', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(400, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await _open(tester, fullPage());
+
+      final Rect area = tester.getRect(
+        find.byType(SingleChildScrollView).first,
+      );
+      final Rect first = tester.getRect(find.byType(TvRow).first);
+      final Rect last = tester.getRect(find.byType(TvRow).last);
+
+      expect(
+        first.top - area.top,
+        greaterThanOrEqualTo(TileMetrics.margin - 0.5),
+      );
+      expect(
+        area.bottom - last.bottom,
+        greaterThanOrEqualTo(TileMetrics.margin - 0.5),
+      );
+    });
+
     testWidgets(
       'on a short screen the rows stay natural and the page scrolls',
       (WidgetTester tester) async {

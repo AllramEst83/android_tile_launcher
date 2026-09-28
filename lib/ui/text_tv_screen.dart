@@ -359,6 +359,9 @@ class _PageArea extends StatelessWidget {
   final ValueChanged<String> onLink;
   final VoidCallback onRetry;
 
+  /// Black space above and below the page.
+  static const double _airAbove = TileMetrics.margin;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -374,7 +377,7 @@ class _PageArea extends StatelessWidget {
               part: part,
               onLink: onLink,
               width: constraints.maxWidth,
-              height: constraints.maxHeight,
+              height: constraints.maxHeight - 2 * _airAbove,
             ),
             TextTvNotBroadcast(:final int number) => _Message(
               lines: <String>[Messages.textTvPageNotBroadcast(number)],
@@ -388,7 +391,12 @@ class _PageArea extends StatelessWidget {
         return SingleChildScrollView(
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(child: content),
+            child: Padding(
+              // Air above and below the page, so the first row is not pressed
+              // against the bar over it nor the last against the controls.
+              padding: const EdgeInsets.symmetric(vertical: _airAbove),
+              child: Center(child: content),
+            ),
           ),
         );
       },
@@ -470,6 +478,10 @@ class _Grid extends StatelessWidget {
       fontFamily: kPixelFontFamily,
       fontSize: 8,
       height: 1.6,
+      // The extra line height goes half above and half below the letters.
+      // Left to the font's own split it all went above, so text sat low in its
+      // row and its descenders ran into the row below.
+      leadingDistribution: TextLeadingDistribution.even,
     );
 
     // Spread the rows over the height there is: a headline row counts for two.
