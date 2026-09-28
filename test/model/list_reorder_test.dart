@@ -3,19 +3,25 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('moveItem', () {
-    test(
-      'moving forward: the target keeps its slot, the item lands before it',
-      () {
-        final result = moveItem(['A', 'B', 'C', 'D'], from: 0, to: 2);
+    test('moving forward: the item takes the target\'s slot', () {
+      final result = moveItem(['A', 'B', 'C', 'D'], from: 0, to: 2);
 
-        expect(result, ['B', 'A', 'C', 'D']);
-      },
-    );
+      expect(result, ['B', 'C', 'A', 'D']);
+    });
 
-    test('moving backward: the item takes the target\'s old slot', () {
+    test('moving backward: the item takes the target\'s slot', () {
       final result = moveItem(['A', 'B', 'C', 'D'], from: 3, to: 1);
 
       expect(result, ['A', 'D', 'B', 'C']);
+    });
+
+    test('dropping on the next neighbour swaps the two', () {
+      expect(moveItem(['A', 'B', 'C'], from: 0, to: 1), ['B', 'A', 'C']);
+      expect(moveItem(['A', 'B', 'C'], from: 1, to: 0), ['B', 'A', 'C']);
+    });
+
+    test('dropping on the last item puts the moved one last', () {
+      expect(moveItem(['A', 'B', 'C'], from: 0, to: 2), ['B', 'C', 'A']);
     });
 
     test('moving to the same index changes nothing', () {

@@ -302,7 +302,10 @@ void main() {
       final Offset from = tester.getCenter(_inEditor(find.text('MAPS')));
       final Offset to = tester.getCenter(_inEditor(find.text('CLOCK')));
       final TestGesture gesture = await tester.startGesture(from);
-      await tester.pump(const Duration(milliseconds: 100));
+      // A tile comes off the grid once it has been held for a moment.
+      await tester.pump(
+        EditableTileGrid.pickUpDelay + const Duration(milliseconds: 50),
+      );
       await gesture.moveTo(to);
       await tester.pump(const Duration(milliseconds: 100));
       await gesture.up();
