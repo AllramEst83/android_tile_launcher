@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app.dart';
+import 'services/android_alarm_service.dart';
 import 'services/android_app_repository.dart';
 import 'services/android_calendar_service.dart';
 import 'services/android_contacts_service.dart';
@@ -69,6 +70,7 @@ Future<void> main() async {
         sms: const AndroidSmsService(permissions: AndroidPermissionService()),
         whatsApp: const AndroidWhatsAppService(),
         textTv: LiveTextTvRepository(textTv: TextTv(fetcher: fetcher)),
+        alarm: const AndroidAlarmService(),
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

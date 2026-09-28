@@ -23,6 +23,8 @@ import 'package:android_tile_launcher/services/weather_repository.dart';
 import 'package:android_tile_launcher/services/weather_tile_source.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
+import 'package:android_tile_launcher/ui/alarm_sheet.dart';
+import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
 import 'package:android_tile_launcher/ui/calc_sheet.dart';
 import 'package:android_tile_launcher/ui/calc_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
@@ -249,6 +251,17 @@ Widget tileContent(
           ink: tile.colour.ink,
           onTap: interactive
               ? () => unawaited(showCalcSheet(context, rates: services.rates))
+              : null,
+        ),
+      );
+    case TileKind.alarm:
+      // Nothing to read from outside (the clock app owns the timers and
+      // alarms), so no poller: it opens the sheet that sets them.
+      return Builder(
+        builder: (context) => AlarmTileContentView(
+          ink: tile.colour.ink,
+          onTap: interactive
+              ? () => unawaited(showAlarmSheet(context, alarm: services.alarm))
               : null,
         ),
       );

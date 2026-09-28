@@ -15,6 +15,8 @@ import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
+import 'package:android_tile_launcher/ui/alarm_sheet.dart';
+import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/calc_pad.dart';
@@ -24,6 +26,7 @@ import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/contact_picker.dart';
 import 'package:android_tile_launcher/ui/contact_sheet.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
+import 'package:android_tile_launcher/ui/digit_pad.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
 import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
@@ -33,11 +36,13 @@ import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/text_tv_screen.dart';
 import 'package:android_tile_launcher/ui/text_tv_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/timer_pad.dart';
 import 'package:android_tile_launcher/ui/weather_tile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_agenda_repository.dart';
+import '../fakes/fake_alarm_service.dart';
 import '../fakes/fake_app_repository.dart';
 import '../fakes/fake_contacts.dart';
 import '../fakes/fake_device_repository.dart';
@@ -73,6 +78,7 @@ Future<void> pumpShell(
   FakeWhatsAppService? whatsAppService,
   FakeMailService? mailService,
   FakeTextTvRepository? textTvRepository,
+  FakeAlarmService? alarmService,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
@@ -90,6 +96,7 @@ Future<void> pumpShell(
         whatsApp: whatsAppService,
         mail: mailService,
         textTv: textTvRepository,
+        alarm: alarmService,
       ),
     ),
   ),
@@ -811,6 +818,39 @@ void main() {
         expect(_onHome(find.byType(TextTvTileContentView)), findsOneWidget);
       },
     );
+
+    testWidgets('the alarm tile opens the timer, which hands it to the clock', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeAlarmService alarm = FakeAlarmService();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        alarmService: alarm,
+      );
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.alarm);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.byType(AlarmTileContentView)));
+      await tester.pumpAndSettle();
+      // Nothing is set by opening it.
+      expect(alarm.timers, isEmpty);
+      for (final int d in <int>[5, 0, 0]) {
+        await tester.tap(find.byKey(DigitPad.digitKey(timerPadPrefix, d)));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(timerStartKey));
+      await tester.pumpAndSettle();
+
+      expect(alarm.timers, <Duration>[const Duration(minutes: 5)]);
+
+      await tester.tap(find.byKey(alarmCloseKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(alarmCloseKey), findsNothing);
+    });
 
     testWidgets('the calc tile opens the calculator, which works', (
       WidgetTester tester,

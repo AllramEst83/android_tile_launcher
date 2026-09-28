@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
+import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
@@ -12,6 +13,7 @@ import 'package:android_tile_launcher/services/weather_repository.dart';
 import 'package:android_tile_launcher/services/whatsapp_service.dart';
 
 import 'fake_agenda_repository.dart';
+import 'fake_alarm_service.dart';
 import 'fake_contacts.dart';
 import 'fake_device_repository.dart';
 import 'fake_mail_service.dart';
@@ -34,6 +36,7 @@ TileServices fakeTileServices({
   MailService? mail,
   TextTvRepository? textTv,
   RatesRepository? rates,
+  AlarmService? alarm,
 }) => TileServices(
   systemControl: systemControl ?? FakeSystemControlService(),
   device: device ?? FakeDeviceRepository(),
@@ -46,4 +49,5 @@ TileServices fakeTileServices({
   mail: mail ?? FakeMailService(),
   textTv: textTv ?? FakeTextTvRepository(),
   rates: rates ?? FakeRatesRepository(),
+  alarm: alarm ?? FakeAlarmService(),
 );

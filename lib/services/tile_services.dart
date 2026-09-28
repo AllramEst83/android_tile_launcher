@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
+import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
@@ -26,6 +27,7 @@ class TileServices {
     required this.mail,
     required this.textTv,
     required this.rates,
+    required this.alarm,
   });
 
   final SystemControlService systemControl;
@@ -39,4 +41,5 @@ class TileServices {
   final MailService mail;
   final TextTvRepository textTv;
   final RatesRepository rates;
+  final AlarmService alarm;
 }

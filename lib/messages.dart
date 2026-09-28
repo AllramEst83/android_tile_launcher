@@ -106,6 +106,24 @@ abstract final class Messages {
       stale ? 'SAVED RATES FROM $day (OFFLINE)' : 'RATES FROM $day (ECB)';
   static const String calcMoney = 'MONEY';
 
+  static const String alarmTitle = 'ALARM';
+  static const String alarmTabTimer = 'TIMER';
+  static const String alarmTabAlarm = 'ALARM';
+  static const String alarmStart = 'START';
+  static const String alarmSet = 'SET ALARM';
+  static const String alarmSeeTimers = 'SEE TIMERS';
+  static const String alarmSeeAlarms = 'SEE ALARMS';
+  static const String alarmDays = 'REPEAT';
+  static const String alarmOnce = 'ONCE';
+  static const String alarmWeekdays = 'MON-FRI';
+  static const String alarmWeekend = 'SAT SUN';
+  static const String alarmDaily = 'DAILY';
+  static const String alarmTooLong = 'A TIMER IS 24 HOURS AT MOST.';
+  static const String alarmHandedOver = 'SET IN THE CLOCK APP.';
+  static String alarmTimerSet(String length) => 'TIMER STARTED: $length';
+  static String alarmAlarmSet(String when) => 'ALARM SET: $when';
+  static String alarmNext(String when) => 'NEXT: $when';
+
   static const String textTvTitle = 'TEXT TV';
   static const String textTvTapToOpen = 'TAP TO OPEN';
   static const String textTvNotBroadcast = 'NOT IN BROADCAST.';
