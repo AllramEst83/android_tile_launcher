@@ -4,6 +4,8 @@ import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
+import 'package:android_tile_launcher/model/weather.dart';
+import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
@@ -15,12 +17,14 @@ import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/weather_tile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_app_repository.dart';
 import '../fakes/fake_device_repository.dart';
 import '../fakes/fake_system_control_service.dart';
+import '../fakes/fake_weather_repository.dart';
 import '../fakes/in_memory_local_store.dart';
 
 Finder _onHome(Finder matching) =>
@@ -40,6 +44,7 @@ Future<void> pumpShell(
   GridState? gridState,
   FakeSystemControlService? systemControlService,
   FakeDeviceRepository? deviceRepository,
+  FakeWeatherRepository? weatherRepository,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
@@ -49,6 +54,7 @@ Future<void> pumpShell(
       services: TileServices(
         systemControl: systemControlService ?? FakeSystemControlService(),
         device: deviceRepository ?? FakeDeviceRepository(),
+        weather: weatherRepository ?? FakeWeatherRepository(),
       ),
     ),
   ),
@@ -340,6 +346,93 @@ void main() {
       expect(gridState.isPinned('device'), isTrue);
       expect(_onHome(find.byType(DeviceTileContentView)), findsOneWidget);
       expect(_onHome(find.text('BATTERY  64%')), findsOneWidget);
+    });
+
+    testWidgets('tapping the weather tile asks for location, then shows it', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeWeatherRepository weather = FakeWeatherRepository(
+        const WeatherNeedsPlace(),
+        WeatherReady(
+          Forecast(
+            place: const Place(
+              name: 'Gothenburg',
+              latitude: 57.7,
+              longitude: 11.97,
+            ),
+            source: 'SMHI',
+            now: const Conditions(
+              temperature: 9.6,
+              feelsLike: 8,
+              humidity: 70,
+              code: 3,
+              windSpeed: 3,
+              windDirection: 180,
+              precipitation: 0,
+            ),
+            days: [
+              DayForecast(
+                date: DateTime(2026, 9, 28),
+                code: 3,
+                low: 6,
+                high: 11,
+                precipitation: 0,
+              ),
+            ],
+          ),
+        ),
+      );
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        weatherRepository: weather,
+      );
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('WEATHER'));
+      await tester.pumpAndSettle();
+
+      expect(_onHome(find.text(Messages.weatherTapToLocate)), findsOneWidget);
+
+      await tester.tap(_onHome(find.byType(WeatherTileContentView)));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(weather.locateCalls, 1);
+      expect(_onHome(find.text('10°')), findsOneWidget);
+      expect(_onHome(find.text('GOTHENBURG')), findsOneWidget);
+    });
+
+    testWidgets('a permanent refusal is not asked again on tap', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeWeatherRepository weather = FakeWeatherRepository(
+        const WeatherLocationDenied(permanent: true),
+      );
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        weatherRepository: weather,
+      );
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.weather);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.byType(WeatherTileContentView)));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(weather.locateCalls, 0);
+      expect(
+        _onHome(find.text(Messages.weatherAllowInSettings)),
+        findsOneWidget,
+      );
     });
 
     testWidgets('tapping the sound tile cycles normal, vibrate, silent', (

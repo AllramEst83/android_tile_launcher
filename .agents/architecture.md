@@ -13,15 +13,18 @@ lib/
   messages.dart              # user-facing strings
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
-    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed
+    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     list_reorder.dart        # moveItem<T>: pure ReorderableListView-style index move, for drag-to-reorder
+    weather.dart             # Place, Conditions, DayForecast, Forecast; WeatherKind + weatherKind(code); describeWeather(code) (WMO codes, upper case)
+    weather_snapshot.dart    # WeatherSnapshot (sealed): WeatherReady(forecast, stale) / NeedsPlace / LocationDenied / LocationUnavailable / Offline
+    weather_format.dart      # formatDegrees, weekdayAbbreviation
     device_status.dart       # DeviceStatus: battery %, charging, storage free/total (each nullable); free/battery fractions for the bars
     device_format.dart       # formatBattery/formatStorageFree: DeviceStatus -> the tile's strings
     sound_mode.dart          # SoundMode (normal/vibrate/silent): the ringer, with its tap cycle and label
-    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, SoundContent, ToggleContent)
+    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, WeatherContent, SoundContent, ToggleContent)
     clock_format.dart        # formatClockTime/formatClockDate: DateTime -> the tile's display strings
     alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets (Swedish order); shared by the app drawer and the contacts tile (Phase 11)
     app_matcher.dart         # rankApps: best-match-first search ranking, for the drawer's search field
@@ -38,7 +41,19 @@ lib/
     clock_tile_source.dart   # ClockTileSource: pure, DateTime.now() by default, injectable for tests
     system_control_service.dart      # abstract: soundMode/setSoundMode (ringer), isOn/setOn(TileKind) (torch)
     android_system_control_service.dart  # MethodChannel implementation
-    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device), bundled
+    http_fetcher.dart        # abstract: Future<String> get(Uri); the only way features reach the network (read-only)
+    io_http_fetcher.dart     # dart:io implementation: timeouts, size cap, NetworkException
+    network_exception.dart   # NetworkException(message, statusCode): a request that could not complete
+    weather.dart             # Weather: Open-Meteo forecast + geocoding (find), the saved home Place; tries a preferred ForecastSource first
+    smhi.dart                # Smhi: SMHI point forecast + nearest station's measurements; 404 outside its area means fall back
+    weather_repository.dart  # abstract: current({force}) / locate(); never throws, failures are WeatherSnapshots
+    live_weather_repository.dart  # LiveWeatherRepository: saved place, 15-min cache, stale fallback, remembers the last locate failure
+    weather_tile_source.dart # WeatherTileSource: the repository's snapshot as WeatherContent
+    location_service.dart    # abstract: current() -> LocationFound / LocationDenied / LocationUnavailable
+    android_location_service.dart  # asks PermissionService for location, then the Kotlin channel
+    permission_service.dart  # abstract: request(AppPermission) -> granted / denied / permanentlyDenied (only `location` so far)
+    android_permission_service.dart  # MethodChannel implementation
+    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather), bundled
     device_repository.dart   # abstract: Future<DeviceStatus> status(); never throws
     android_device_repository.dart  # MethodChannel implementation
     device_tile_source.dart  # DeviceTileSource: the repository's status as DeviceContent
@@ -52,6 +67,8 @@ lib/
     tile_view.dart           # chrome shell (fill, bevel/selection, delete badge) + tileContent(tile) dispatcher + AppTileContent
     tile_poller.dart         # TilePoller: rebuilds from a TileSource on an interval, paused while backgrounded; builder gets a refreshNow to re-read early
     clock_tile_view.dart     # ClockTileContentView: the clock's content -- time large, date small
+    weather_tile_view.dart   # WeatherTileContentView: fits its size (small: sky+temp; medium: +words/place/source; wide: +5 days); states without a forecast say why
+    weather_icon.dart        # WeatherIcon: 12x12 pixel-block sky pictures, drawn from bitmaps in the tile's ink
     device_tile_view.dart    # DeviceTileContentView: battery and free storage, each a label + value + flat bar
     state_tile_view.dart     # StateTileContentView: label + a state string ([ON], [VIBRATE]...), nullable onTap
     editable_tile_grid.dart  # the grid editor's canvas: Draggable/DragTarget per tile, tap to select, delete badge
@@ -62,6 +79,8 @@ lib/
 android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   MainActivity.kt            # wires channel handlers into the Flutter engine
   AppsChannelHandler.kt      # list/launch/uninstall/openAppDetails; listing runs off the main thread
+  LocationChannelHandler.kt  # coarse position from the network (else fused) provider, named by Android's geocoder when it can
+  PermissionsChannelHandler.kt  # runtime permission requests; MainActivity forwards onRequestPermissionsResult
   DeviceChannelHandler.kt    # battery (sticky broadcast) and storage (StatFs); no permissions
   SystemControlChannelHandler.kt  # ringer mode, torch
 test/  # mirrors lib/; fakes/ holds FakeAppRepository
@@ -143,3 +162,9 @@ Record decisions that future agents can't derive from code (append, newest last)
 - `TileServices` (`services/tile_services.dart`) replaces the single `systemControl` parameter that `tileContent`, `TileGrid`, `AppTileGrid`, `EditableTileGrid`, `HomeShell` and `TileLauncherApp` each carried. The device tile was the second live kind needing a platform collaborator and every later phase (weather, calendar, contacts, mail) adds another, so bundling them means a new kind's service is one field in one class plus its wiring in `main()`, not a new parameter through six widget layers. `interactive` stays a separate `tileContent` parameter: it is about the call site (editor vs home), not a service.
 - `DeviceRepository.status()` never throws: a failed or missing platform query returns a `DeviceStatus` whose fields are `null`, and the view shows dashes, rather than the tile poller having an error path (`TilePoller` has none; an exception from `read()` would be an unhandled async error). Storage is the internal data partition (`StatFs` on `Environment.getDataDirectory()`) in decimal units, like Android's own storage screen. Battery comes from the sticky `ACTION_BATTERY_CHANGED` broadcast read with a null receiver, so it needs no permission and no registered receiver. The tile polls every 60 seconds (plus on resume): both change slowly.
 - The device tile's two bars both fill toward "more is left" — battery by charge, storage by *free* share — because the storage label says FREE and a bar filling the other way read as "plenty" on a nearly-full disk (seen on the emulator: 648 MB free with a 90%-full bar). The bars are an outlined box filled with the tile's ink, no gradient or alpha, per the palette rule.
+- Phase 9's weather code is a port of the sibling terminal launcher's (`weather.dart`, `smhi.dart`, their fixtures and tests), split to fit this repo: the value types (`Place`, `Forecast`, ...), `WeatherKind` and the WMO descriptions live in pure-Dart `model/`; `Weather`/`Smhi` and the HTTP layer stay in `services/`. Descriptions are upper case (a tile, not a card). `Weather.find` (geocoding by name) is kept and tested although no tile uses it yet: it is the natural fallback when location is refused for good, for a later settings phase.
+- The tile never asks for location on its own. With no saved place it says "TAP TO USE MY LOCATION"; the tap calls `WeatherRepository.locate()`, which asks for permission, saves the place (`weather.home`, via the same `LocalStore`) and fetches. A permission dialog appearing unprompted on a home screen would be hostile, and only a tap can also be retried after a refusal. A permanent refusal has no tap action (Android would not show the dialog); the tile says where the setting is.
+- `LiveWeatherRepository` keeps the last forecast in memory for 15 minutes (the `TilePoller` interval and every return to the launcher then cost nothing), falls back to it marked stale if a refresh fails, and — found on the emulator — remembers why the last `locate()` failed: the tile re-reads with `current()` straight after a tap, which otherwise reported "needs a place" again and hid every refusal or missing fix.
+- Location is coarse only (`ACCESS_COARSE_LOCATION`; the system dialog offers "approximate" only). The Kotlin handler uses the network provider if enabled, else the fused provider (Android 12+); the port used the network provider alone, so a phone without one (no Play services, Google Location Accuracy off) reported "location is switched off" while it was on. GPS is never used: it needs precise location. `INTERNET` is now in the main manifest (it was only in debug/profile), which a release build needs.
+- The weather tile chooses its layout from the width it is given (`_compact` 120, `_wide` 260 logical px), not from `TileSize`, so it follows the grid's cell maths and any future size: small shows the sky and temperature; medium adds the words, place and source (SMHI's licence is CC BY, so the source is always credited); wide adds five day columns. Sky pictures are 12x12 pixel-block bitmaps painted with anti-aliasing off (hairline seams otherwise), not the sibling's anti-aliased line drawings, to keep the hard-edged look.
+- Testing location on the emulator needs a mock provider: the emulator's `geo fix` feeds only GPS, which a coarse-only app cannot use, so the fused provider returns "no location fix". `adb -s emulator-5554 shell appops set com.android.shell android:mock_location allow`, then `cmd location providers add-test-provider network`, `set-test-provider-enabled network true`, `set-test-provider-location network --location 57.70,11.97 --accuracy 500` (and `remove-test-provider` + `appops ... deny` afterwards) gives the app a position.

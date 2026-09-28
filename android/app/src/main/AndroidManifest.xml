@@ -3,6 +3,13 @@
          confirmation dialog (API 28+). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
+    <!-- The weather tile fetches forecasts (SMHI, Open-Meteo)... -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- ...for roughly where the phone is. Coarse only: a forecast needs no
+         more, and precise location is never requested. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <!-- Lets the silent-mode/vibration-mode tiles query and (once the user
          grants Do-Not-Disturb access via Settings) set the ringer mode. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />

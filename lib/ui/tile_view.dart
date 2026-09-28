@@ -4,17 +4,21 @@ import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_content.dart';
+import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
 import 'package:android_tile_launcher/services/sound_mode_tile_source.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/services/toggle_tile_source.dart';
+import 'package:android_tile_launcher/services/weather_repository.dart';
+import 'package:android_tile_launcher/services/weather_tile_source.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
+import 'package:android_tile_launcher/ui/weather_tile_view.dart';
 import 'package:flutter/material.dart';
 
 /// The chrome every tile shares regardless of kind: a flat VIC-II fill with a
@@ -117,6 +121,24 @@ Widget tileContent(
           ink: tile.colour.ink,
         ),
       );
+    case TileKind.weather:
+      final WeatherRepository weather = services.weather;
+      return TilePoller(
+        source: WeatherTileSource(repository: weather),
+        interval: const Duration(minutes: 15),
+        builder: (context, content, refreshNow) {
+          final WeatherSnapshot snapshot = (content as WeatherContent).snapshot;
+          return WeatherTileContentView(
+            snapshot: snapshot,
+            ink: tile.colour.ink,
+            onTap: interactive
+                ? () => unawaited(
+                    _act(() => _weatherTap(weather, snapshot), refreshNow),
+                  )
+                : null,
+          );
+        },
+      );
     case TileKind.soundMode:
       return TilePoller(
         source: SoundModeTileSource(control: systemControl),
@@ -172,6 +194,20 @@ Future<void> _act(
   refreshNow();
   await Future<void>.delayed(const Duration(milliseconds: 400));
   refreshNow();
+}
+
+/// What a tap on the weather tile does: ask for the phone's location when
+/// there is no place (or it was refused, and Android will still ask), else
+/// fetch afresh. Nothing when Android has stopped asking — the tile says where
+/// the setting is.
+Future<void> _weatherTap(WeatherRepository weather, WeatherSnapshot snapshot) {
+  return switch (snapshot) {
+    WeatherLocationDenied(permanent: true) => Future<void>.value(),
+    WeatherNeedsPlace() ||
+    WeatherLocationDenied() ||
+    WeatherLocationUnavailable() => weather.locate(),
+    WeatherReady() || WeatherOffline() => weather.current(force: true),
+  };
 }
 
 /// An app tile's content: a monochrome glyph — its label's first letter,

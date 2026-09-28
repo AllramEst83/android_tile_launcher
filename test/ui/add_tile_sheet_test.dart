@@ -38,6 +38,7 @@ void main() {
 
     expect(find.text('CLOCK'), findsOneWidget);
     expect(find.text('DEVICE'), findsOneWidget);
+    expect(find.text('WEATHER'), findsOneWidget);
     expect(find.text('SOUND'), findsOneWidget);
     expect(find.text('FLASHLIGHT'), findsOneWidget);
   });

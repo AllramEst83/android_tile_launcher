@@ -27,4 +27,13 @@ abstract final class Messages {
 
   static const String addTile = '+ ADD TILE';
   static const String noTilesToAdd = 'NOTHING LEFT TO ADD.';
+
+  static const String weatherTitle = 'WEATHER';
+  static const String weatherTapToLocate = 'TAP TO USE MY LOCATION';
+  static const String weatherTapToAllow = 'TAP TO ALLOW LOCATION';
+  static const String weatherAllowInSettings =
+      'ALLOW LOCATION IN ANDROID SETTINGS';
+  static const String weatherTapToRetry = 'TAP TO RETRY';
+  static const String weatherOffline = 'NO CONNECTION.';
+  static const String weatherOld = 'OLD';
 }

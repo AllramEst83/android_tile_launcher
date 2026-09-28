@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
+import 'package:android_tile_launcher/model/weather_snapshot.dart';
 
 /// What a live tile currently shows, from its `TileSource`. An app tile has
 /// none of these — its label and glyph come straight from the `AppInfo` it
@@ -75,4 +76,14 @@ class DeviceContent extends TileContent {
 
   @override
   String toString() => 'DeviceContent($status)';
+}
+
+/// The weather tile's content: a forecast, or the reason there is none.
+class WeatherContent extends TileContent {
+  const WeatherContent({required this.snapshot});
+
+  final WeatherSnapshot snapshot;
+
+  @override
+  String toString() => 'WeatherContent($snapshot)';
 }
