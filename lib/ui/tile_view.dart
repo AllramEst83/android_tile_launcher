@@ -15,6 +15,8 @@ import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/mail_tile_source.dart';
 import 'package:android_tile_launcher/services/sound_mode_tile_source.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
+import 'package:android_tile_launcher/services/text_tv_repository.dart';
+import 'package:android_tile_launcher/services/text_tv_tile_source.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/services/toggle_tile_source.dart';
 import 'package:android_tile_launcher/services/weather_repository.dart';
@@ -28,6 +30,8 @@ import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
+import 'package:android_tile_launcher/ui/text_tv_screen.dart';
+import 'package:android_tile_launcher/ui/text_tv_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
 import 'package:android_tile_launcher/ui/weather_tile_view.dart';
@@ -214,6 +218,26 @@ Widget tileContent(
                 : null,
           );
         },
+      );
+    case TileKind.textTv:
+      final TextTvRepository textTv = services.textTv;
+      return TilePoller(
+        source: TextTvTileSource(repository: textTv),
+        interval: const Duration(minutes: 10),
+        builder: (context, content, refreshNow) => TextTvTileContentView(
+          result: (content as TextTvContent).result,
+          ink: tile.colour.ink,
+          // Opens the viewer over the whole screen; when it is closed the tile
+          // reads again, so its headlines match what was just read.
+          onTap: interactive
+              ? () => unawaited(
+                  showTextTv(
+                    context,
+                    repository: textTv,
+                  ).then((_) => refreshNow()),
+                )
+              : null,
+        ),
       );
     case TileKind.soundMode:
       return TilePoller(

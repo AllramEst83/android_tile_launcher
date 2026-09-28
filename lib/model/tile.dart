@@ -4,7 +4,7 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 /// What a tile is. `app` launches [Tile.id] as a package name; a system kind
 /// (`clock`, `device`, ...) has no launch target — [Tile.id] is just a
 /// fixed identity (`"clock"`) instead. More arrive one phase at a time
-/// (Text TV in Phase 14, ...) — see "Adding a tile
+/// (calc and convert in Phase 15, ...) — see "Adding a tile
 /// kind" in .agents/architecture.md.
 enum TileKind {
   app,
@@ -14,6 +14,7 @@ enum TileKind {
   agenda,
   contact,
   mail,
+  textTv,
   soundMode,
   flashlight,
 }
@@ -35,6 +36,7 @@ String displayNameOf(TileKind kind) => switch (kind) {
   TileKind.agenda => 'AGENDA',
   TileKind.contact => 'CONTACT',
   TileKind.mail => 'MAIL',
+  TileKind.textTv => 'TEXT TV',
   TileKind.soundMode => 'SOUND',
   TileKind.flashlight => 'FLASHLIGHT',
 };

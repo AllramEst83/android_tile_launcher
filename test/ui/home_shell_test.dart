@@ -6,6 +6,7 @@ import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
+import 'package:android_tile_launcher/model/text_tv_page.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/model/weather.dart';
@@ -26,6 +27,8 @@ import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
+import 'package:android_tile_launcher/ui/text_tv_screen.dart';
+import 'package:android_tile_launcher/ui/text_tv_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/weather_tile_view.dart';
 import 'package:flutter/material.dart';
@@ -37,6 +40,7 @@ import '../fakes/fake_contacts.dart';
 import '../fakes/fake_device_repository.dart';
 import '../fakes/fake_mail_service.dart';
 import '../fakes/fake_system_control_service.dart';
+import '../fakes/fake_text_tv_repository.dart';
 import '../fakes/fake_tile_services.dart';
 import '../fakes/fake_weather_repository.dart';
 import '../fakes/in_memory_local_store.dart';
@@ -65,6 +69,7 @@ Future<void> pumpShell(
   FakeSmsService? smsService,
   FakeWhatsAppService? whatsAppService,
   FakeMailService? mailService,
+  FakeTextTvRepository? textTvRepository,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
@@ -81,6 +86,7 @@ Future<void> pumpShell(
         sms: smsService,
         whatsApp: whatsAppService,
         mail: mailService,
+        textTv: textTvRepository,
       ),
     ),
   ),
@@ -750,6 +756,56 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byKey(mailConnectKey), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'the Text TV tile shows headlines, and opens the viewer on tap',
+      (WidgetTester tester) async {
+        final GridState gridState = _gridState();
+        final FakeTextTvRepository textTv = FakeTextTvRepository(
+          <int, TextTvPage>{
+            100: const TextTvPage(
+              number: 100,
+              parts: <List<String>>[
+                <String>[
+                  '100 SVT Text',
+                  '',
+                  '  Fyra dödades i ryska attacker',
+                  '                   130',
+                ],
+              ],
+            ),
+          },
+        );
+        await pumpShell(
+          tester,
+          FakeAppRepository(),
+          gridState: gridState,
+          textTvRepository: textTv,
+        );
+        await tester.pump();
+        await gridState.pinSystemTile(TileKind.textTv);
+        await tester.pumpAndSettle();
+        expect(
+          _onHome(find.text('FYRA DÖDADES I RYSKA ATTACKER')),
+          findsOneWidget,
+        );
+
+        await tester.tap(_onHome(find.byType(TextTvTileContentView)));
+        await tester.pumpAndSettle();
+
+        // The viewer covers the home screen, with its close button on top.
+        expect(find.byKey(textTvCloseKey), findsOneWidget);
+
+        final int before = textTv.requests.length;
+        await tester.tap(find.byKey(textTvCloseKey));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(textTvCloseKey), findsNothing);
+        // Back on home the tile read again.
+        expect(textTv.requests.length, greaterThan(before));
+        expect(_onHome(find.byType(TextTvTileContentView)), findsOneWidget);
       },
     );
 

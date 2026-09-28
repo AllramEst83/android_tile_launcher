@@ -2,6 +2,7 @@ import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
+import 'package:android_tile_launcher/model/text_tv_page.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
 
 /// What a live tile currently shows, from its `TileSource`. An app tile has
@@ -104,6 +105,16 @@ class MailContent extends TileContent {
 
   @override
   String toString() => 'MailContent($result, $now)';
+}
+
+/// The Text TV tile's content: the headline page, or the reason there is none.
+class TextTvContent extends TileContent {
+  const TextTvContent({required this.result});
+
+  final TextTvResult result;
+
+  @override
+  String toString() => 'TextTvContent($result)';
 }
 
 /// The weather tile's content: a forecast, or the reason there is none.

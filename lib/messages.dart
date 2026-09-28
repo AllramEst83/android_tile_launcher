@@ -90,4 +90,14 @@ abstract final class Messages {
   static const String mailForget = 'FORGET ACCOUNT';
   static const String mailForgetAsk = 'FORGET THIS ACCOUNT AND ITS PASSWORD?';
   static const String mailRefresh = 'REFRESH';
+
+  static const String textTvTitle = 'TEXT TV';
+  static const String textTvTapToOpen = 'TAP TO OPEN';
+  static const String textTvNotBroadcast = 'NOT IN BROADCAST.';
+  static const String textTvLoading = 'LOADING...';
+  static const String textTvTryAgain = 'TRY AGAIN';
+  static const String textTvRefresh = 'REFRESH';
+  static const String textTvPart = 'PART';
+  static String textTvPageNotBroadcast(int number) =>
+      'PAGE $number IS NOT IN BROADCAST.';
 }

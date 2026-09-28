@@ -21,10 +21,12 @@ import 'services/imap_mail_service.dart';
 import 'services/io_http_fetcher.dart';
 import 'services/live_agenda_repository.dart';
 import 'services/live_contacts_repository.dart';
+import 'services/live_text_tv_repository.dart';
 import 'services/live_weather_repository.dart';
 import 'services/mail_account.dart';
 import 'services/shared_preferences_local_store.dart';
 import 'services/smhi.dart';
+import 'services/text_tv.dart';
 import 'services/tile_services.dart';
 import 'services/weather.dart';
 import 'ui/theme.dart';
@@ -64,6 +66,7 @@ Future<void> main() async {
         ),
         sms: const AndroidSmsService(permissions: AndroidPermissionService()),
         whatsApp: const AndroidWhatsAppService(),
+        textTv: LiveTextTvRepository(textTv: TextTv(fetcher: fetcher)),
         mail: CachedMailService(
           inner: ImapMailService(
             accounts: MailAccountStore(FlutterSecretStore()),

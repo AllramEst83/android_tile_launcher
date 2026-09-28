@@ -13,11 +13,17 @@ lib/
   messages.dart              # user-facing strings
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
-    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, contact, mail, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed, contactTileId/contactKeyOf; Tile.label
+    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, contact, mail, textTv, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed, contactTileId/contactKeyOf; Tile.label
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder
+    styled_text.dart         # TvColor, StyledRun (text + colours + underline + tall + mosaic + link), mergeRuns, plainText
+    tv_mosaic.dart           # tvPictureFor(hash): texttv.nu's block-graphics GIFs rebuilt and looked up by CRC-32 (no downloads)
+    text_tv_html.dart        # parseTextTvHtml: a page's HTML as styled rows (null if not the shape expected, so the plain text is the fallback)
+    text_tv_page.dart        # TextTvPage (parts, styledParts, previous/next) and TextTvResult (TextTvShown / NotBroadcast / Failed)
+    text_tv_headlines.dart   # textTvHeadlines(page): the headline lines for the tile (no title, bare numbers or navigation)
+    tv_layout.dart           # tvTextMargins / tvGutters: the black gutter each side of a page that gives its TEXT equal margins
     mail.dart                # MailMessage, MailResult (MailMessages / MailNotSetUp / MailUnavailable), MailAccountInfo, MailMoveResult (MailMoved / MailGone / MailMoveNotSetUp / MailMoveFailed)
     mail_format.dart         # guessImapHost(email), formatMailDate
     contact.dart             # PhoneNumber, Contact(key, name, numbers, preferredNumber), dialable, whatsAppNumber (default country code 46), findContact
@@ -30,7 +36,7 @@ lib/
     device_status.dart       # DeviceStatus: battery %, charging, storage free/total (each nullable); free/battery fractions for the bars
     device_format.dart       # formatBattery/formatStorageFree: DeviceStatus -> the tile's strings
     sound_mode.dart          # SoundMode (normal/vibrate/silent): the ringer, with its tap cycle and label
-    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, WeatherContent, AgendaContent, MailContent, SoundContent, ToggleContent)
+    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, WeatherContent, AgendaContent, MailContent, TextTvContent, SoundContent, ToggleContent)
     clock_format.dart        # formatClockTime/formatClockDate: DateTime -> the tile's display strings
     alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets (Swedish order); shared by the app drawer and the contacts tile (Phase 11)
     app_matcher.dart         # rankApps: best-match-first search ranking, for the drawer's search field
@@ -59,6 +65,10 @@ lib/
     android_location_service.dart  # asks PermissionService for location, then the Kotlin channel
     permission_service.dart  # abstract: request(AppPermission) -> granted / denied / permanentlyDenied (only `location` so far)
     android_permission_service.dart  # MethodChannel implementation
+    text_tv.dart             # TextTv: the texttv.nu API client (page(n) -> TextTvPage?), read-only, identifies itself as android_tile_launcher
+    text_tv_repository.dart  # abstract: page(n, {fresh}) -> TextTvResult, never throws
+    live_text_tv_repository.dart  # LiveTextTvRepository: keeps up to 40 pages for 5 min, so flipping back does not refetch
+    text_tv_tile_source.dart # TextTvTileSource: page 100 for the tile
     secret_store.dart        # abstract SecretStore: read/write/delete plain strings kept encrypted by the platform (secrets only, never settings)
     flutter_secret_store.dart  # SecretStore on flutter_secure_storage (Android Keystore); the only file that knows the package
     mail_account.dart        # MailAccount(email, host, port, password) as one value, and MailAccountStore over a SecretStore
@@ -81,7 +91,7 @@ lib/
     agenda_repository.dart   # abstract: between(from, to) -> AgendaSnapshot; allow() asks for calendar access (tap only)
     live_agenda_repository.dart  # LiveAgendaRepository: CalendarService + PermissionService; remembers a refusal until a read succeeds
     agenda_tile_source.dart  # AgendaTileSource: now .. end of the 7th day, with the moment it read (AgendaContent.now)
-    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather, agenda, contacts, phone, sms, whatsApp, mail), bundled
+    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather, agenda, contacts, phone, sms, whatsApp, mail, textTv), bundled
     device_repository.dart   # abstract: Future<DeviceStatus> status(); never throws
     android_device_repository.dart  # MethodChannel implementation
     device_tile_source.dart  # DeviceTileSource: the repository's status as DeviceContent
@@ -96,6 +106,9 @@ lib/
     tile_poller.dart         # TilePoller: rebuilds from a TileSource on an interval, paused while backgrounded; builder gets a refreshNow to re-read early
     clock_tile_view.dart     # ClockTileContentView: the clock's content -- time large, date small
     grouped_list.dart        # GroupedList<T> (headers per initial + jump index, shared by the app drawer and the contact picker), SectionHeader, JumpIndex (rows shrink to fit a short strip)
+    tv_row.dart              # TvRow: one row of a Text TV page drawn cell by cell (colour bars, block graphics, underlined links, tall headlines); font fitted to the width
+    text_tv_tile_view.dart   # TextTvTileContentView: name + page number on a small tile, plus the headlines that fit on a larger one
+    text_tv_screen.dart      # showTextTv / TextTvScreen: the full-screen viewer (close, refresh, page arrows, number pad, shortcuts, links, parts, history)
     mail_tile_view.dart      # MailTileContentView: fits its size (small: unread count; medium: +newest message; wide: +as many one-line messages as fit, unread marked *)
     mail_setup_sheet.dart    # showMailSetupSheet: address, IMAP server (guessed from the address until typed over), app password (obscured); CONNECT logs in, then saves
     mail_sheet.dart          # showMailSheet: newest 20, tap a message for TRASH (asks again), REFRESH, FORGET ACCOUNT (asks first)
@@ -231,3 +244,7 @@ Record decisions that future agents can't derive from code (append, newest last)
 - Mail is read-only apart from one change, moving a message to the server's Trash (`moveToTrash`, guarded by the inbox's `UIDVALIDITY` from the listing the user is looking at; never a delete, and no Trash folder means nothing is touched). "Anything that acts asks first": tapping a message only reveals TRASH, TRASH asks `MOVE TO TRASH?` and only YES moves it; FORGET ACCOUNT asks too. No message bodies are fetched (envelope only), no sending. The tile shows the unread count (`MailMessages.unread`, from IMAP `STATUS UNSEEN`) as a big number, which is the "badge".
 - The IMAP server is guessed from the address by `guessImapHost` (Gmail, Outlook/Hotmail, iCloud, Yahoo, else `imap.<domain>`) so the user types less; once the field has been typed in, the guess stops overwriting it. Port 993 with TLS unless the field says `host:port`.
 - The emulator has almost no free storage: the larger APK (mail libraries) failed `INSTALL_FAILED_INSUFFICIENT_STORAGE` even after uninstalling the old build; `adb shell pm trim-caches 2G` freed enough. The user checked mail on their own phone, so the emulator was not used past installing.
+- Phase 14's Text TV core (the texttv.nu client, the HTML-to-coloured-rows parser, the block-graphics decoder, `TvRow` and their fixtures/tests) is ported from the sibling. Adaptations: the pure value types and parsers moved to `model/` (`styled_text`, `tv_mosaic`, `text_tv_html`, and `TextTvPage` split out of the client, with a `TextTvResult`), so tile content depends on the model only; a link's command is just the page number (`commandFor: (page) => '$page'`), since there is no command line; `RunCommand` became `ValueChanged<String>`.
+- The viewer is a full-screen route, not a sheet (asked for by the user: "like opening an app"): `showTextTv` pushes a `MaterialPageRoute(fullscreenDialog: true)` from the tile's tap, and the tile reads again when it closes. Layout: a top bar with the close button on the left (where a thumb reaches back from), the name, and REFRESH; the page on its own black screen in the middle; thumb-sized controls below (`<` page `>`, then shortcuts to 100 NYHETER / 101 / 104 / 300 SPORT / 400 VÄDER / 700 INNEHÅLL). Tapping the number opens a remote-style number pad (a page number starts with 1 to 8; the third digit opens the page; DEL; X puts it away) instead of the system keyboard. Underlined page numbers in a page are tappable links. A swipe left/right steps through a page's parts and then to the next/previous page, and a part bar shows `PART 2/3` with arrows. Back steps back through the pages read (a history stack), closes the number pad first, then closes the viewer (`PopScope`). Failures word themselves (TRY AGAIN reads with `fresh`), and an unbroadcast page says so while the arrows keep working.
+- Alignment (the user had seen text and elements sit right of centre in the sibling's rendering): texttv.nu pages are not symmetric (headlines are indented two cells and run to the last column), so drawn as they come the text leans one way. `tvTextMargins` measures the blank cells the page's longer text rows leave at each side (ignoring the title strip, block graphics and short rows) and `tvGutters` gives the black gutter to each side that makes those margins equal; the two gutters always add to 2 cells, so the grid is the same size on every page. The trade-off is inherent: the coloured header bars run to the page's edges, so on a page that leans, the text is centred and the bar is not. Measured on the real pages 100 and 377 in a test.
+- The text is Press Start 2P, monospaced (one square cell per character), fitted to the width so 40 columns plus the two gutters fill it, with a 1.6 line height for teletext proportions; block graphics are drawn by the painter. There is no zoom yet: 40 columns on a phone is small, and a text-size control would be the next thing to add if reading is hard. `flutter test` does not load the pixel font, so a rendered test image shows blocks for text (the mosaic logo is real); text layout was therefore checked by geometry in tests rather than by eye.
