@@ -602,13 +602,16 @@ class _NumberBox extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           border: Border.all(
-            color: active ? C64.yellow : TileColors.bezel,
+            color: active ? TileColors.highlight : TileColors.bezel,
             width: TileMetrics.bevel,
           ),
         ),
         child: Text(
           text,
-          style: _text(20, active ? C64.yellow : TileColors.textBright),
+          style: _text(
+            20,
+            active ? TileColors.highlight : TileColors.textBright,
+          ),
         ),
       ),
     );
@@ -638,7 +641,9 @@ class _Shortcuts extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: page == current ? C64.yellow : TileColors.bezel,
+                    color: page == current
+                        ? TileColors.highlight
+                        : TileColors.bezel,
                     width: TileMetrics.bevel,
                   ),
                 ),
@@ -646,7 +651,9 @@ class _Shortcuts extends StatelessWidget {
                   '$page $name',
                   style: _text(
                     10,
-                    page == current ? C64.yellow : TileColors.textBright,
+                    page == current
+                        ? TileColors.highlight
+                        : TileColors.textBright,
                   ),
                 ),
               ),

@@ -117,7 +117,10 @@ class _MailSetupState extends State<_MailSetup> {
               const SizedBox(height: TileMetrics.gutter),
               Text(
                 Messages.mailAppPasswordNote,
-                style: text.bodySmall?.copyWith(fontSize: 8, color: C64.cyan),
+                style: text.bodySmall?.copyWith(
+                  fontSize: 8,
+                  color: TileColors.accent,
+                ),
               ),
               const SizedBox(height: TileMetrics.margin),
               _Field(
@@ -175,7 +178,7 @@ class _MailSetupState extends State<_MailSetup> {
                   _problem!,
                   style: text.bodySmall?.copyWith(
                     fontSize: 10,
-                    color: C64.lightRed,
+                    color: TileColors.danger,
                   ),
                 ),
               ],
@@ -214,7 +217,10 @@ class _Field extends StatelessWidget {
         children: <Widget>[
           Text(
             label,
-            style: text.bodySmall?.copyWith(fontSize: 8, color: C64.lightGrey),
+            style: text.bodySmall?.copyWith(
+              fontSize: 8,
+              color: TileColors.muted,
+            ),
           ),
           TextField(
             key: fieldKey,
@@ -230,7 +236,7 @@ class _Field extends StatelessWidget {
               color: TileColors.textBright,
             ),
             cursorColor: TileColors.textBright,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               contentPadding: EdgeInsets.symmetric(vertical: 12),
               enabledBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: TileColors.bezel),

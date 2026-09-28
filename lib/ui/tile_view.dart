@@ -82,7 +82,10 @@ class TileView extends StatelessWidget {
         decoration: BoxDecoration(
           color: fill,
           border: selected
-              ? Border.all(color: C64.white, width: TileMetrics.bevel * 2)
+              ? Border.all(
+                  color: TileColors.textBright,
+                  width: TileMetrics.bevel * 2,
+                )
               : Border(
                   top: BorderSide(color: light, width: TileMetrics.bevel),
                   left: BorderSide(color: light, width: TileMetrics.bevel),

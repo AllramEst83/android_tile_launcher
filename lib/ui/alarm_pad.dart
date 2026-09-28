@@ -146,10 +146,10 @@ class _AlarmPadState extends State<AlarmPad> {
               : Text(
                   Messages.alarmNext(when),
                   key: alarmNextKey,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: kPixelFontFamily,
                     fontSize: 10,
-                    color: C64.cyan,
+                    color: TileColors.accent,
                   ),
                 ),
         ),
@@ -237,10 +237,10 @@ class _AlarmPadState extends State<AlarmPad> {
             child: Text(
               status,
               key: alarmStatusKey,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: kPixelFontFamily,
                 fontSize: 10,
-                color: C64.cyan,
+                color: TileColors.accent,
               ),
             ),
           ),
@@ -260,10 +260,10 @@ class _Label extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: kPixelFontFamily,
           fontSize: 8,
-          color: C64.lightGrey,
+          color: TileColors.muted,
         ),
       ),
     );

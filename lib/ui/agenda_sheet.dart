@@ -189,7 +189,7 @@ class _Toggle extends StatelessWidget {
         child: Text(
           selected ? '[$label]' : ' $label ',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: selected ? TileColors.textBright : C64.lightGrey,
+            color: selected ? TileColors.textBright : TileColors.muted,
           ),
         ),
       ),
@@ -216,7 +216,10 @@ class _EventRow extends StatelessWidget {
         children: <Widget>[
           Text(
             formatSpan(event, day),
-            style: text.bodySmall?.copyWith(fontSize: 10, color: C64.cyan),
+            style: text.bodySmall?.copyWith(
+              fontSize: 10,
+              color: TileColors.accent,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
@@ -233,7 +236,7 @@ class _EventRow extends StatelessWidget {
               location.toUpperCase(),
               style: text.bodySmall?.copyWith(
                 fontSize: 8,
-                color: C64.lightGrey,
+                color: TileColors.muted,
               ),
             ),
         ],

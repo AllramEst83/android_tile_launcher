@@ -91,11 +91,11 @@ class _ContactPickerState extends State<_ContactPicker> {
                 // Roomy, not dense: a thin field is hard to hit and to read.
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 hintText: Messages.contactSearch,
-                hintStyle: text.bodyMedium?.copyWith(color: C64.lightGrey),
-                enabledBorder: const UnderlineInputBorder(
+                hintStyle: text.bodyMedium?.copyWith(color: TileColors.muted),
+                enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: TileColors.bezel),
                 ),
-                focusedBorder: const UnderlineInputBorder(
+                focusedBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: TileColors.textBright),
                 ),
               ),
@@ -205,7 +205,7 @@ class _ContactPickerState extends State<_ContactPicker> {
           horizontal: TileMetrics.margin,
           vertical: TileMetrics.gutter,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: TileColors.bezel)),
         ),
         child: Text(

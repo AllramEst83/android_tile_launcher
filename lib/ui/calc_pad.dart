@@ -98,20 +98,20 @@ class _CalcPadState extends State<CalcPad> {
                   error.toUpperCase(),
                   key: calcErrorKey,
                   textAlign: TextAlign.right,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: kPixelFontFamily,
                     fontSize: 8,
-                    color: C64.lightRed,
+                    color: TileColors.danger,
                   ),
                 )
               else if (preview != null)
                 Text(
                   '= $preview',
                   key: calcPreviewKey,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: kPixelFontFamily,
                     fontSize: 12,
-                    color: C64.cyan,
+                    color: TileColors.accent,
                   ),
                 ),
             ],

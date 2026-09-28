@@ -172,7 +172,7 @@ class _JumpIndexState extends State<JumpIndex> {
                                   fontSize: rowHeight < 14 ? 8 : 10,
                                   height: 1,
                                   color: i == _active
-                                      ? C64.white
+                                      ? TileColors.textBright
                                       : TileColors.textBright,
                                   fontWeight: i == _active
                                       ? FontWeight.bold

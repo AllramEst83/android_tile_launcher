@@ -33,9 +33,9 @@ class PadKey extends StatelessWidget {
     final Color colour = onTap == null
         ? TileColors.textDim
         : selected
-        ? C64.yellow
+        ? TileColors.highlight
         : accent
-        ? C64.cyan
+        ? TileColors.accent
         : TileColors.textBright;
     return InkWell(
       onTap: onTap,
@@ -45,7 +45,7 @@ class PadKey extends StatelessWidget {
         padding: padding,
         decoration: BoxDecoration(
           border: Border.all(
-            color: selected ? C64.yellow : TileColors.bezel,
+            color: selected ? TileColors.highlight : TileColors.bezel,
             width: TileMetrics.bevel,
           ),
         ),

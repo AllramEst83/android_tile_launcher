@@ -1,5 +1,7 @@
 import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/settings.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// The VIC-II palette the Commodore 64 could draw, in Pepto's calibration.
 ///
@@ -34,13 +36,125 @@ abstract final class C64 {
   ];
 }
 
-/// The screen a C64 powers on to: light blue on blue, inside a lighter border.
+/// The colours the launcher's own chrome is drawn in (the canvas behind the
+/// tiles, text, borders, and the few status colours). Tile fills are not part
+/// of it: they are always the sixteen VIC-II colours ([C64], `C64Colour`),
+/// whatever screen they sit on.
+///
+/// Three are offered (`ThemeVariant`): the C64's own blue screen, a pitch-black
+/// one for OLED screens, and the beige of the C64's case.
+class TilePalette {
+  const TilePalette({
+    required this.brightness,
+    required this.canvas,
+    required this.bezel,
+    required this.text,
+    required this.textBright,
+    required this.textDim,
+    required this.muted,
+    required this.accent,
+    required this.highlight,
+    required this.danger,
+  });
+
+  /// Whether the canvas is dark or light, for the parts of Flutter that ask
+  /// (the system bars' icons, dialogs).
+  final Brightness brightness;
+
+  /// The screen everything is drawn on.
+  final Color canvas;
+
+  /// Borders and rules.
+  final Color bezel;
+
+  /// Ordinary text, and text on a border.
+  final Color text;
+
+  /// Text that matters most: names, numbers, what is selected.
+  final Color textBright;
+
+  /// Text that recedes: hints, disabled things.
+  final Color textDim;
+
+  /// Secondary text that must still be easy to read.
+  final Color muted;
+
+  /// A second voice: the answer under a sum, a date, a running total.
+  final Color accent;
+
+  /// What is chosen, or asks for a decision.
+  final Color highlight;
+
+  /// Something went wrong.
+  final Color danger;
+
+  /// The C64 power-on screen: light blue on blue.
+  static const TilePalette c64 = TilePalette(
+    brightness: Brightness.dark,
+    canvas: C64.blue,
+    bezel: C64.lightBlue,
+    text: C64.lightBlue,
+    textBright: C64.white,
+    textDim: C64.grey,
+    muted: C64.lightGrey,
+    accent: C64.cyan,
+    highlight: C64.yellow,
+    danger: C64.lightRed,
+  );
+
+  /// Pitch black, so an OLED screen lights only what is drawn on it.
+  static const TilePalette oled = TilePalette(
+    brightness: Brightness.dark,
+    canvas: C64.black,
+    bezel: C64.lightBlue,
+    text: C64.lightBlue,
+    textBright: C64.white,
+    textDim: C64.grey,
+    muted: C64.lightGrey,
+    accent: C64.cyan,
+    highlight: C64.yellow,
+    danger: C64.lightRed,
+  );
+
+  /// The beige of the C64's case: dark brown on beige, with the C64's own blue
+  /// and purple as accents.
+  static const TilePalette beige = TilePalette(
+    brightness: Brightness.light,
+    canvas: Color(0xFFD8CDB2),
+    bezel: Color(0xFF8E5029),
+    text: Color(0xFF553800),
+    textBright: C64.black,
+    textDim: Color(0xFF7A6A4C),
+    muted: Color(0xFF5E4E32),
+    accent: C64.blue,
+    highlight: C64.purple,
+    danger: C64.red,
+  );
+
+  /// The palette for [variant].
+  static TilePalette of(ThemeVariant variant) => switch (variant) {
+    ThemeVariant.c64 => c64,
+    ThemeVariant.oled => oled,
+    ThemeVariant.beige => beige,
+  };
+}
+
+/// The colours the launcher's chrome is drawn in right now: whatever
+/// [TilePalette] is [current]. The app sets [current] when the theme setting
+/// changes and then rebuilds everything, so any widget can read these without
+/// a `BuildContext`.
 abstract final class TileColors {
-  static const Color canvas = C64.blue;
-  static const Color bezel = C64.lightBlue;
-  static const Color text = C64.lightBlue;
-  static const Color textBright = C64.white;
-  static const Color textDim = C64.grey;
+  static TilePalette current = TilePalette.c64;
+
+  static Color get canvas => current.canvas;
+  static Color get bezel => current.bezel;
+  static Color get text => current.text;
+  static Color get textBright => current.textBright;
+  static Color get textDim => current.textDim;
+  static Color get muted => current.muted;
+  static Color get accent => current.accent;
+  static Color get highlight => current.highlight;
+  static Color get danger => current.danger;
 }
 
 /// The mosaic the home screen is laid out on: four columns, a tight gutter, and
@@ -104,32 +218,50 @@ extension C64ColourSwatch on C64Colour {
 /// constant; swapping the font later is a one-line change here.
 const String kPixelFontFamily = 'PressStart2P';
 
+/// How the system bars are drawn over [palette]: no colour behind the status
+/// bar, the navigation bar the colour of the canvas, and icons that show up on
+/// it (light on a dark canvas, dark on a light one).
+SystemUiOverlayStyle systemUiStyleFor(TilePalette palette) {
+  final Brightness icons = palette.brightness == Brightness.dark
+      ? Brightness.light
+      : Brightness.dark;
+  return SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: palette.canvas,
+    statusBarIconBrightness: icons,
+    systemNavigationBarIconBrightness: icons,
+  );
+}
+
 ThemeData tileLauncherTheme() {
-  const TextStyle base = TextStyle(
+  final TilePalette palette = TileColors.current;
+  final TextStyle base = TextStyle(
     fontFamily: kPixelFontFamily,
-    color: TileColors.text,
+    color: palette.text,
     height: 1.6,
   );
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
-    scaffoldBackgroundColor: TileColors.canvas,
-    colorScheme: const ColorScheme.dark(
-      primary: C64.lightBlue,
-      onPrimary: C64.black,
-      secondary: C64.cyan,
-      onSecondary: C64.black,
-      surface: C64.blue,
-      onSurface: C64.lightBlue,
-      error: C64.lightRed,
+    brightness: palette.brightness,
+    scaffoldBackgroundColor: palette.canvas,
+    colorScheme: ColorScheme(
+      brightness: palette.brightness,
+      primary: palette.bezel,
+      onPrimary: palette.canvas,
+      secondary: palette.accent,
+      onSecondary: palette.canvas,
+      surface: palette.canvas,
+      onSurface: palette.text,
+      error: palette.danger,
+      onError: palette.canvas,
     ),
     fontFamily: kPixelFontFamily,
     textTheme: TextTheme(
-      displayLarge: base.copyWith(fontSize: 48, color: TileColors.textBright),
-      headlineMedium: base.copyWith(fontSize: 24, color: TileColors.textBright),
+      displayLarge: base.copyWith(fontSize: 48, color: palette.textBright),
+      headlineMedium: base.copyWith(fontSize: 24, color: palette.textBright),
       titleSmall: base.copyWith(fontSize: 12, letterSpacing: 1),
       bodyMedium: base.copyWith(fontSize: 14),
-      labelSmall: base.copyWith(fontSize: 10, color: TileColors.textDim),
+      labelSmall: base.copyWith(fontSize: 10, color: palette.textDim),
     ),
   );
 }

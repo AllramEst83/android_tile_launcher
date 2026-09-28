@@ -27,36 +27,31 @@ import 'services/live_rates_repository.dart';
 import 'services/live_text_tv_repository.dart';
 import 'services/live_weather_repository.dart';
 import 'services/mail_account.dart';
+import 'services/settings_state.dart';
 import 'services/shared_preferences_local_store.dart';
 import 'services/smhi.dart';
 import 'services/text_tv.dart';
 import 'services/tile_services.dart';
 import 'services/weather.dart';
-import 'ui/theme.dart';
 
 const String _ownPackage = 'com.codedbykay.android_tile_launcher';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: TileColors.canvas,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
 
   final SharedPreferencesLocalStore store = SharedPreferencesLocalStore();
   final GridState gridState = GridState(store: store);
   await gridState.load();
+  final SettingsState settingsState = SettingsState(store: store);
+  await settingsState.load();
   final IoHttpFetcher fetcher = IoHttpFetcher();
 
   runApp(
     TileLauncherApp(
       appRepository: AndroidAppRepository(ownPackage: _ownPackage),
       gridState: gridState,
+      settingsState: settingsState,
       services: TileServices(
         systemControl: const AndroidSystemControlService(),
         device: const AndroidDeviceRepository(),

@@ -165,7 +165,7 @@ class _MailSheetState extends State<_MailSheet> {
                 _email!.toUpperCase(),
                 style: text.bodySmall?.copyWith(
                   fontSize: 8,
-                  color: C64.lightGrey,
+                  color: TileColors.muted,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -180,7 +180,7 @@ class _MailSheetState extends State<_MailSheet> {
                   _status!,
                   style: text.bodySmall?.copyWith(
                     fontSize: 10,
-                    color: C64.cyan,
+                    color: TileColors.accent,
                   ),
                 ),
               ),
@@ -218,7 +218,7 @@ class _MailSheetState extends State<_MailSheet> {
 
   Widget _row(TextTheme text, MailMessage m, DateTime now) {
     final bool selected = _selected == m.uid;
-    final Color bright = m.unread ? TileColors.textBright : C64.lightGrey;
+    final Color bright = m.unread ? TileColors.textBright : TileColors.muted;
     return InkWell(
       key: mailMessageKey(m.uid),
       onTap: _busy
@@ -230,7 +230,7 @@ class _MailSheetState extends State<_MailSheet> {
             }),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: TileColors.bezel)),
         ),
         child: Column(
@@ -252,7 +252,10 @@ class _MailSheetState extends State<_MailSheet> {
                 const SizedBox(width: 8),
                 Text(
                   formatMailDate(m.date, now),
-                  style: text.bodySmall?.copyWith(fontSize: 8, color: C64.cyan),
+                  style: text.bodySmall?.copyWith(
+                    fontSize: 8,
+                    color: TileColors.accent,
+                  ),
                 ),
               ],
             ),
@@ -274,7 +277,7 @@ class _MailSheetState extends State<_MailSheet> {
                       Messages.mailTrashAsk,
                       style: text.bodySmall?.copyWith(
                         fontSize: 8,
-                        color: C64.yellow,
+                        color: TileColors.highlight,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -322,7 +325,10 @@ class _MailSheetState extends State<_MailSheet> {
         Expanded(
           child: Text(
             Messages.mailForgetAsk,
-            style: text.bodySmall?.copyWith(fontSize: 8, color: C64.yellow),
+            style: text.bodySmall?.copyWith(
+              fontSize: 8,
+              color: TileColors.highlight,
+            ),
           ),
         ),
         const SizedBox(width: 8),

@@ -84,11 +84,11 @@ class _AppDrawerState extends State<AppDrawer> {
               contentPadding: const EdgeInsets.symmetric(vertical: 16),
               hintText: Messages.searchApps,
               hintStyle: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: C64.lightGrey),
-              enabledBorder: const UnderlineInputBorder(
+                  ?.copyWith(color: TileColors.muted),
+              enabledBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: TileColors.bezel),
               ),
-              focusedBorder: const UnderlineInputBorder(
+              focusedBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: TileColors.textBright),
               ),
             ),
@@ -164,7 +164,7 @@ class _AppRow extends StatelessWidget {
           horizontal: TileMetrics.margin,
           vertical: TileMetrics.gutter,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: TileColors.bezel)),
         ),
         child: Text(

@@ -186,7 +186,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
         top: r.top,
         width: _lineWidth,
         height: r.height,
-        child: const IgnorePointer(child: ColoredBox(color: C64.yellow)),
+        child: IgnorePointer(child: ColoredBox(color: TileColors.highlight)),
       );
     }
     return null;

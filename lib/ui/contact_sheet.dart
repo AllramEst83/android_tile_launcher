@@ -258,12 +258,12 @@ class _ContactSheetState extends State<_ContactSheet> {
                       hintText: Messages.contactMessageHint,
                       hintStyle: text.bodySmall?.copyWith(
                         fontSize: 12,
-                        color: C64.lightGrey,
+                        color: TileColors.muted,
                       ),
-                      enabledBorder: const UnderlineInputBorder(
+                      enabledBorder: UnderlineInputBorder(
                         borderSide: BorderSide(color: TileColors.bezel),
                       ),
-                      focusedBorder: const UnderlineInputBorder(
+                      focusedBorder: UnderlineInputBorder(
                         borderSide: BorderSide(color: TileColors.textBright),
                       ),
                     ),
@@ -281,7 +281,7 @@ class _ContactSheetState extends State<_ContactSheet> {
                     _status!,
                     style: text.bodySmall?.copyWith(
                       fontSize: 10,
-                      color: C64.cyan,
+                      color: TileColors.accent,
                     ),
                   ),
                 ],
@@ -318,7 +318,7 @@ class _NumberRow extends StatelessWidget {
           '${selected ? '>' : ' '} ${number.label} ${number.number}',
           style: text.bodySmall?.copyWith(
             fontSize: 10,
-            color: selected ? C64.cyan : C64.lightGrey,
+            color: selected ? TileColors.accent : TileColors.muted,
           ),
         ),
       ),
@@ -343,7 +343,7 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color colour = onTap == null
         ? TileColors.textDim
-        : (selected ? C64.yellow : TileColors.textBright);
+        : (selected ? TileColors.highlight : TileColors.textBright);
     return InkWell(
       onTap: onTap,
       child: Container(

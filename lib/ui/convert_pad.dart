@@ -186,10 +186,10 @@ class _ConvertPadState extends State<ConvertPad> {
                 child: Text(
                   '= ${result ?? '...'} $toName',
                   key: convertResultKey,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: kPixelFontFamily,
                     fontSize: 14,
-                    color: C64.cyan,
+                    color: TileColors.accent,
                   ),
                 ),
               ),
@@ -270,10 +270,10 @@ class _Label extends StatelessWidget {
       padding: const EdgeInsets.only(top: 4, bottom: 4),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: kPixelFontFamily,
           fontSize: 8,
-          color: C64.lightGrey,
+          color: TileColors.muted,
         ),
       ),
     );
@@ -333,10 +333,10 @@ class _MoneyNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const TextStyle style = TextStyle(
+    final TextStyle style = TextStyle(
       fontFamily: kPixelFontFamily,
       fontSize: 8,
-      color: C64.lightGrey,
+      color: TileColors.muted,
     );
     final RatesResult? current = rates;
     if (current is RatesLoaded) {
@@ -359,7 +359,7 @@ class _MoneyNote extends StatelessWidget {
               current.reason.toUpperCase(),
               key: convertNoteKey,
               textAlign: TextAlign.right,
-              style: style.copyWith(color: C64.lightRed),
+              style: style.copyWith(color: TileColors.danger),
             ),
             const SizedBox(height: 6),
             PadKey(
@@ -374,7 +374,7 @@ class _MoneyNote extends StatelessWidget {
         ),
       );
     }
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.only(top: 6),
       child: Text(Messages.calcRatesLoading, key: convertNoteKey, style: style),
     );

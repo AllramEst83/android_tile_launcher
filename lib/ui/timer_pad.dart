@@ -96,13 +96,15 @@ class _TimerPadState extends State<TimerPad> {
                 fontSize: 32,
                 color: _entry.digits.isEmpty
                     ? TileColors.textDim
-                    : (_entry.tooLong ? C64.lightRed : TileColors.textBright),
+                    : (_entry.tooLong
+                          ? TileColors.danger
+                          : TileColors.textBright),
               ),
             ),
           ),
         ),
         if (_entry.tooLong)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(bottom: TileMetrics.gutter),
             child: Text(
               Messages.alarmTooLong,
@@ -110,7 +112,7 @@ class _TimerPadState extends State<TimerPad> {
               style: TextStyle(
                 fontFamily: kPixelFontFamily,
                 fontSize: 8,
-                color: C64.lightRed,
+                color: TileColors.danger,
               ),
             ),
           ),
@@ -175,10 +177,10 @@ class _TimerPadState extends State<TimerPad> {
             child: Text(
               status,
               key: timerStatusKey,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: kPixelFontFamily,
                 fontSize: 10,
-                color: C64.cyan,
+                color: TileColors.accent,
               ),
             ),
           ),

@@ -30,7 +30,7 @@ class TileInspector extends StatelessWidget {
     final TextTheme text = Theme.of(context).textTheme;
     final PinnedTile? selected = tile;
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: TileColors.bezel)),
       ),
       child: Padding(
