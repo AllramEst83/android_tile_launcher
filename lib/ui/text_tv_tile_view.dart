@@ -116,7 +116,12 @@ class _Headlines extends StatelessWidget {
   /// Air between two headlines, so the list reads as separate stories rather
   /// than one block of text.
   static const double _gap = 5;
-  static const double _headerHeight = 22;
+
+  /// Room for the header line: taller than the title's own text needs, so
+  /// there is a clear step down to the first headline below it, the way the
+  /// mail tile's header (sized to fit its big unread count) leaves under
+  /// `MAIL`.
+  static const double _headerHeight = 28;
 
   /// The most lines the headline at [index] may wrap to: the lead story, the
   /// one the page leads with, gets an extra one over the rest.
