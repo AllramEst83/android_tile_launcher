@@ -1,15 +1,17 @@
 import 'dart:async';
 
 import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_content.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
+import 'package:android_tile_launcher/services/sound_mode_tile_source.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/toggle_tile_source.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
+import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
-import 'package:android_tile_launcher/ui/toggle_tile_view.dart';
 import 'package:flutter/material.dart';
 
 /// The chrome every tile shares regardless of kind: a flat VIC-II fill with a
@@ -102,33 +104,56 @@ Widget tileContent(
           ink: tile.colour.ink,
         ),
       );
-    case TileKind.silentMode:
-    case TileKind.vibrationMode:
+    case TileKind.soundMode:
+      return TilePoller(
+        source: SoundModeTileSource(control: systemControl),
+        interval: const Duration(seconds: 5),
+        builder: (context, content, refreshNow) {
+          final SoundMode mode = (content as SoundContent).mode;
+          return StateTileContentView(
+            label: displayNameOf(tile.kind),
+            state: mode.label,
+            ink: tile.colour.ink,
+            onTap: interactive
+                ? () => unawaited(
+                    _act(
+                      () => systemControl.setSoundMode(mode.next),
+                      refreshNow,
+                    ),
+                  )
+                : null,
+          );
+        },
+      );
+    case TileKind.doNotDisturb:
     case TileKind.flashlight:
       return TilePoller(
         source: ToggleTileSource(kind: tile.kind, control: systemControl),
         interval: const Duration(seconds: 5),
-        builder: (context, content, refreshNow) => ToggleTileContentView(
-          label: displayNameOf(tile.kind),
-          on: (content as ToggleContent).on,
-          ink: tile.colour.ink,
-          onToggle: interactive
-              ? () => unawaited(
-                  _toggle(systemControl, tile.kind, !content.on, refreshNow),
-                )
-              : null,
-        ),
+        builder: (context, content, refreshNow) {
+          final bool on = (content as ToggleContent).on;
+          return StateTileContentView(
+            label: displayNameOf(tile.kind),
+            state: on ? '[ON]' : '[OFF]',
+            ink: tile.colour.ink,
+            onTap: interactive
+                ? () => unawaited(
+                    _act(() => systemControl.setOn(tile.kind, !on), refreshNow),
+                  )
+                : null,
+          );
+        },
       );
   }
 }
 
-Future<void> _toggle(
-  SystemControlService control,
-  TileKind kind,
-  bool next,
+/// Runs a state-changing [action], then re-reads the tile so it shows the
+/// result at once instead of at the next poll.
+Future<void> _act(
+  Future<void> Function() action,
   VoidCallback refreshNow,
 ) async {
-  await control.setOn(kind, next);
+  await action();
   refreshNow();
 }
 

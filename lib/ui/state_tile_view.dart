@@ -1,22 +1,23 @@
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
-/// A toggle tile's content: its label, and `[ON]`/`[OFF]` large enough to
-/// read at a glance. [onToggle] flips it on tap — `null` in the grid editor,
-/// where a tap selects the tile instead (see `tileContent`'s `interactive`).
-class ToggleTileContentView extends StatelessWidget {
-  const ToggleTileContentView({
+/// A device-state tile's content: its label, and its current [state]
+/// (`[ON]`, `[VIBRATE]`, ...) large enough to read at a glance. [onTap]
+/// changes it — `null` in the grid editor, where a tap selects the tile
+/// instead (see `tileContent`'s `interactive`).
+class StateTileContentView extends StatelessWidget {
+  const StateTileContentView({
     super.key,
     required this.label,
-    required this.on,
+    required this.state,
     required this.ink,
-    this.onToggle,
+    this.onTap,
   });
 
   final String label;
-  final bool on;
+  final String state;
   final Color ink;
-  final VoidCallback? onToggle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +42,7 @@ class ToggleTileContentView extends StatelessWidget {
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
-              on ? '[ON]' : '[OFF]',
+              state,
               style: TextStyle(
                 fontFamily: kPixelFontFamily,
                 fontSize: 28,
@@ -52,7 +53,7 @@ class ToggleTileContentView extends StatelessWidget {
         ],
       ),
     );
-    final VoidCallback? tap = onToggle;
+    final VoidCallback? tap = onTap;
     if (tap == null) return body;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

@@ -37,8 +37,8 @@ void main() {
     await _open(tester, gridState);
 
     expect(find.text('CLOCK'), findsOneWidget);
-    expect(find.text('SILENT MODE'), findsOneWidget);
-    expect(find.text('VIBRATION MODE'), findsOneWidget);
+    expect(find.text('SOUND'), findsOneWidget);
+    expect(find.text('DO NOT DISTURB'), findsOneWidget);
     expect(find.text('FLASHLIGHT'), findsOneWidget);
   });
 

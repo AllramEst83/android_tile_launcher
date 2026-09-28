@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
@@ -9,8 +10,8 @@ import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
+import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
-import 'package:android_tile_launcher/ui/toggle_tile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -309,6 +310,34 @@ void main() {
       expect(_onHome(find.byType(ClockTileContentView)), findsOneWidget);
     });
 
+    testWidgets('tapping the sound tile cycles normal, vibrate, silent', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeSystemControlService control = FakeSystemControlService();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        systemControlService: control,
+      );
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SOUND'));
+      await tester.pumpAndSettle();
+
+      expect(_onHome(find.text(SoundMode.normal.label)), findsOneWidget);
+
+      for (final SoundMode expected in [SoundMode.vibrate, SoundMode.silent]) {
+        await tester.tap(_onHome(find.byType(StateTileContentView)));
+        await tester.pumpAndSettle();
+        expect(_onHome(find.text(expected.label)), findsOneWidget);
+      }
+      expect(control.soundCalls, [SoundMode.vibrate, SoundMode.silent]);
+    });
+
     testWidgets('tapping a toggle tile flips it through the control service', (
       WidgetTester tester,
     ) async {
@@ -329,7 +358,7 @@ void main() {
 
       expect(_onHome(find.text('[OFF]')), findsOneWidget);
 
-      await tester.tap(_onHome(find.byType(ToggleTileContentView)));
+      await tester.tap(_onHome(find.byType(StateTileContentView)));
       await tester.pumpAndSettle();
 
       expect(control.setCalls, [(TileKind.flashlight, true)]);

@@ -1,3 +1,5 @@
+import 'package:android_tile_launcher/model/sound_mode.dart';
+
 /// What a live tile currently shows, from its `TileSource`. An app tile has
 /// none of these — its label and glyph come straight from the `AppInfo` it
 /// names — so this only grows a case when a kind actually needs one.
@@ -24,9 +26,24 @@ class ClockContent extends TileContent {
   String toString() => 'ClockContent($time, $date)';
 }
 
-/// A toggle tile's content — silent mode, vibration mode, flashlight all
-/// show the same shape, just one bool, so they share this one case rather
-/// than each getting their own.
+/// The sound tile's content: which of normal/vibrate/silent the ringer is in.
+class SoundContent extends TileContent {
+  const SoundContent({required this.mode});
+
+  final SoundMode mode;
+
+  @override
+  bool operator ==(Object other) => other is SoundContent && other.mode == mode;
+
+  @override
+  int get hashCode => mode.hashCode;
+
+  @override
+  String toString() => 'SoundContent($mode)';
+}
+
+/// A two-state toggle tile's content — Do Not Disturb and the flashlight
+/// share this one case, just one bool.
 class ToggleContent extends TileContent {
   const ToggleContent({required this.on});
 

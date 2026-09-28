@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +19,22 @@ class AndroidSystemControlService implements SystemControlService {
   final MethodChannel _channel;
 
   @override
+  Future<SoundMode> soundMode() async {
+    try {
+      final String? name = await _channel.invokeMethod<String>('getSoundMode');
+      return SoundMode.values.asNameMap()[name] ?? SoundMode.normal;
+    } on PlatformException {
+      return SoundMode.normal;
+    } on MissingPluginException {
+      return SoundMode.normal;
+    }
+  }
+
+  @override
+  Future<void> setSoundMode(SoundMode mode) =>
+      _invoke('setSoundMode', {'mode': mode.name});
+
+  @override
   Future<bool> isOn(TileKind kind) async {
     try {
       final bool? result = await _channel.invokeMethod<bool>('isOn', {
@@ -32,12 +49,16 @@ class AndroidSystemControlService implements SystemControlService {
   }
 
   @override
-  Future<void> setOn(TileKind kind, bool on) async {
+  Future<void> setOn(TileKind kind, bool on) =>
+      _invoke('setOn', {'kind': kind.name, 'on': on});
+
+  // Best-effort, like every other platform action in this app: there is no
+  // error surface for a tile tap to report a failure through.
+  Future<void> _invoke(String method, Map<String, Object?> arguments) async {
     try {
-      await _channel.invokeMethod<void>('setOn', {'kind': kind.name, 'on': on});
+      await _channel.invokeMethod<void>(method, arguments);
     } on PlatformException {
-      // Best-effort, like every other platform action in this app: there is
-      // no error surface for a tile tap to report a failure through.
+      // no-op
     } on MissingPluginException {
       // no-op
     }

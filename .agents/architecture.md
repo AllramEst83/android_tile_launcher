@@ -13,12 +13,13 @@ lib/
   messages.dart              # user-facing strings
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
-    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, silentMode, vibrationMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed
+    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, soundMode, doNotDisturb, flashlight); launchTargetOf, displayNameOf, tileKindNamed
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     list_reorder.dart        # moveItem<T>: pure ReorderableListView-style index move, for drag-to-reorder
-    tile_content.dart        # what a live tile shows now (sealed: ClockContent, ToggleContent)
+    sound_mode.dart          # SoundMode (normal/vibrate/silent): the ringer, with its tap cycle and label
+    tile_content.dart        # what a live tile shows now (sealed: ClockContent, SoundContent, ToggleContent)
     clock_format.dart        # formatClockTime/formatClockDate: DateTime -> the tile's display strings
     alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets (Swedish order); shared by the app drawer and the contacts tile (Phase 11)
     app_matcher.dart         # rankApps: best-match-first search ranking, for the drawer's search field
@@ -33,9 +34,10 @@ lib/
     shared_preferences_local_store.dart  # LocalStore on shared_preferences, one JSON string per key
     tile_source.dart         # abstract: Future<TileContent> read(), for one tile kind
     clock_tile_source.dart   # ClockTileSource: pure, DateTime.now() by default, injectable for tests
-    system_control_service.dart      # abstract: isOn/setOn(TileKind) -- ringer mode, torch
+    system_control_service.dart      # abstract: soundMode/setSoundMode (ringer), isOn/setOn(TileKind) (DND, torch)
     android_system_control_service.dart  # MethodChannel implementation
-    toggle_tile_source.dart  # ToggleTileSource: one TileSource for every toggle kind
+    toggle_tile_source.dart  # ToggleTileSource: one TileSource for the two-state kinds (DND, flashlight)
+    sound_mode_tile_source.dart  # SoundModeTileSource: the ringer's current mode
   ui/
     theme.dart               # VIC-II palette, ThemeData, grid metrics, C64Colour -> (fill, ink)
     home_shell.dart          # the launcher shell: PopScope, boot/loading/error state, the PageView (home, drawer), "+ ADD TILE"
@@ -44,7 +46,7 @@ lib/
     tile_view.dart           # chrome shell (fill, bevel/selection, delete badge) + tileContent(tile) dispatcher + AppTileContent
     tile_poller.dart         # TilePoller: rebuilds from a TileSource on an interval, paused while backgrounded; builder gets a refreshNow to re-read early
     clock_tile_view.dart     # ClockTileContentView: the clock's content -- time large, date small
-    toggle_tile_view.dart    # ToggleTileContentView: label + [ON]/[OFF], tap to flip (nullable onToggle)
+    state_tile_view.dart     # StateTileContentView: label + a state string ([ON], [VIBRATE]...), nullable onTap
     editable_tile_grid.dart  # the grid editor's canvas: Draggable/DragTarget per tile, tap to select, delete badge
     tile_inspector.dart      # the editor's panel: label + Apply always, size/colour pickers while a tile is selected
     add_tile_sheet.dart      # "+ ADD TILE": every system kind not already pinned, one instance each
@@ -53,7 +55,7 @@ lib/
 android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   MainActivity.kt            # wires channel handlers into the Flutter engine
   AppsChannelHandler.kt      # list/launch/uninstall/openAppDetails; listing runs off the main thread
-  SystemControlChannelHandler.kt  # isOn/setOn for silentMode/vibrationMode (ringer mode) and flashlight (torch)
+  SystemControlChannelHandler.kt  # ringer mode, Do Not Disturb, torch
 test/  # mirrors lib/; fakes/ holds FakeAppRepository
 ```
 
@@ -121,10 +123,10 @@ Record decisions that future agents can't derive from code (append, newest last)
 - A live tile's ticking timer and `AppLifecycleState` observer live in a single reusable `TilePoller` widget (`ui/tile_poller.dart`), not duplicated per kind or hoisted into a `ChangeNotifier` service: it's pure widget lifecycle (mount/unmount, resumed/paused), which is a natural fit for `State`, and keeping it in `ui/` means a kind's `TileSource` stays platform-and-widget-free. `ClockTileSource` polls every 30 seconds — a home-screen clock showing minutes doesn't need per-second updates, and per-second would poll it needlessly while the screen is simply sitting there.
 - `ClockTileSource` takes an injectable `now` (`DateTime Function()`, defaulting to `DateTime.now`) precisely so its tests, and `TilePoller`'s, never touch the wall clock — the same pattern `date_command.dart`'s `context.now()` uses in the sibling repo.
 - `TileContent` stayed a real `sealed class` (one case, `ClockContent`, so far) rather than being deferred until a second kind existed, unlike `TileKind` earlier: a test needing a second `TileContent` for `TilePoller`'s tests would have had to fake one anyway, and `ClockContent`'s two plain strings are also exactly what `test/services/clock_tile_source_test.dart` and `test/ui/tile_poller_test.dart` reuse to avoid inventing a throwaway type.
-- Silent mode, vibration mode and flashlight (requested by the user ahead of Phase 8) share one `TileSource` (`ToggleTileSource`), one `TileContent` case (`ToggleContent`, a single bool) and one content view (`ToggleTileContentView`), parameterised by `TileKind` — three kinds that are all "read a bool, flip a bool" would have been three near-identical files otherwise. `SystemControlService.isOn`/`setOn(TileKind, bool)` is likewise one interface for all three, not one method per toggle.
+- Sound (ringer), Do Not Disturb and flashlight tiles. The two-state kinds (DND, flashlight) share `ToggleTileSource`/`ToggleContent`; the ringer is three-way so it has its own `SoundModeTileSource`/`SoundContent`. All three render through one `StateTileContentView` (label + a state string). `SystemControlService` has `soundMode`/`setSoundMode` plus `isOn`/`setOn(TileKind, bool)`. (First attempt modelled silent and vibrate as two independent toggles; the user corrected that — the ringer is one state that can only be normal, vibrate or silent, so one tile cycles it.)
 - `TileSource.read()` became `Future<TileContent> read()` (was synchronous) specifically because the toggle kinds' state lives on the platform side and must be queried through a channel; `ClockTileSource.read()` just wraps its already-synchronous body in `async` to satisfy the interface — it does no real awaiting. `TilePoller` grew a matching `TileContent?` (was non-nullable `late`) so it can render nothing for the one frame before the first read resolves, and its `initState` fires the first read with `unawaited(...)` instead of blocking.
 - `TilePoller.builder` grew a third argument, `refreshNow` — a toggle tile's own tap flips the platform state then wants to show the new value immediately, not wait up to `interval` for the next tick. Adding this to the shared widget (available to every kind, even though only the toggle kinds use it yet) was simpler than giving toggle tiles a second, near-duplicate poller.
-- Silent mode and vibration mode are two tiles over one underlying fact — Android's ringer mode is a single three-way enum (normal/vibrate/silent), not two independent switches. Each tile's `isOn` answers "is the ringer mode exactly mine", and `setOn(kind, true)` sets the ringer to that kind's mode; `setOn(kind, false)` always sets it back to normal. Turning one on necessarily reads as turning the other off, which matches what the ringer actually does.
-- Changing the ringer mode to/from silent or vibrate needs Android's notification-policy access (`NotificationManager.isNotificationPolicyAccessGranted()`) — a special permission granted only through a Settings screen, never a runtime dialog, and not the same as declaring `ACCESS_NOTIFICATION_POLICY` in the manifest (which only lets the app ask). `SystemControlChannelHandler.setRingerMode` checks it and, if not granted, opens `ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS` instead of throwing — the same best-effort, no-error-surface contract every other platform action in this app already follows.
+- Ringer mode and Do Not Disturb are separate settings that Android couples (AOSP `ZenModeHelper.RingerModeDelegate`): while DND is on, `AudioManager.ringerMode` *reads* as silent whatever the user chose, and moving from silent to normal/vibrate only lifts "alarms only"/"total silence" DND (not priority-only); on some devices setting silent turns DND to alarms-only. The sound tile therefore shows the reported ringer mode (what the phone is really doing), and `setSoundMode` clears DND to "all" *before* setting the ringer — a sound-tile tap is an explicit request for that sound and would otherwise appear to do nothing under a masking DND. The DND tile toggles between `INTERRUPTION_FILTER_PRIORITY` (the stock quick-settings behaviour, so the user's own exceptions still apply) and `ALL`; "on" is any filter other than `ALL`. Tapping sound while DND is on reads as silent, so it goes to normal and DND turns off. The sound tile cycles normal → vibrate → silent → normal. Unverified on-device: behaviour of setting silent varies by OEM/Android version.
+- Changing the ringer mode and changing DND both need Android's notification-policy access (`NotificationManager.isNotificationPolicyAccessGranted()`) — a special permission granted only through a Settings screen, never a runtime dialog, and not the same as declaring `ACCESS_NOTIFICATION_POLICY` in the manifest (which only lets the app ask). `SystemControlChannelHandler.withPolicyAccess` checks it and, if not granted, opens `ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS` instead of throwing — the same best-effort, no-error-surface contract every other platform action in this app already follows. Previously pinned `silentMode`/`vibrationMode` tiles no longer parse (`PinnedTile.fromJson` drops unknown kinds) and vanish from the saved grid.
 - The flashlight tile uses `CameraManager.setTorchMode`, not `Camera.open()`/a `CAMERA` permission: torch-only control was explicitly carved out to not need it, so the tile never triggers a runtime permission prompt. A registered `CameraManager.TorchCallback` keeps the Kotlin side's cached `torchOn` correct if the torch is toggled from outside the app (quick settings), since `setTorchMode` itself has no getter.
 - `tileContent()` grew two new required-ish parameters — `systemControl: SystemControlService` and `interactive: bool = true` — the one deliberate exception to "no changes to `TileGrid`/`EditableTileGrid` needed" for a new kind: a toggle kind is the first kind whose view needs a genuinely new collaborator (not just `labelFor`), so threading it through `TileGrid`/`AppTileGrid`/`EditableTileGrid`'s constructors was unavoidable. `interactive: false` in `EditableTileGrid` stops a toggle tile's own tap zone from fighting the outer `TileView`'s tap-to-select — outside the editor (`TileGrid`, home), it defaults to `true` and the tile itself handles the tap since `launchTargetOf` is `null` for every system kind anyway.

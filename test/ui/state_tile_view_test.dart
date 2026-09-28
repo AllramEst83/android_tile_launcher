@@ -1,21 +1,21 @@
+import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
-import 'package:android_tile_launcher/ui/toggle_tile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> _pump(
   WidgetTester tester, {
-  required bool on,
-  VoidCallback? onToggle,
+  required String state,
+  VoidCallback? onTap,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
     home: Scaffold(
-      body: ToggleTileContentView(
+      body: StateTileContentView(
         label: 'FLASHLIGHT',
-        on: on,
+        state: state,
         ink: Colors.white,
-        onToggle: onToggle,
+        onTap: onTap,
       ),
     ),
   ),
@@ -23,31 +23,31 @@ Future<void> _pump(
 
 void main() {
   testWidgets('shows its label and ON when on', (WidgetTester tester) async {
-    await _pump(tester, on: true);
+    await _pump(tester, state: '[ON]');
 
     expect(find.text('FLASHLIGHT'), findsOneWidget);
     expect(find.text('[ON]'), findsOneWidget);
   });
 
   testWidgets('shows OFF when off', (WidgetTester tester) async {
-    await _pump(tester, on: false);
+    await _pump(tester, state: '[OFF]');
 
     expect(find.text('[OFF]'), findsOneWidget);
   });
 
-  testWidgets('tapping calls onToggle when given', (WidgetTester tester) async {
+  testWidgets('tapping calls onTap when given', (WidgetTester tester) async {
     var toggled = false;
-    await _pump(tester, on: false, onToggle: () => toggled = true);
+    await _pump(tester, state: '[OFF]', onTap: () => toggled = true);
 
-    await tester.tap(find.byType(ToggleTileContentView));
+    await tester.tap(find.byType(StateTileContentView));
 
     expect(toggled, isTrue);
   });
 
-  testWidgets('is not tappable when onToggle is null', (
+  testWidgets('is not tappable when onTap is null', (
     WidgetTester tester,
   ) async {
-    await _pump(tester, on: false);
+    await _pump(tester, state: '[OFF]');
 
     expect(find.byType(GestureDetector), findsNothing);
   });
