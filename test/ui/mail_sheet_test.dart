@@ -637,4 +637,59 @@ void main() {
       expect(find.byKey(mailForgetKey), findsNothing);
     });
   });
+  group('type size', () {
+    testWidgets(
+      'the text of a message is easy to read, well over the tiny 9 px',
+      (WidgetTester tester) async {
+        await _open(tester, _service());
+        await _read(tester, 12);
+
+        final SelectableText body = tester.widget<SelectableText>(
+          find.byKey(mailBodyKey),
+        );
+        expect(body.style!.fontSize, greaterThanOrEqualTo(12));
+      },
+    );
+
+    testWidgets('the buttons and the list are larger too', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+
+      final Text sender = tester.widget<Text>(find.text('* ANNA ANDERSSON'));
+      final Text subject = tester.widget<Text>(find.text('LUNCH ON FRIDAY?'));
+      expect(sender.style!.fontSize, greaterThanOrEqualTo(13));
+      expect(subject.style!.fontSize, greaterThanOrEqualTo(11));
+
+      await _read(tester, 12);
+      final Text mark = tester.widget<Text>(find.text(Messages.mailMarkUnread));
+      expect(mark.style!.fontSize, greaterThanOrEqualTo(11));
+    });
+
+    testWidgets('it all still fits a narrow phone', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(360 * 3, 780 * 3)
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      // Both action rows, at their longest.
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(mailTrashKey));
+      await tester.pump();
+      expect(find.text(Messages.mailTrashAsk), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(mailTrashNoKey));
+      await tester.pump();
+
+      final Rect mark = tester.getRect(find.byKey(mailMarkKey));
+      final Rect trash = tester.getRect(find.byKey(mailTrashKey));
+      expect(trash.right, lessThanOrEqualTo(360 - TileMetrics.margin));
+      expect(trash.left - mark.right, greaterThanOrEqualTo(TileMetrics.margin));
+    });
+  });
 }

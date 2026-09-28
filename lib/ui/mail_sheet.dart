@@ -287,7 +287,7 @@ class _MailSheetState extends State<_MailSheet> {
               Text(
                 _email!.toUpperCase(),
                 style: text.bodySmall?.copyWith(
-                  fontSize: 8,
+                  fontSize: 11,
                   color: TileColors.muted,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -308,7 +308,7 @@ class _MailSheetState extends State<_MailSheet> {
                 child: Text(
                   _status!,
                   style: text.bodySmall?.copyWith(
-                    fontSize: 10,
+                    fontSize: 13,
                     color: TileColors.accent,
                   ),
                 ),
@@ -335,11 +335,11 @@ class _MailSheetState extends State<_MailSheet> {
     final MailBody? body = _opened;
     if (body == null) return const SizedBox.shrink();
     final TextStyle? label = text.bodySmall?.copyWith(
-      fontSize: 8,
+      fontSize: 11,
       color: TileColors.muted,
     );
     final TextStyle? value = text.bodySmall?.copyWith(
-      fontSize: 10,
+      fontSize: 13,
       color: TileColors.textBright,
     );
     return SingleChildScrollView(
@@ -355,7 +355,7 @@ class _MailSheetState extends State<_MailSheet> {
             Text(
               '${formatClockDate(body.date!)} ${formatClockTime(body.date!)}',
               style: text.bodySmall?.copyWith(
-                fontSize: 10,
+                fontSize: 13,
                 color: TileColors.accent,
               ),
             ),
@@ -374,7 +374,7 @@ class _MailSheetState extends State<_MailSheet> {
             body.text.isEmpty ? Messages.mailNoText : body.text,
             key: mailBodyKey,
             style: text.bodySmall?.copyWith(
-              fontSize: 9,
+              fontSize: 12,
               height: 1.7,
               color: body.text.isEmpty
                   ? TileColors.muted
@@ -403,7 +403,7 @@ class _MailSheetState extends State<_MailSheet> {
           Text(
             Messages.mailTrashAsk,
             style: text.bodySmall?.copyWith(
-              fontSize: 8,
+              fontSize: 11,
               color: TileColors.highlight,
             ),
           ),
@@ -484,7 +484,7 @@ class _MailSheetState extends State<_MailSheet> {
                   child: Text(
                     '${m.unread ? '* ' : ''}${m.from.toUpperCase()}',
                     style: text.bodySmall?.copyWith(
-                      fontSize: 10,
+                      fontSize: 13,
                       color: bright,
                     ),
                     maxLines: 1,
@@ -495,7 +495,7 @@ class _MailSheetState extends State<_MailSheet> {
                 Text(
                   formatMailDate(m.date, now),
                   style: text.bodySmall?.copyWith(
-                    fontSize: 8,
+                    fontSize: 11,
                     color: TileColors.accent,
                   ),
                 ),
@@ -506,7 +506,7 @@ class _MailSheetState extends State<_MailSheet> {
               m.subject.isEmpty
                   ? Messages.mailNoSubject
                   : m.subject.toUpperCase(),
-              style: text.bodySmall?.copyWith(fontSize: 8, color: bright),
+              style: text.bodySmall?.copyWith(fontSize: 11, color: bright),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -533,7 +533,7 @@ class _MailSheetState extends State<_MailSheet> {
           child: Text(
             Messages.mailForgetAsk,
             style: text.bodySmall?.copyWith(
-              fontSize: 8,
+              fontSize: 11,
               color: TileColors.highlight,
             ),
           ),
@@ -578,7 +578,7 @@ class _Button extends StatelessWidget {
         child: Text(
           label,
           style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(fontSize: 8, color: colour),
+              ?.copyWith(fontSize: 11, color: colour),
         ),
       ),
     );
