@@ -300,9 +300,11 @@ class _HomePageState extends State<_HomePage> {
         // of passing beneath the text.
         Padding(
           padding: const EdgeInsets.symmetric(vertical: TileMetrics.gutter),
-          child: Text(
-            Messages.swipeForAllApps,
-            style: Theme.of(context).textTheme.labelSmall,
+          child: Center(
+            child: Text(
+              Messages.swipeForAllApps,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
           ),
         ),
       ],
