@@ -1,7 +1,9 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/app_matcher.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
+import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/ui/app_icon.dart';
 import 'package:android_tile_launcher/ui/grouped_list.dart';
 import 'package:android_tile_launcher/ui/quick_actions_sheet.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -20,6 +22,7 @@ class AppDrawer extends StatefulWidget {
     required this.onOpenDetails,
     required this.onUninstall,
     this.searchFocus,
+    this.iconOf,
   });
 
   final List<AppInfo> apps;
@@ -31,6 +34,9 @@ class AppDrawer extends StatefulWidget {
   /// Lets the caller put the cursor in the search field (the swipe-up
   /// "search apps" gesture).
   final FocusNode? searchFocus;
+
+  /// Where a row gets its app's icon from; without it rows show a letter.
+  final AppIconLoader? iconOf;
 
   @override
   State<AppDrawer> createState() => _AppDrawerState();
@@ -63,6 +69,7 @@ class _AppDrawerState extends State<AppDrawer> {
     app: app,
     onTap: () => widget.onLaunch(app.packageName),
     onLongPress: () => _openQuickActions(app),
+    iconOf: widget.iconOf,
   );
 
   @override
@@ -146,15 +153,46 @@ class _SearchResults extends StatelessWidget {
   }
 }
 
+/// How big an app's icon is on a drawer row.
+const double rowIconSize = 32;
+
+/// An app's first letter in a frame, for while its icon loads, or when it has
+/// none, so every row keeps the same indent.
+class _LetterBox extends StatelessWidget {
+  const _LetterBox({required this.letter});
+
+  final String letter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        border: Border.all(color: TileColors.bezel, width: TileMetrics.bevel),
+      ),
+      child: Text(
+        letter.isEmpty ? '?' : letter[0].toUpperCase(),
+        style: TextStyle(
+          fontFamily: kPixelFontFamily,
+          fontSize: 12,
+          color: TileColors.textDim,
+        ),
+      ),
+    );
+  }
+}
+
 class _AppRow extends StatelessWidget {
   const _AppRow({
     super.key,
     required this.app,
     required this.onTap,
     required this.onLongPress,
+    this.iconOf,
   });
 
   final AppInfo app;
+  final AppIconLoader? iconOf;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -173,11 +211,26 @@ class _AppRow extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: TileColors.bezel)),
         ),
-        child: Text(
-          app.label.toUpperCase(),
-          style: Theme.of(context).textTheme.bodyMedium
-              ?.copyWith(color: TileColors.textBright),
-          overflow: TextOverflow.ellipsis,
+        child: Row(
+          children: <Widget>[
+            if (iconOf != null) ...<Widget>[
+              AppIcon(
+                packageName: app.packageName,
+                loader: iconOf!,
+                size: rowIconSize,
+                fallback: _LetterBox(letter: app.label),
+              ),
+              const SizedBox(width: TileMetrics.margin),
+            ],
+            Expanded(
+              child: Text(
+                app.label.toUpperCase(),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: TileColors.textBright),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );

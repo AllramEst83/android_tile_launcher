@@ -178,4 +178,124 @@ void main() {
       expect(await repository().openAppDetails('pkg.clock'), isFalse);
     },
   );
+  group('icon', () {
+    final Uint8List png = Uint8List.fromList(<int>[1, 2, 3, 4]);
+
+    test(
+      'asks for the package at the icon size, and returns the bytes',
+      () async {
+        MethodCall? received;
+        _mockChannel((call) async {
+          received = call;
+          return png;
+        });
+
+        final Uint8List? icon = await repository().icon('pkg.clock');
+
+        expect(icon, png);
+        expect(received?.method, 'icon');
+        expect(received?.arguments, {
+          'packageName': 'pkg.clock',
+          'size': AndroidAppRepository.iconPixels,
+        });
+      },
+    );
+
+    test(
+      'asks the platform once for an app, however often it is wanted',
+      () async {
+        int calls = 0;
+        _mockChannel((call) async {
+          calls++;
+          return png;
+        });
+        final AndroidAppRepository repo = repository();
+
+        // Two at once, and one later.
+        final List<Uint8List?> both = await Future.wait(<Future<Uint8List?>>[
+          repo.icon('pkg.clock'),
+          repo.icon('pkg.clock'),
+        ]);
+        await repo.icon('pkg.clock');
+
+        expect(calls, 1);
+        expect(both, <Uint8List?>[png, png]);
+      },
+    );
+
+    test(
+      'an app with no icon is null, and asked about again next time',
+      () async {
+        int calls = 0;
+        _mockChannel((call) async {
+          calls++;
+          return null;
+        });
+        final AndroidAppRepository repo = repository();
+
+        expect(await repo.icon('pkg.gone'), isNull);
+        expect(await repo.icon('pkg.gone'), isNull);
+
+        expect(calls, 2);
+      },
+    );
+
+    test('an empty picture counts as none', () async {
+      _mockChannel((call) async => Uint8List(0));
+
+      expect(await repository().icon('pkg.clock'), isNull);
+    });
+
+    test('a platform error, or no handler, is null, never a throw', () async {
+      _mockChannel((call) async => throw PlatformException(code: 'BOOM'));
+      expect(await repository().icon('pkg.clock'), isNull);
+
+      _mockChannel((call) => throw MissingPluginException());
+      expect(await repository().icon('pkg.clock'), isNull);
+    });
+
+    test('the oldest icons are dropped past the limit', () async {
+      final List<String> asked = <String>[];
+      _mockChannel((call) async {
+        asked.add(
+          (call.arguments as Map<Object?, Object?>)['packageName']! as String,
+        );
+        return png;
+      });
+      final AndroidAppRepository repo = repository();
+
+      for (int i = 0; i < AndroidAppRepository.maxIcons; i++) {
+        await repo.icon('pkg.$i');
+      }
+      // One over: the first goes.
+      await repo.icon('pkg.extra');
+      asked.clear();
+      await repo.icon('pkg.2'); // still remembered
+      expect(asked, isEmpty);
+      await repo.icon('pkg.0'); // forgotten, so asked again
+      expect(asked, <String>['pkg.0']);
+    });
+
+    test('an icon in use outlives one that is not', () async {
+      final List<String> asked = <String>[];
+      _mockChannel((call) async {
+        asked.add(
+          (call.arguments as Map<Object?, Object?>)['packageName']! as String,
+        );
+        return png;
+      });
+      final AndroidAppRepository repo = repository();
+
+      for (int i = 0; i < AndroidAppRepository.maxIcons; i++) {
+        await repo.icon('pkg.$i');
+      }
+      await repo.icon('pkg.0'); // used again: now the newest
+      await repo.icon('pkg.extra'); // pushes out pkg.1, not pkg.0
+      asked.clear();
+      await repo.icon('pkg.0');
+      await repo.icon('pkg.1');
+
+      expect(asked, <String>['pkg.1']);
+    });
+  });
 }

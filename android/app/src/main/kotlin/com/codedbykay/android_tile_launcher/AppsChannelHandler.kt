@@ -1,6 +1,8 @@
 package com.codedbykay.android_tile_launcher
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
@@ -12,6 +14,7 @@ import android.provider.Settings
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -41,6 +44,8 @@ class AppsChannelHandler(
             "uninstall" -> uninstall(call.argument<String>("packageName"), result)
             "openAppDetails" ->
                 openAppDetails(call.argument<String>("packageName"), result)
+            "icon" ->
+                icon(call.argument<String>("packageName"), call.argument<Int>("size"), result)
             else -> result.notImplemented()
         }
     }
@@ -48,6 +53,33 @@ class AppsChannelHandler(
     fun dispose() {
         channel.setMethodCallHandler(null)
         executor.shutdown()
+    }
+
+    // An app's icon drawn to a square PNG. Off the main thread (drawing an
+    // adaptive icon is not free), and a `null` reply, never an error, for an
+    // app that is gone or whose icon cannot be drawn.
+    private fun icon(packageName: String?, size: Int?, result: MethodChannel.Result) {
+        if (packageName == null) {
+            result.success(null)
+            return
+        }
+        val side = (size ?: 144).coerceIn(16, 512)
+        executor.execute {
+            val bytes = try {
+                val drawable = context.packageManager.getApplicationIcon(packageName)
+                val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                drawable.setBounds(0, 0, side, side)
+                drawable.draw(canvas)
+                val out = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                bitmap.recycle()
+                out.toByteArray()
+            } catch (e: Exception) {
+                null
+            }
+            mainHandler.post { result.success(bytes) }
+        }
     }
 
     // The query can be slow with many apps, so it runs off the main thread and

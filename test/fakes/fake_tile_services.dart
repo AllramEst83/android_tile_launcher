@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
+import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
@@ -49,6 +50,7 @@ TileServices fakeTileServices({
   ClipboardService? clipboard,
   ShadeService? shade,
   WallpaperService? wallpaper,
+  AppIconLoader? icons,
 }) => TileServices(
   systemControl: systemControl ?? FakeSystemControlService(),
   device: device ?? FakeDeviceRepository(),
@@ -66,4 +68,5 @@ TileServices fakeTileServices({
   clipboard: clipboard ?? FakeClipboardService(),
   shade: shade ?? FakeShadeService(),
   wallpaper: wallpaper ?? FakeWallpaperService(),
+  icons: icons ?? (String _) async => null,
 );

@@ -334,6 +334,15 @@ class _SettingsScreenState extends State<SettingsScreen>
           onSelect: (bool on) => _change(_current.copyWith(effects: on)),
         ),
         const _Note(text: Messages.settingsEffectsNote),
+        _Label(text: Messages.settingsAppIcons),
+        _Choices<bool>(
+          values: const <bool>[true, false],
+          selected: _current.appIcons,
+          labelOf: (bool on) => on ? Messages.settingsOn : Messages.settingsOff,
+          keyOf: (bool on) => settingsKey('icons-${on ? 'on' : 'off'}'),
+          onSelect: (bool on) => _change(_current.copyWith(appIcons: on)),
+        ),
+        const _Note(text: Messages.settingsAppIconsNote),
       ],
     );
   }

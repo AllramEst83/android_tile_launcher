@@ -203,6 +203,7 @@ class _HomeShellState extends State<HomeShell> {
                             onOpenDetails: widget.appRepository.openAppDetails,
                             onUninstall: widget.appRepository.uninstall,
                             searchFocus: _searchFocus,
+                            iconOf: widget.appRepository.icon,
                           ),
                         ],
                       ),

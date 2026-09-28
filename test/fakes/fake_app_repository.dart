@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 
@@ -24,6 +26,10 @@ class FakeAppRepository implements AppRepository {
 
   /// Package names passed to [openAppDetails], in call order.
   final List<String> detailsOpened = [];
+
+  /// The icon each package has (none by default), and every package asked for.
+  final Map<String, Uint8List> icons = {};
+  final List<String> iconsAsked = [];
   int listCalls = 0;
 
   /// How many of the [listApps] calls asked for a refresh.
@@ -48,6 +54,12 @@ class FakeAppRepository implements AppRepository {
   Future<bool> uninstall(String packageName) async {
     uninstalled.add(packageName);
     return uninstallSucceeds;
+  }
+
+  @override
+  Future<Uint8List?> icon(String packageName) async {
+    iconsAsked.add(packageName);
+    return icons[packageName];
   }
 
   @override

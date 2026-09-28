@@ -1,7 +1,9 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
+import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
+import 'package:android_tile_launcher/ui/app_icon.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +24,7 @@ Future<void> _pump(
   ValueChanged<String>? onLaunch,
   Future<bool> Function(String)? onOpenDetails,
   Future<bool> Function(String)? onUninstall,
+  AppIconLoader? iconOf,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
@@ -32,6 +35,7 @@ Future<void> _pump(
         onLaunch: onLaunch ?? (_) {},
         onOpenDetails: onOpenDetails ?? (_) async => true,
         onUninstall: onUninstall ?? (_) async => true,
+        iconOf: iconOf,
       ),
     ),
   ),
@@ -208,5 +212,69 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(uninstalled, ['pkg.clock']);
+  });
+  group('app icons', () {
+    testWidgets('a row shows its app icon beside its name', (
+      WidgetTester tester,
+    ) async {
+      final List<String> asked = <String>[];
+      await _pump(
+        tester,
+        iconOf: (String package) async {
+          asked.add(package);
+          return null;
+        },
+      );
+      await tester.pump();
+
+      expect(find.byType(AppIcon), findsNWidgets(2));
+      expect(
+        tester.getSize(find.byType(AppIcon).first),
+        const Size(rowIconSize, rowIconSize),
+      );
+      expect(asked, containsAll(<String>['pkg.clock', 'pkg.maps']));
+      expect(find.text('CLOCK'), findsOneWidget);
+    });
+
+    testWidgets('a letter in a frame holds the place until it loads', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, iconOf: (String package) async => null);
+      await tester.pump();
+
+      final Finder clockRow = find.ancestor(
+        of: find.text('CLOCK'),
+        matching: find.byType(InkWell),
+      );
+      expect(
+        find.descendant(of: clockRow, matching: find.text('C')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('without a way to fetch icons, the rows are as they were', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+
+      expect(find.byType(AppIcon), findsNothing);
+      expect(find.text('CLOCK'), findsOneWidget);
+    });
+
+    testWidgets('tapping a row with an icon still launches it', (
+      WidgetTester tester,
+    ) async {
+      final List<String> launched = <String>[];
+      await _pump(
+        tester,
+        onLaunch: launched.add,
+        iconOf: (String package) async => null,
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('MAPS'));
+
+      expect(launched, <String>['pkg.maps']);
+    });
   });
 }

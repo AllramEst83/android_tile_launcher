@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/app_repository_exception.dart';
@@ -21,6 +23,17 @@ class AndroidAppRepository implements AppRepository {
   final String ownPackage;
   final MethodChannel _channel;
   List<AppInfo>? _cache;
+
+  /// How many icons are kept: enough for a long app list, and each is a few
+  /// kilobytes. The oldest is dropped first.
+  static const int maxIcons = 400;
+
+  /// The icon's side in pixels: sharp on a 3x screen at a 48 dp tile icon.
+  static const int iconPixels = 144;
+
+  // The pending or finished answer for each app, so a list that scrolls back
+  // and forth (and a tile drawn twice) asks the platform once.
+  final Map<String, Future<Uint8List?>> _icons = <String, Future<Uint8List?>>{};
 
   @override
   Future<List<AppInfo>> listApps({bool refresh = false}) async {
@@ -55,6 +68,42 @@ class AndroidAppRepository implements AppRepository {
   @override
   Future<bool> openAppDetails(String packageName) =>
       _invokeBool('openAppDetails', packageName);
+
+  @override
+  Future<Uint8List?> icon(String packageName) {
+    final Future<Uint8List?>? known = _icons.remove(packageName);
+    if (known != null) {
+      // Moved to the newest place, so a used icon outlives an unused one.
+      return _icons[packageName] = known;
+    }
+    if (_icons.length >= maxIcons) _forget(_icons.keys.first);
+    return _icons[packageName] = _fetchIcon(packageName);
+  }
+
+  // `Map.remove` hands back the removed future, which nobody awaits here.
+  void _forget(String packageName) => _icons.removeWhere(
+    (String key, Future<Uint8List?> _) => key == packageName,
+  );
+
+  Future<Uint8List?> _fetchIcon(String packageName) async {
+    try {
+      final Uint8List? bytes = await _channel.invokeMethod<Uint8List>('icon', {
+        'packageName': packageName,
+        'size': iconPixels,
+      });
+      if (bytes == null || bytes.isEmpty) {
+        _forget(packageName);
+        return null;
+      }
+      return bytes;
+    } on PlatformException {
+      _forget(packageName);
+      return null;
+    } on MissingPluginException {
+      _forget(packageName);
+      return null;
+    }
+  }
 
   /// Expected failures (no launch intent, dialog refused, no settings screen
   /// for that package) are a `false`, not an exception, so the UI can show

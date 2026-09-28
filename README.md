@@ -21,7 +21,7 @@ last answer. It is a personal project and is not on the Play Store.
   twelve VIC-II colours. Long-press to edit: drag to reorder (an insertion line
   shows where it will land), resize, recolour, delete. Apply or cancel.
 - **All Apps:** swipe left. A–Z then Å Ä Ö with a jump index you can scrub,
-  or search (best match first). Long-press an app to pin it, open its details
+  or search (best match first); each row shows the app's icon. Long-press an app to pin it, open its details
   or uninstall it. Apps you open often are suggested under **+ ADD TILE**.
 - **Tiles:**
   - **Clock**, **Device** (battery and free storage), **Weather** (SMHI, with
@@ -36,7 +36,7 @@ last answer. It is a personal project and is not on the Play Store.
 - **Settings:** three themes (C64 screen, pitch-black OLED, beige hardware),
   4 or 6 columns, the gap between tiles, what swiping down at the top and up
   at the bottom of Home does (refresh, notification shade, quick settings,
-  All Apps, search), haptics and tile effects on or off, a themed lock-screen wallpaper you can
+  All Apps, search), haptics, tile effects and app icons on or off, a themed lock-screen wallpaper you can
   set (or take off again), a shortcut to Android's Home-app chooser, and
   export/import of your layout as text.
 - **First run:** the boot screen types out a C64 power-on once.

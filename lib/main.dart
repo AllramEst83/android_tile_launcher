@@ -45,6 +45,13 @@ const String _ownPackage = 'com.codedbykay.android_tile_launcher';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+  // Portrait only, here and in the manifest (which stops the rotation from
+  // ever starting).
+  unawaited(
+    SystemChrome.setPreferredOrientations(<DeviceOrientation>[
+      DeviceOrientation.portraitUp,
+    ]),
+  );
 
   final SharedPreferencesLocalStore store = SharedPreferencesLocalStore();
   final GridState gridState = GridState(store: store);
@@ -57,9 +64,13 @@ Future<void> main() async {
   await launchStats.load();
   final IoHttpFetcher fetcher = IoHttpFetcher();
 
+  final AndroidAppRepository appRepository = AndroidAppRepository(
+    ownPackage: _ownPackage,
+  );
+
   runApp(
     TileLauncherApp(
-      appRepository: AndroidAppRepository(ownPackage: _ownPackage),
+      appRepository: appRepository,
       gridState: gridState,
       settingsState: settingsState,
       firstRun: firstRun,
@@ -82,6 +93,7 @@ Future<void> main() async {
         clipboard: const SystemClipboardService(),
         shade: const AndroidShadeService(),
         wallpaper: const AndroidWallpaperService(),
+        icons: appRepository.icon,
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

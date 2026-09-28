@@ -13,6 +13,7 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/model/weather.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
+import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/first_run.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/launch_stats.dart';
@@ -22,6 +23,7 @@ import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/alarm_sheet.dart';
 import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
+import 'package:android_tile_launcher/ui/app_icon.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/boot_screen.dart';
 import 'package:android_tile_launcher/ui/calc_pad.dart';
@@ -91,6 +93,7 @@ Future<void> pumpShell(
   FakeShadeService? shadeService,
   FirstRun? firstRun,
   LaunchStats? launchStats,
+  AppIconLoader? icons,
 }) => tester.pumpWidget(
   SettingsScope(
     state: settingsState ?? SettingsState(store: InMemoryLocalStore()),
@@ -114,6 +117,7 @@ Future<void> pumpShell(
           textTv: textTvRepository,
           alarm: alarmService,
           shade: shadeService,
+          icons: icons,
         ),
       ),
     ),
@@ -1350,6 +1354,35 @@ void main() {
 
       expect(find.text(Messages.addTileMostUsed), findsNothing);
       expect(find.text(Messages.addTileOther), findsNothing);
+    });
+  });
+  group('app icons', () {
+    testWidgets('home tiles and drawer rows ask the repository for icons', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await gridState.pin('pkg.clock');
+      final FakeAppRepository repository = FakeAppRepository(
+        apps: const <AppInfo>[
+          AppInfo(label: 'Clock', packageName: 'pkg.clock'),
+          AppInfo(label: 'Maps', packageName: 'pkg.maps'),
+        ],
+      );
+      await pumpShell(
+        tester,
+        repository,
+        gridState: gridState,
+        icons: repository.icon,
+      );
+      await tester.pump();
+      expect(_onHome(find.byType(AppIcon)), findsOneWidget);
+      await _swipeToDrawer(tester);
+
+      expect(
+        repository.iconsAsked,
+        containsAll(<String>['pkg.clock', 'pkg.maps']),
+      );
+      expect(_inDrawer(find.byType(AppIcon)), findsNWidgets(2));
     });
   });
 }

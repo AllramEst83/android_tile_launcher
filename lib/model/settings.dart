@@ -61,6 +61,7 @@ class LauncherSettings {
     this.swipeUp = GestureAction.none,
     this.haptics = true,
     this.effects = true,
+    this.appIcons = true,
   });
 
   final ThemeVariant theme;
@@ -79,6 +80,9 @@ class LauncherSettings {
 
   /// The faint scanlines, shine and dithered shade drawn over every tile.
   final bool effects;
+
+  /// Each app's own icon on its home tile and its drawer row.
+  final bool appIcons;
 
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
@@ -104,6 +108,7 @@ class LauncherSettings {
     GestureAction? swipeUp,
     bool? haptics,
     bool? effects,
+    bool? appIcons,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -112,6 +117,7 @@ class LauncherSettings {
     swipeUp: swipeUp ?? this.swipeUp,
     haptics: haptics ?? this.haptics,
     effects: effects ?? this.effects,
+    appIcons: appIcons ?? this.appIcons,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -122,6 +128,7 @@ class LauncherSettings {
     'swipeUp': swipeUp.name,
     'haptics': haptics,
     'effects': effects,
+    'appIcons': appIcons,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -162,6 +169,9 @@ class LauncherSettings {
       effects: json['effects'] is bool
           ? json['effects']! as bool
           : defaults.effects,
+      appIcons: json['appIcons'] is bool
+          ? json['appIcons']! as bool
+          : defaults.appIcons,
     );
   }
 
@@ -174,13 +184,22 @@ class LauncherSettings {
       other.swipeDown == swipeDown &&
       other.swipeUp == swipeUp &&
       other.haptics == haptics &&
-      other.effects == effects;
+      other.effects == effects &&
+      other.appIcons == appIcons;
 
   @override
-  int get hashCode =>
-      Object.hash(theme, columns, gap, swipeDown, swipeUp, haptics, effects);
+  int get hashCode => Object.hash(
+    theme,
+    columns,
+    gap,
+    swipeDown,
+    swipeUp,
+    haptics,
+    effects,
+    appIcons,
+  );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects)';
+      'LauncherSettings($theme, $columns columns, $gap, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons)';
 }

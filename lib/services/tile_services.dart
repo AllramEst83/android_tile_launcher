@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
+import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
@@ -36,6 +37,7 @@ class TileServices {
     required this.clipboard,
     required this.shade,
     required this.wallpaper,
+    required this.icons,
   });
 
   final SystemControlService systemControl;
@@ -60,4 +62,7 @@ class TileServices {
 
   /// Nor is this: the wallpaper the settings screen puts on the phone.
   final WallpaperService wallpaper;
+
+  /// Where an app's tile gets its icon from (`AppRepository.icon`).
+  final AppIconLoader icons;
 }

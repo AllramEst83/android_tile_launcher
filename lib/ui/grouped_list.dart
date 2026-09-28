@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:android_tile_launcher/model/alpha_grouping.dart';
+import 'package:android_tile_launcher/ui/haptics.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
@@ -105,14 +108,28 @@ class SectionHeader extends StatelessWidget {
 }
 
 /// A–Z down the right edge: tap a letter to jump, or drag up and down the
-/// whole strip to scrub through it — every row a finger passes over jumps in
-/// turn, with a thin bar tracking the touch so a fast scrub still shows where
-/// it is. Rows are [maxRowHeight] tall, or less when the strip has less room
-/// than that (a sheet with the keyboard up), so every letter always fits.
+/// strip to scrub through it — every letter a finger passes over jumps in turn,
+/// with a light tick, a thin bar tracking the touch, and a wave: the letters
+/// near the finger bulge out to the left and grow, and settle back when it lifts.
+///
+/// The letters are spread over the whole height the strip is given, so a tall
+/// screen gets a tall strip, up to [maxRowHeight] a letter (a list with only a
+/// few initials sits in the middle rather than being stretched silly); a short
+/// strip (a sheet with the keyboard up) squeezes them so every letter fits.
 class JumpIndex extends StatefulWidget {
   const JumpIndex({super.key, required this.initials, required this.onTap});
 
-  static const double maxRowHeight = 20;
+  /// The tallest a letter's row is, however much room there is.
+  static const double maxRowHeight = 44;
+
+  /// How wide the strip is (the wave swings out past it, to the left).
+  static const double width = 24;
+
+  /// How many letters either side of the finger take part in the wave, how far
+  /// the nearest one swings out, and how much bigger it grows.
+  static const int waveReach = 4;
+  static const double waveSwing = 16;
+  static const double waveGrowth = 0.7;
 
   final List<String> initials;
   final ValueChanged<int> onTap;
@@ -121,80 +138,151 @@ class JumpIndex extends StatefulWidget {
   State<JumpIndex> createState() => _JumpIndexState();
 }
 
-class _JumpIndexState extends State<JumpIndex> {
+class _JumpIndexState extends State<JumpIndex>
+    with SingleTickerProviderStateMixin {
   int? _active;
 
-  void _handleAt(double localY, double rowHeight) {
-    final int index = (localY / rowHeight).floor().clamp(
-      0,
-      widget.initials.length - 1,
-    );
+  // Where along the letters the finger is, as a fractional index, so the wave
+  // slides smoothly between letters rather than stepping.
+  double _position = 0;
+
+  // 0 at rest, 1 with a finger down: eases the wave in and out.
+  late final AnimationController _wave = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 110),
+    reverseDuration: const Duration(milliseconds: 220),
+  );
+
+  @override
+  void dispose() {
+    _wave.dispose();
+    super.dispose();
+  }
+
+  void _handleAt(double localY, double top, double rowHeight) {
+    final int count = widget.initials.length;
+    if (count == 0) return;
+    final double row = (localY - top) / rowHeight;
+    final int index = row.floor().clamp(0, count - 1);
+    setState(() => _position = (row - 0.5).clamp(0.0, count - 1.0));
+    _wave.forward();
     if (index == _active) return;
     setState(() => _active = index);
+    haptic(context, Haptic.tick);
     widget.onTap(index);
   }
 
-  void _release() => setState(() => _active = null);
+  void _release() {
+    _wave.reverse();
+    setState(() => _active = null);
+  }
+
+  /// How much of the wave the letter at [index] takes: 1 under the finger,
+  /// easing to 0 [JumpIndex.waveReach] letters away.
+  double _weight(int index) {
+    final double distance = (index - _position).abs();
+    if (distance >= JumpIndex.waveReach) return 0;
+    final double c = math.cos(distance / JumpIndex.waveReach * math.pi / 2);
+    return c * c;
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final double rowHeight = widget.initials.isEmpty
+        final int count = widget.initials.length;
+        final double rowHeight = count == 0
             ? JumpIndex.maxRowHeight
-            : (constraints.maxHeight / widget.initials.length).clamp(
+            : (constraints.maxHeight / count).clamp(
                 0.0,
                 JumpIndex.maxRowHeight,
               );
+        // Centred in what is left over.
+        final double top = ((constraints.maxHeight - rowHeight * count) / 2)
+            .clamp(0.0, double.infinity);
+        final double fontSize = (rowHeight * 0.55).clamp(8.0, 12.0);
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: (d) => _handleAt(d.localPosition.dy, rowHeight),
+          onTapDown: (d) => _handleAt(d.localPosition.dy, top, rowHeight),
           onTapUp: (_) => _release(),
           onTapCancel: _release,
-          onVerticalDragStart: (d) => _handleAt(d.localPosition.dy, rowHeight),
-          onVerticalDragUpdate: (d) => _handleAt(d.localPosition.dy, rowHeight),
+          onVerticalDragStart: (d) =>
+              _handleAt(d.localPosition.dy, top, rowHeight),
+          onVerticalDragUpdate: (d) =>
+              _handleAt(d.localPosition.dy, top, rowHeight),
           onVerticalDragEnd: (_) => _release(),
           child: SizedBox(
-            width: 20,
-            child: Stack(
-              children: <Widget>[
-                Column(
-                  children: <Widget>[
-                    for (final (int i, String initial)
-                        in widget.initials.indexed)
-                      SizedBox(
-                        height: rowHeight,
-                        child: Center(
-                          child: Text(
-                            initial,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  fontSize: rowHeight < 14 ? 8 : 10,
-                                  height: 1,
-                                  color: i == _active
-                                      ? TileColors.textBright
-                                      : TileColors.textBright,
-                                  fontWeight: i == _active
-                                      ? FontWeight.bold
-                                      : null,
-                                ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                if (_active != null)
+            width: JumpIndex.width,
+            child: AnimatedBuilder(
+              animation: _wave,
+              builder: (BuildContext context, Widget? _) => Stack(
+                clipBehavior: Clip.none,
+                children: <Widget>[
                   Positioned(
                     left: 0,
                     right: 0,
-                    top: _active! * rowHeight + rowHeight - 2,
-                    child: Container(height: 2, color: TileColors.textBright),
+                    top: top,
+                    child: Column(
+                      children: <Widget>[
+                        for (final (int i, String initial)
+                            in widget.initials.indexed)
+                          SizedBox(
+                            height: rowHeight,
+                            child: _Letter(
+                              initial: initial,
+                              fontSize: fontSize,
+                              wave: _weight(i) * _wave.value,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-              ],
+                  if (_active != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: top + _active! * rowHeight + rowHeight - 2,
+                      child: Container(height: 2, color: TileColors.textBright),
+                    ),
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// One letter of the strip, swung out to the left and grown by [wave] (0 to 1).
+class _Letter extends StatelessWidget {
+  const _Letter({
+    required this.initial,
+    required this.fontSize,
+    required this.wave,
+  });
+
+  final String initial;
+  final double fontSize;
+  final double wave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Transform.translate(
+        offset: Offset(-JumpIndex.waveSwing * wave, 0),
+        child: Transform.scale(
+          scale: 1 + JumpIndex.waveGrowth * wave,
+          child: Text(
+            initial,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              fontSize: fontSize,
+              height: 1,
+              color: TileColors.textBright,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

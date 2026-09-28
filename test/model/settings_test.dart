@@ -14,6 +14,7 @@ void main() {
       expect(defaults.swipeUp, GestureAction.none);
       expect(defaults.haptics, isTrue);
       expect(defaults.effects, isTrue);
+      expect(defaults.appIcons, isTrue);
     });
 
     test('the gaps are 4, 8 and 14 pixels', () {
@@ -33,6 +34,7 @@ void main() {
         swipeUp: GestureAction.searchApps,
         haptics: false,
         effects: false,
+        appIcons: false,
       );
 
       expect(LauncherSettings.fromJson(settings.toJson()), settings);
@@ -95,6 +97,17 @@ void main() {
     );
     expect(
       LauncherSettings.fromJson(<String, Object?>{'effects': false}).effects,
+      isFalse,
+    );
+  });
+
+  test('app icons that are not a true or false are on', () {
+    expect(
+      LauncherSettings.fromJson(<String, Object?>{'appIcons': 'no'}).appIcons,
+      isTrue,
+    );
+    expect(
+      LauncherSettings.fromJson(<String, Object?>{'appIcons': false}).appIcons,
       isFalse,
     );
   });

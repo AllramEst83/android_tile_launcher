@@ -226,6 +226,22 @@ void main() {
     });
   });
 
+  group('app icons', () {
+    testWidgets('are on to begin with, and can be switched off and on', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+      expect(rig.settings.settings.appIcons, isTrue);
+
+      await _tap(tester, settingsKey('icons-off'));
+      expect(rig.settings.settings.appIcons, isFalse);
+
+      await _tap(tester, settingsKey('icons-on'));
+      expect(rig.settings.settings.appIcons, isTrue);
+    });
+  });
+
   group('the Home app', () {
     testWidgets('says when this launcher is it', (WidgetTester tester) async {
       await _Rig(homeRole: FakeHomeRoleService(true)).open(tester);

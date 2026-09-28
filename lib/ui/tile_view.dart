@@ -9,6 +9,7 @@ import 'package:android_tile_launcher/model/tile_content.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/agenda_tile_source.dart';
+import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
@@ -25,6 +26,7 @@ import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/alarm_sheet.dart';
 import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
+import 'package:android_tile_launcher/ui/app_icon.dart';
 import 'package:android_tile_launcher/ui/calc_sheet.dart';
 import 'package:android_tile_launcher/ui/calc_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
@@ -231,7 +233,12 @@ Widget tileContent(
   final SystemControlService systemControl = services.systemControl;
   switch (tile.kind) {
     case TileKind.app:
-      return AppTileContent(label: labelFor(tile), ink: tile.colour.ink);
+      return AppTileContent(
+        label: labelFor(tile),
+        ink: tile.colour.ink,
+        packageName: tile.id,
+        iconOf: services.icons,
+      );
     case TileKind.clock:
       return TilePoller(
         source: const ClockTileSource(),
@@ -491,28 +498,65 @@ Future<void> _mailTap(
   refreshNow();
 }
 
-/// An app tile's content: a monochrome glyph — its label's first letter,
-/// since no real app icons are drawn yet (plan.md, "Not implemented") — and
-/// the label itself along the bottom edge.
+/// An app tile's content: the app's own icon (its first letter as a glyph while
+/// that loads, when it has none, or with APP ICONS off) and the label itself
+/// along the bottom edge. Without a [packageName] and [iconOf] (a contact's
+/// tile) it is always the letter.
 class AppTileContent extends StatelessWidget {
-  const AppTileContent({super.key, required this.label, required this.ink});
+  const AppTileContent({
+    super.key,
+    required this.label,
+    required this.ink,
+    this.packageName,
+    this.iconOf,
+  });
 
   final String label;
   final Color ink;
+  final String? packageName;
+  final AppIconLoader? iconOf;
+
+  /// The room the label takes along the bottom.
+  static const double labelSpace = 14;
+
+  /// The largest an icon is drawn; a big tile does not need a bigger one.
+  static const double maxIcon = 72;
 
   @override
   Widget build(BuildContext context) {
     final String glyph = label.isEmpty ? '?' : label[0].toUpperCase();
+    final Widget letter = FittedBox(
+      child: Text(
+        glyph,
+        style: TextStyle(fontFamily: kPixelFontFamily, color: ink),
+      ),
+    );
+    final String? package = packageName;
+    final AppIconLoader? loader = iconOf;
     return Stack(
       children: <Widget>[
-        Center(
-          child: FittedBox(
-            child: Text(
-              glyph,
-              style: TextStyle(fontFamily: kPixelFontFamily, color: ink),
+        if (package != null && loader != null)
+          Positioned.fill(
+            bottom: labelSpace,
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints box) {
+                final double side = (box.biggest.shortestSide * 0.9).clamp(
+                  0.0,
+                  maxIcon,
+                );
+                return Center(
+                  child: AppIcon(
+                    packageName: package,
+                    loader: loader,
+                    size: side,
+                    fallback: Center(child: letter),
+                  ),
+                );
+              },
             ),
-          ),
-        ),
+          )
+        else
+          Center(child: letter),
         Align(
           alignment: Alignment.bottomLeft,
           child: Text(
