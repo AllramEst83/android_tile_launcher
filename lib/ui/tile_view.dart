@@ -34,24 +34,28 @@ import 'package:android_tile_launcher/ui/haptics.dart';
 import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/text_tv_screen.dart';
 import 'package:android_tile_launcher/ui/text_tv_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/tile_gloss.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
 import 'package:android_tile_launcher/ui/weather_tile_view.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 /// The chrome every tile shares regardless of kind: a flat VIC-II fill with a
-/// 2px light-top-left/dark-bottom-right bevel (never a shadow or gradient),
-/// or — in the grid editor — a bright outline if [selected] and a delete
+/// bevel, light on the top and left (3px) and thicker and dark on the bottom
+/// and right (5px), never a blurred shadow or gradient, and (unless switched
+/// off in settings) a shine, scanlines and dithered shade drawn over it by
+/// [TileGloss]; or — in the grid editor — a bright outline if [selected] and a delete
 /// badge if [onDelete] is given. [content] draws whatever the tile's kind
 /// wants inside that frame; see [tileContent].
 ///
-/// While a finger is on it the bevel flips (dark top-left, light bottom-right)
-/// and the content moves down-right by the bevel's width, so the tile reads as
-/// a key being pushed in. A tap ticks, a long-press thuds (unless haptics are
+/// While a finger is on it the bevel flips (dark top-left, light bottom-right),
+/// which moves the content down and right by the difference of the two widths
+/// and takes the shine off, so the tile reads as a key being pushed in. A tap ticks, a long-press thuds (unless haptics are
 /// off in settings). The press is read from the raw pointer, not the tap
 /// recogniser, so a tile whose content takes the tap itself (a toggle) still
 /// sinks; it lets go once the finger has slid past touch slop, i.e. when it is
@@ -141,7 +145,11 @@ class _TileViewState extends State<TileView> {
     final Color topLeft = sunk ? dark : light;
     final Color bottomRight = sunk ? light : dark;
     const double inset = TileMetrics.gutter / 2;
-    final double shift = sunk ? TileMetrics.bevel : 0;
+    const double lit = TileMetrics.tileBevelLight;
+    const double shaded = TileMetrics.tileBevelDark;
+    final double topLeftWidth = sunk ? shaded : lit;
+    final double bottomRightWidth = sunk ? lit : shaded;
+    final bool effects = SettingsScope.of(context).effects;
 
     return Listener(
       onPointerDown: _onDown,
@@ -151,57 +159,58 @@ class _TileViewState extends State<TileView> {
         _longPressTimer?.cancel();
         _setPressed(false);
       },
-      child: InkWell(
-        onTap: widget.onTap,
-        onLongPress: widget.onLongPress == null ? null : _onLongPress,
-        // Ours, below: the built-in feedback would buzz even with haptics off
-        // and twice on a long-press.
-        enableFeedback: false,
-        splashFactory: NoSplash.splashFactory,
-        highlightColor: Colors.transparent,
-        child: AnimatedContainer(
-          duration: TileView.pressDuration,
-          decoration: BoxDecoration(
-            color: fill,
-            border: widget.selected
-                ? Border.all(
-                    color: TileColors.textBright,
-                    width: TileMetrics.bevel * 2,
-                  )
-                : Border(
-                    top: BorderSide(color: topLeft, width: TileMetrics.bevel),
-                    left: BorderSide(color: topLeft, width: TileMetrics.bevel),
-                    right: BorderSide(
-                      color: bottomRight,
-                      width: TileMetrics.bevel,
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          InkWell(
+            onTap: widget.onTap,
+            onLongPress: widget.onLongPress == null ? null : _onLongPress,
+            // Ours, below: the built-in feedback would buzz even with haptics off
+            // and twice on a long-press.
+            enableFeedback: false,
+            splashFactory: NoSplash.splashFactory,
+            highlightColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: TileView.pressDuration,
+              decoration: BoxDecoration(
+                color: fill,
+                border: widget.selected
+                    ? Border.all(
+                        color: TileColors.textBright,
+                        width: TileMetrics.bevel * 2,
+                      )
+                    : Border(
+                        top: BorderSide(color: topLeft, width: topLeftWidth),
+                        left: BorderSide(color: topLeft, width: topLeftWidth),
+                        right: BorderSide(
+                          color: bottomRight,
+                          width: bottomRightWidth,
+                        ),
+                        bottom: BorderSide(
+                          color: bottomRight,
+                          width: bottomRightWidth,
+                        ),
+                      ),
+              ),
+              padding: const EdgeInsets.all(inset),
+              child: Stack(
+                children: <Widget>[
+                  widget.content,
+                  if (widget.onDelete != null)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: _DeleteBadge(
+                        key: widget.deleteKey,
+                        onTap: widget.onDelete!,
+                      ),
                     ),
-                    bottom: BorderSide(
-                      color: bottomRight,
-                      width: TileMetrics.bevel,
-                    ),
-                  ),
+                ],
+              ),
+            ),
           ),
-          padding: EdgeInsets.fromLTRB(
-            inset + shift,
-            inset + shift,
-            inset - shift,
-            inset - shift,
-          ),
-          child: Stack(
-            children: <Widget>[
-              widget.content,
-              if (widget.onDelete != null)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: _DeleteBadge(
-                    key: widget.deleteKey,
-                    onTap: widget.onDelete!,
-                  ),
-                ),
-            ],
-          ),
-        ),
+          if (effects) TileGloss(sunk: sunk, outlined: widget.selected),
+        ],
       ),
     );
   }

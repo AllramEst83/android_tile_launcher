@@ -148,6 +148,9 @@ abstract final class Messages {
   static const String settingsHaptics = 'HAPTICS';
   static const String settingsHapticsNote =
       'A SHORT BUZZ WHEN YOU PRESS A TILE OR A KEY.';
+  static const String settingsEffects = 'TILE EFFECTS';
+  static const String settingsEffectsNote =
+      'FAINT SCANLINES, A SHINE AND A DITHERED SHADE ON EVERY TILE.';
   static const String settingsOn = 'ON';
   static const String settingsOff = 'OFF';
   static const String settingsWallpaper = 'WALLPAPER';

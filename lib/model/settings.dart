@@ -60,6 +60,7 @@ class LauncherSettings {
     this.swipeDown = GestureAction.refreshApps,
     this.swipeUp = GestureAction.none,
     this.haptics = true,
+    this.effects = true,
   });
 
   final ThemeVariant theme;
@@ -75,6 +76,9 @@ class LauncherSettings {
 
   /// A short buzz on a tile or key press and on long-press.
   final bool haptics;
+
+  /// The faint scanlines, shine and dithered shade drawn over every tile.
+  final bool effects;
 
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
@@ -99,6 +103,7 @@ class LauncherSettings {
     GestureAction? swipeDown,
     GestureAction? swipeUp,
     bool? haptics,
+    bool? effects,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -106,6 +111,7 @@ class LauncherSettings {
     swipeDown: swipeDown ?? this.swipeDown,
     swipeUp: swipeUp ?? this.swipeUp,
     haptics: haptics ?? this.haptics,
+    effects: effects ?? this.effects,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -115,6 +121,7 @@ class LauncherSettings {
     'swipeDown': swipeDown.name,
     'swipeUp': swipeUp.name,
     'haptics': haptics,
+    'effects': effects,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -152,6 +159,9 @@ class LauncherSettings {
       haptics: json['haptics'] is bool
           ? json['haptics']! as bool
           : defaults.haptics,
+      effects: json['effects'] is bool
+          ? json['effects']! as bool
+          : defaults.effects,
     );
   }
 
@@ -163,13 +173,14 @@ class LauncherSettings {
       other.gap == gap &&
       other.swipeDown == swipeDown &&
       other.swipeUp == swipeUp &&
-      other.haptics == haptics;
+      other.haptics == haptics &&
+      other.effects == effects;
 
   @override
   int get hashCode =>
-      Object.hash(theme, columns, gap, swipeDown, swipeUp, haptics);
+      Object.hash(theme, columns, gap, swipeDown, swipeUp, haptics, effects);
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, down: $swipeDown, up: $swipeUp, haptics: $haptics)';
+      'LauncherSettings($theme, $columns columns, $gap, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects)';
 }

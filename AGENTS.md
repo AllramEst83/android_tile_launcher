@@ -21,6 +21,6 @@ Guidance lives in [`.agents/`](.agents/README.md). Start with the index, then:
 2. Platform/app access only through `AppRepository`; never use the discontinued `device_apps`.
 3. Must work offline: bundle fonts, no runtime downloads. A launcher draws itself at boot with no network.
 4. Dispose every controller/focus node/timer; check `mounted` after awaits.
-5. Colours come from the VIC-II palette in `lib/ui/theme.dart` and nowhere else. No gradients, drop shadows or blur.
+5. Colours come from the VIC-II palette in `lib/ui/theme.dart` and nowhere else. No gradients, drop shadows or blur: bevels, shine, scanlines and dither are flat, hard-edged shapes.
 6. Before calling work done: `dart format`, `flutter analyze`, `flutter test` all clean.
 7. Small steps: finish and verify one plan phase before starting the next.

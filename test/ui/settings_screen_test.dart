@@ -210,6 +210,22 @@ void main() {
     });
   });
 
+  group('tile effects', () {
+    testWidgets('are on to begin with, and can be switched off and on', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+      expect(rig.settings.settings.effects, isTrue);
+
+      await _tap(tester, settingsKey('effects-off'));
+      expect(rig.settings.settings.effects, isFalse);
+
+      await _tap(tester, settingsKey('effects-on'));
+      expect(rig.settings.settings.effects, isTrue);
+    });
+  });
+
   group('the Home app', () {
     testWidgets('says when this launcher is it', (WidgetTester tester) async {
       await _Rig(homeRole: FakeHomeRoleService(true)).open(tester);

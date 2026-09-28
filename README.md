@@ -7,7 +7,7 @@ what it knows (the time, the weather, your next event, how many messages are
 waiting) and opens the thing behind it when you tap it. The layout is
 Windows-Phone-ish; the *look* is not: light blue on C64 blue, VIC-II colours,
 the *Press Start 2P* pixel font, hard edges and bevels instead of shadows and
-blur. Tiles sink like keys when you press them.
+blur. Tiles are chunky bevelled keys with a faint scanline, a shine and a dithered shade, and they sink when you press them.
 
 <p align="center"><img src="design/icon/preview_circle.png" alt="The app icon: four bevelled tiles under a rainbow stripe" width="160"></p>
 
@@ -36,7 +36,7 @@ last answer. It is a personal project and is not on the Play Store.
 - **Settings:** three themes (C64 screen, pitch-black OLED, beige hardware),
   4 or 6 columns, the gap between tiles, what swiping down at the top and up
   at the bottom of Home does (refresh, notification shade, quick settings,
-  All Apps, search), haptics on or off, a themed lock-screen wallpaper you can
+  All Apps, search), haptics and tile effects on or off, a themed lock-screen wallpaper you can
   set (or take off again), a shortcut to Android's Home-app chooser, and
   export/import of your layout as text.
 - **First run:** the boot screen types out a C64 power-on once.

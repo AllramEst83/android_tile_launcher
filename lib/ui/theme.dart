@@ -167,6 +167,12 @@ abstract final class TileMetrics {
   /// Hard edges. The Commodore look has bevels, not rounded corners.
   static const double radius = 0;
   static const double bevel = 2;
+
+  /// A tile's bevel: the lit top and left sides, and the thicker shaded bottom
+  /// and right ones, so a tile stands up like a key. A pressed tile swaps them,
+  /// which is what moves its content down and right.
+  static const double tileBevelLight = 3;
+  static const double tileBevelDark = 5;
 }
 
 /// Turns a [C64Colour] selector into an actual fill and a contrasting ink

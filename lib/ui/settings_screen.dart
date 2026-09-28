@@ -325,6 +325,15 @@ class _SettingsScreenState extends State<SettingsScreen>
           onSelect: (bool on) => _change(_current.copyWith(haptics: on)),
         ),
         const _Note(text: Messages.settingsHapticsNote),
+        _Label(text: Messages.settingsEffects),
+        _Choices<bool>(
+          values: const <bool>[true, false],
+          selected: _current.effects,
+          labelOf: (bool on) => on ? Messages.settingsOn : Messages.settingsOff,
+          keyOf: (bool on) => settingsKey('effects-${on ? 'on' : 'off'}'),
+          onSelect: (bool on) => _change(_current.copyWith(effects: on)),
+        ),
+        const _Note(text: Messages.settingsEffectsNote),
       ],
     );
   }
