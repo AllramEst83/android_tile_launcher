@@ -26,6 +26,11 @@
          open them, not read what is in them. -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
+    <!-- Settings can put one of the launcher's own pictures on the lock screen
+         or home screen, only when the button is tapped and confirmed. A normal
+         permission, granted at install. -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+
     <!-- Lets the silent-mode/vibration-mode tiles query and (once the user
          grants Do-Not-Disturb access via Settings) set the ringer mode. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />

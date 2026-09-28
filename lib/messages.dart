@@ -150,6 +150,22 @@ abstract final class Messages {
       'A SHORT BUZZ WHEN YOU PRESS A TILE OR A KEY.';
   static const String settingsOn = 'ON';
   static const String settingsOff = 'OFF';
+  static const String settingsWallpaper = 'WALLPAPER';
+  static const String settingsPicture = 'PICTURE';
+  static const String settingsPutOn = 'PUT IT ON';
+  static const String settingsWallpaperHomeNote =
+      'THIS LAUNCHER DRAWS ITS OWN SCREEN, SO A HOME PICTURE SHOWS BEHIND OTHER LAUNCHERS.';
+  static const String settingsPictureMissing = 'NO PICTURE.';
+  static const String settingsSetWallpaper = 'SET WALLPAPER';
+  static const String settingsDefaultWallpaper = 'DEFAULT WALLPAPER';
+  static const String settingsWallpaperSet = 'WALLPAPER SET.';
+  static const String settingsWallpaperCleared = 'DEFAULT WALLPAPER BACK.';
+  static const String settingsWallpaperRefused = 'THE PHONE DOES NOT ALLOW IT.';
+  static const String settingsWallpaperFailed = 'COULD NOT DO IT.';
+  static String settingsWallpaperAsk(String picture, String screen) =>
+      'PUT THE $picture PICTURE ON $screen?';
+  static String settingsWallpaperClearAsk(String screen) =>
+      'PUT THE PHONE\'S OWN WALLPAPER BACK ON $screen?';
   static const String settingsSystem = 'SYSTEM';
   static const String settingsHomeApp = 'DEFAULT HOME APP';
   static const String settingsHomeActive = 'ACTIVE: THIS IS YOUR HOME APP.';

@@ -16,6 +16,7 @@ import 'services/android_phone_service.dart';
 import 'services/android_shade_service.dart';
 import 'services/android_sms_service.dart';
 import 'services/android_system_control_service.dart';
+import 'services/android_wallpaper_service.dart';
 import 'services/android_whatsapp_service.dart';
 import 'services/cached_mail_service.dart';
 import 'services/currency_rates.dart';
@@ -80,6 +81,7 @@ Future<void> main() async {
         homeRole: const AndroidHomeRoleService(),
         clipboard: const SystemClipboardService(),
         shade: const AndroidShadeService(),
+        wallpaper: const AndroidWallpaperService(),
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

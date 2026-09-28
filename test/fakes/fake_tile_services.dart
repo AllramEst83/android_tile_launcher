@@ -12,6 +12,7 @@ import 'package:android_tile_launcher/services/sms_service.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/text_tv_repository.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
+import 'package:android_tile_launcher/services/wallpaper_service.dart';
 import 'package:android_tile_launcher/services/weather_repository.dart';
 import 'package:android_tile_launcher/services/whatsapp_service.dart';
 
@@ -26,6 +27,7 @@ import 'fake_rates_repository.dart';
 import 'fake_shade_service.dart';
 import 'fake_system_control_service.dart';
 import 'fake_text_tv_repository.dart';
+import 'fake_wallpaper_service.dart';
 import 'fake_weather_repository.dart';
 
 /// A [TileServices] made entirely of fakes; pass any of them to look at or
@@ -46,6 +48,7 @@ TileServices fakeTileServices({
   HomeRoleService? homeRole,
   ClipboardService? clipboard,
   ShadeService? shade,
+  WallpaperService? wallpaper,
 }) => TileServices(
   systemControl: systemControl ?? FakeSystemControlService(),
   device: device ?? FakeDeviceRepository(),
@@ -62,4 +65,5 @@ TileServices fakeTileServices({
   homeRole: homeRole ?? FakeHomeRoleService(),
   clipboard: clipboard ?? FakeClipboardService(),
   shade: shade ?? FakeShadeService(),
+  wallpaper: wallpaper ?? FakeWallpaperService(),
 );

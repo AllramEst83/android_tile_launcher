@@ -1,12 +1,15 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/layout_export.dart';
 import 'package:android_tile_launcher/model/settings.dart';
+import 'package:android_tile_launcher/model/wallpaper.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
+import 'package:android_tile_launcher/services/wallpaper_service.dart';
 import 'package:android_tile_launcher/ui/pad_key.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Keys so tests can find the parts.
 const Key settingsCloseKey = ValueKey<String>('settings-close');
@@ -66,6 +69,15 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   String? _message;
 
+  // Which section the current question and message belong to, so each shows
+  // under the keys that raised it.
+  String _where = 'layout';
+
+  // The wallpaper picture and screen picked but not yet set. The picture
+  // follows the theme until one is chosen.
+  ThemeVariant? _paperTheme;
+  WallpaperTarget _paperTarget = WallpaperTarget.lock;
+
   @override
   void initState() {
     super.initState();
@@ -101,12 +113,16 @@ class _SettingsScreenState extends State<SettingsScreen>
     widget.settings.update(next);
   }
 
-  void _askThen(String question, Future<void> Function() action) =>
-      setState(() {
-        _ask = question;
-        _onYes = action;
-        _message = null;
-      });
+  void _askThen(
+    String question,
+    Future<void> Function() action, {
+    String where = 'layout',
+  }) => setState(() {
+    _where = where;
+    _ask = question;
+    _onYes = action;
+    _message = null;
+  });
 
   void _dismissAsk() => setState(() {
     _ask = null;
@@ -120,6 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _export() async {
+    _where = 'layout';
     final String text = exportLayout(
       tiles: widget.gridState.pinned,
       settings: _current,
@@ -134,6 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _import() async {
+    _where = 'layout';
     final String? text = await widget.services.clipboard.read();
     if (!mounted) return;
     final LayoutImport parsed = parseLayout(text);
@@ -200,6 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         _gridSection(),
                         _gestureSection(),
                         _feelSection(),
+                        _wallpaperSection(),
                         _systemSection(),
                         _layoutSection(),
                         const SizedBox(height: 24),
@@ -310,6 +329,111 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  Widget _wallpaperSection() {
+    final ThemeVariant paper = _paperTheme ?? _current.theme;
+    final WallpaperTarget target = _paperTarget;
+    return _Section(
+      title: Messages.settingsWallpaper,
+      children: <Widget>[
+        _Label(text: Messages.settingsPicture),
+        _Choices<ThemeVariant>(
+          values: ThemeVariant.values,
+          selected: paper,
+          labelOf: (ThemeVariant v) => v.label,
+          keyOf: (ThemeVariant v) => settingsKey('paper-${v.name}'),
+          onSelect: (ThemeVariant v) => setState(() => _paperTheme = v),
+        ),
+        _Label(text: Messages.settingsPutOn),
+        _Choices<WallpaperTarget>(
+          values: WallpaperTarget.values,
+          selected: target,
+          labelOf: (WallpaperTarget t) => t.label,
+          keyOf: (WallpaperTarget t) => settingsKey('paper-on-${t.name}'),
+          onSelect: (WallpaperTarget t) => setState(() => _paperTarget = t),
+        ),
+        const _Note(text: Messages.settingsWallpaperHomeNote),
+        const SizedBox(height: TileMetrics.margin),
+        Center(
+          child: _WallpaperPreview(
+            key: settingsKey('paper-preview'),
+            asset: wallpaperAssetOf(paper),
+          ),
+        ),
+        const SizedBox(height: TileMetrics.margin),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: PadKey(
+                key: settingsKey('set-wallpaper'),
+                label: Messages.settingsSetWallpaper,
+                height: 44,
+                fontSize: 10,
+                onTap: () => _askThen(
+                  Messages.settingsWallpaperAsk(paper.label, target.phrase),
+                  () => _setWallpaper(paper, target),
+                  where: 'wallpaper',
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: PadKey(
+                key: settingsKey('default-wallpaper'),
+                label: Messages.settingsDefaultWallpaper,
+                height: 44,
+                fontSize: 10,
+                accent: true,
+                onTap: () => _askThen(
+                  Messages.settingsWallpaperClearAsk(target.phrase),
+                  () => _clearWallpaper(target),
+                  where: 'wallpaper',
+                ),
+              ),
+            ),
+          ],
+        ),
+        ..._feedback('wallpaper'),
+      ],
+    );
+  }
+
+  Future<void> _setWallpaper(ThemeVariant paper, WallpaperTarget target) async {
+    final Uint8List image;
+    try {
+      final ByteData data = await rootBundle.load(wallpaperAssetOf(paper));
+      image = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    } on Object {
+      _wallpaperSays(WallpaperResult.failed, Messages.settingsWallpaperSet);
+      return;
+    }
+    final WallpaperResult result = await widget.services.wallpaper.set(
+      image,
+      target,
+    );
+    _wallpaperSays(result, Messages.settingsWallpaperSet);
+  }
+
+  Future<void> _clearWallpaper(WallpaperTarget target) async {
+    final WallpaperResult result = await widget.services.wallpaper.clear(
+      target,
+    );
+    _wallpaperSays(result, Messages.settingsWallpaperCleared);
+  }
+
+  void _wallpaperSays(WallpaperResult result, String done) {
+    if (!mounted) return;
+    setState(() {
+      _where = 'wallpaper';
+      _message = switch (result) {
+        WallpaperResult.done => done,
+        WallpaperResult.refused =>
+          '${Messages.failedPrefix}${Messages.settingsWallpaperRefused}',
+        WallpaperResult.failed =>
+          '${Messages.failedPrefix}${Messages.settingsWallpaperFailed}',
+      };
+    });
+  }
+
   Widget _systemSection() {
     final String status = !_homeKnown
         ? Messages.settingsHomeChecking
@@ -343,9 +467,65 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _layoutSection() {
+  /// The question waiting for YES or NO, and the last message, when they
+  /// belong to section [where].
+  List<Widget> _feedback(String where) {
+    if (_where != where) return const <Widget>[];
     final String? ask = _ask;
     final String? message = _message;
+    return <Widget>[
+      if (ask != null) ...<Widget>[
+        const SizedBox(height: TileMetrics.margin),
+        Text(
+          ask,
+          key: settingsAskKey,
+          style: TextStyle(
+            fontFamily: kPixelFontFamily,
+            fontSize: 10,
+            color: TileColors.highlight,
+          ),
+        ),
+        const SizedBox(height: TileMetrics.gutter),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: PadKey(
+                key: settingsYesKey,
+                label: Messages.mailYes,
+                height: 44,
+                fontSize: 12,
+                onTap: _confirmed,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: PadKey(
+                key: settingsNoKey,
+                label: Messages.mailNo,
+                height: 44,
+                fontSize: 12,
+                onTap: _dismissAsk,
+              ),
+            ),
+          ],
+        ),
+      ],
+      if (message != null) ...<Widget>[
+        const SizedBox(height: TileMetrics.margin),
+        Text(
+          message,
+          key: settingsMessageKey,
+          style: TextStyle(
+            fontFamily: kPixelFontFamily,
+            fontSize: 10,
+            color: TileColors.accent,
+          ),
+        ),
+      ],
+    ];
+  }
+
+  Widget _layoutSection() {
     return _Section(
       title: Messages.settingsLayout,
       children: <Widget>[
@@ -403,55 +583,41 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
           ],
         ),
-        if (ask != null) ...<Widget>[
-          const SizedBox(height: TileMetrics.margin),
-          Text(
-            ask,
-            key: settingsAskKey,
-            style: TextStyle(
-              fontFamily: kPixelFontFamily,
-              fontSize: 10,
-              color: TileColors.highlight,
-            ),
-          ),
-          const SizedBox(height: TileMetrics.gutter),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: PadKey(
-                  key: settingsYesKey,
-                  label: Messages.mailYes,
-                  height: 44,
-                  fontSize: 12,
-                  onTap: _confirmed,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: PadKey(
-                  key: settingsNoKey,
-                  label: Messages.mailNo,
-                  height: 44,
-                  fontSize: 12,
-                  onTap: _dismissAsk,
-                ),
-              ),
-            ],
-          ),
-        ],
-        if (message != null) ...<Widget>[
-          const SizedBox(height: TileMetrics.margin),
-          Text(
-            message,
-            key: settingsMessageKey,
-            style: TextStyle(
-              fontFamily: kPixelFontFamily,
-              fontSize: 10,
-              color: TileColors.accent,
-            ),
-          ),
-        ],
+        ..._feedback('layout'),
       ],
+    );
+  }
+}
+
+/// The picture, in a phone-shaped frame, as it would fill the screen.
+class _WallpaperPreview extends StatelessWidget {
+  const _WallpaperPreview({super.key, required this.asset});
+
+  final String asset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 108,
+      decoration: BoxDecoration(
+        border: Border.all(color: TileColors.bezel, width: TileMetrics.bevel),
+      ),
+      child: AspectRatio(
+        aspectRatio: 9 / 20,
+        child: Image.asset(
+          asset,
+          fit: BoxFit.cover,
+          // The picture is 1290 pixels wide; the preview is 108 dp.
+          cacheWidth: 216,
+          errorBuilder: (BuildContext context, Object error, StackTrace? _) =>
+              Center(
+                child: Text(
+                  Messages.settingsPictureMissing,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ),
+        ),
+      ),
     );
   }
 }

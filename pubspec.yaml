@@ -40,6 +40,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # The lock-screen wallpapers settings can put on the phone, one per theme.
+  assets:
+    - assets/wallpapers/
+
   # Bundled (OFL 1.1, see fonts/OFL.txt) so the launcher works offline at boot.
   fonts:
     - family: PressStart2P

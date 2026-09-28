@@ -3,8 +3,10 @@ import 'package:android_tile_launcher/model/layout_export.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/tile.dart';
+import 'package:android_tile_launcher/model/wallpaper.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
+import 'package:android_tile_launcher/services/wallpaper_service.dart';
 import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -13,12 +15,17 @@ import 'package:flutter_test/flutter_test.dart';
 import '../fakes/fake_clipboard_service.dart';
 import '../fakes/fake_home_role_service.dart';
 import '../fakes/fake_tile_services.dart';
+import '../fakes/fake_wallpaper_service.dart';
 import '../fakes/in_memory_local_store.dart';
 
 class _Rig {
-  _Rig({FakeClipboardService? clipboard, FakeHomeRoleService? homeRole})
-    : clipboard = clipboard ?? FakeClipboardService(),
-      homeRole = homeRole ?? FakeHomeRoleService() {
+  _Rig({
+    FakeClipboardService? clipboard,
+    FakeHomeRoleService? homeRole,
+    FakeWallpaperService? wallpaper,
+  }) : clipboard = clipboard ?? FakeClipboardService(),
+       homeRole = homeRole ?? FakeHomeRoleService(),
+       wallpaper = wallpaper ?? FakeWallpaperService() {
     settings = SettingsState(store: InMemoryLocalStore());
     grid = GridState(store: InMemoryLocalStore());
   }
@@ -27,6 +34,7 @@ class _Rig {
   late final GridState grid;
   final FakeClipboardService clipboard;
   final FakeHomeRoleService homeRole;
+  final FakeWallpaperService wallpaper;
 
   Future<void> open(WidgetTester tester) async {
     tester.view
@@ -45,6 +53,7 @@ class _Rig {
               services: fakeTileServices(
                 clipboard: clipboard,
                 homeRole: homeRole,
+                wallpaper: wallpaper,
               ),
             ),
             child: const Text('open'),
@@ -451,5 +460,163 @@ void main() {
       // The tiles are not touched by resetting the settings.
       expect(rig.grid.pinned, hasLength(1));
     });
+  });
+  group('wallpaper', () {
+    testWidgets(
+      'starts on the picture of the current theme, for the lock screen',
+      (WidgetTester tester) async {
+        final _Rig rig = _Rig();
+        await rig.settings.update(
+          const LauncherSettings(theme: ThemeVariant.beige),
+        );
+        await rig.open(tester);
+        await _tap(tester, settingsKey('set-wallpaper'));
+
+        expect(
+          _text(tester, settingsAskKey),
+          Messages.settingsWallpaperAsk('BEIGE', 'THE LOCK SCREEN'),
+        );
+      },
+    );
+
+    testWidgets('shows the picture it would set', (WidgetTester tester) async {
+      await _Rig().open(tester);
+
+      final Image preview = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(settingsKey('paper-preview')),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        ((preview.image as ResizeImage).imageProvider as AssetImage).assetName,
+        wallpaperAssetOf(ThemeVariant.c64),
+      );
+
+      await _tap(tester, settingsKey('paper-oled'));
+
+      final Image next = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(settingsKey('paper-preview')),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        ((next.image as ResizeImage).imageProvider as AssetImage).assetName,
+        wallpaperAssetOf(ThemeVariant.oled),
+      );
+    });
+
+    testWidgets('sets nothing until YES', (WidgetTester tester) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+
+      await _tap(tester, settingsKey('set-wallpaper'));
+      expect(rig.wallpaper.sets, isEmpty);
+
+      await _tap(tester, settingsNoKey);
+      expect(rig.wallpaper.sets, isEmpty);
+      expect(find.byKey(settingsAskKey), findsNothing);
+    });
+
+    testWidgets('YES sets the chosen picture on the chosen screen', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+      await _tap(tester, settingsKey('paper-oled'));
+      await _tap(tester, settingsKey('paper-on-both'));
+
+      await _tap(tester, settingsKey('set-wallpaper'));
+      expect(
+        _text(tester, settingsAskKey),
+        Messages.settingsWallpaperAsk('OLED', 'BOTH SCREENS'),
+      );
+      await _tap(tester, settingsYesKey);
+
+      expect(rig.wallpaper.sets, hasLength(1));
+      expect(rig.wallpaper.sets.single.$1, greaterThan(1000));
+      expect(rig.wallpaper.sets.single.$2, WallpaperTarget.both);
+      expect(_text(tester, settingsMessageKey), Messages.settingsWallpaperSet);
+    });
+
+    testWidgets('a phone that refuses, or fails, is told so', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig(
+        wallpaper: FakeWallpaperService(WallpaperResult.refused),
+      );
+      await rig.open(tester);
+
+      await _tap(tester, settingsKey('set-wallpaper'));
+      await _tap(tester, settingsYesKey);
+      expect(
+        _text(tester, settingsMessageKey),
+        '${Messages.failedPrefix}${Messages.settingsWallpaperRefused}',
+      );
+
+      rig.wallpaper.result = WallpaperResult.failed;
+      await _tap(tester, settingsKey('set-wallpaper'));
+      await _tap(tester, settingsYesKey);
+      expect(
+        _text(tester, settingsMessageKey),
+        '${Messages.failedPrefix}${Messages.settingsWallpaperFailed}',
+      );
+    });
+
+    testWidgets('DEFAULT WALLPAPER asks, then puts the phone\'s own back', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+      await _tap(tester, settingsKey('paper-on-home'));
+
+      await _tap(tester, settingsKey('default-wallpaper'));
+      expect(
+        _text(tester, settingsAskKey),
+        Messages.settingsWallpaperClearAsk('THE HOME SCREEN'),
+      );
+      expect(rig.wallpaper.clears, isEmpty);
+
+      await _tap(tester, settingsYesKey);
+      expect(rig.wallpaper.clears, <WallpaperTarget>[WallpaperTarget.home]);
+      expect(
+        _text(tester, settingsMessageKey),
+        Messages.settingsWallpaperCleared,
+      );
+    });
+
+    testWidgets(
+      'its question and answer sit under its own keys, not the layout ones',
+      (WidgetTester tester) async {
+        final _Rig rig = _Rig();
+        await rig.grid.pin('com.example.a');
+        await rig.open(tester);
+
+        await _tap(tester, settingsKey('set-wallpaper'));
+        final double wallpaperAsk = tester
+            .getTopLeft(find.byKey(settingsAskKey))
+            .dy;
+        final double layoutKeys = tester
+            .getTopLeft(find.byKey(settingsKey('export')))
+            .dy;
+        final double wallpaperKeys = tester
+            .getTopLeft(find.byKey(settingsKey('set-wallpaper')))
+            .dy;
+
+        expect(wallpaperAsk, greaterThan(wallpaperKeys));
+        expect(wallpaperAsk, lessThan(layoutKeys));
+
+        // And a layout question shows under the layout keys instead.
+        await _tap(tester, settingsNoKey);
+        await _tap(tester, settingsKey('clear-layout'));
+        expect(
+          tester.getTopLeft(find.byKey(settingsAskKey)).dy,
+          greaterThan(
+            tester.getTopLeft(find.byKey(settingsKey('clear-layout'))).dy,
+          ),
+        );
+      },
+    );
   });
 }

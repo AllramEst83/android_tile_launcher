@@ -17,6 +17,7 @@ class MainActivity : FlutterActivity() {
     private var alarmChannel: AlarmChannelHandler? = null
     private var homeRoleChannel: HomeRoleChannelHandler? = null
     private var shadeChannel: ShadeChannelHandler? = null
+    private var wallpaperChannel: WallpaperChannelHandler? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -36,6 +37,7 @@ class MainActivity : FlutterActivity() {
         alarmChannel = AlarmChannelHandler(applicationContext, messenger)
         homeRoleChannel = HomeRoleChannelHandler(applicationContext, messenger)
         shadeChannel = ShadeChannelHandler(applicationContext, messenger)
+        wallpaperChannel = WallpaperChannelHandler(applicationContext, messenger)
     }
 
     override fun onRequestPermissionsResult(
@@ -77,6 +79,8 @@ class MainActivity : FlutterActivity() {
         homeRoleChannel = null
         shadeChannel?.dispose()
         shadeChannel = null
+        wallpaperChannel?.dispose()
+        wallpaperChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }

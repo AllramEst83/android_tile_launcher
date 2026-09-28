@@ -36,8 +36,9 @@ last answer. It is a personal project and is not on the Play Store.
 - **Settings:** three themes (C64 screen, pitch-black OLED, beige hardware),
   4 or 6 columns, the gap between tiles, what swiping down at the top and up
   at the bottom of Home does (refresh, notification shade, quick settings,
-  All Apps, search), haptics on or off, a shortcut to Android's Home-app
-  chooser, and export/import of your layout as text.
+  All Apps, search), haptics on or off, a themed lock-screen wallpaper you can
+  set (or take off again), a shortcut to Android's Home-app chooser, and
+  export/import of your layout as text.
 - **First run:** the boot screen types out a C64 power-on once.
 
 Nothing acts on its own. Anything that sends, deletes or sets something waits
@@ -74,6 +75,7 @@ that ever changes.
 | `CALL_PHONE`, `SEND_SMS` | the CALL and SMS buttons on a contact | on the first use of each |
 | `SET_ALARM` | timers and alarms in the clock app | at install |
 | `EXPAND_STATUS_BAR` | the swipe gestures for the shade | at install |
+| `SET_WALLPAPER` | the WALLPAPER setting, only when you confirm it | at install |
 | `REQUEST_DELETE_PACKAGES` | the drawer's uninstall action | at install |
 | `ACCESS_NOTIFICATION_POLICY` | the Sound tile | granted in Android's settings |
 

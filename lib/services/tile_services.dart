@@ -11,6 +11,7 @@ import 'package:android_tile_launcher/services/shade_service.dart';
 import 'package:android_tile_launcher/services/sms_service.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/text_tv_repository.dart';
+import 'package:android_tile_launcher/services/wallpaper_service.dart';
 import 'package:android_tile_launcher/services/weather_repository.dart';
 import 'package:android_tile_launcher/services/whatsapp_service.dart';
 
@@ -34,6 +35,7 @@ class TileServices {
     required this.homeRole,
     required this.clipboard,
     required this.shade,
+    required this.wallpaper,
   });
 
   final SystemControlService systemControl;
@@ -55,4 +57,7 @@ class TileServices {
 
   /// Not for tiles either: what a swipe on Home can pull down.
   final ShadeService shade;
+
+  /// Nor is this: the wallpaper the settings screen puts on the phone.
+  final WallpaperService wallpaper;
 }
