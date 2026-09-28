@@ -158,4 +158,44 @@ void main() {
 
     expect((result as AlarmUnavailable).reason, contains('did not answer'));
   });
+
+  group('next', () {
+    test('a millisecond reply becomes the matching DateTime', () async {
+      final due = DateTime(2026, 9, 28, 7, 30);
+      answer((call) => due.millisecondsSinceEpoch);
+
+      final result = await service.next();
+
+      expect(calls.single.method, 'next');
+      expect(result, due);
+    });
+
+    test('no reply means no alarm is set', () async {
+      answer((call) => null);
+
+      expect(await service.next(), isNull);
+    });
+
+    test('a platform error is no alarm, not a crash', () async {
+      _mockChannel((call) async => throw PlatformException(code: 'ERROR'));
+
+      expect(await service.next(), isNull);
+    });
+
+    test('no platform behind it is no alarm', () async {
+      _mockChannel((call) => null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_channel, null);
+
+      expect(await service.next(), isNull);
+    });
+
+    test('a reply that never comes is no alarm, not a hang', () async {
+      _mockChannel(
+        (call) => Future<Object?>.delayed(const Duration(seconds: 5)),
+      );
+
+      expect(await service.next(), isNull);
+    });
+  });
 }

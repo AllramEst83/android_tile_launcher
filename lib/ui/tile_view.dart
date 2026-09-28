@@ -9,6 +9,8 @@ import 'package:android_tile_launcher/model/tile_content.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/agenda_tile_source.dart';
+import 'package:android_tile_launcher/services/alarm_service.dart';
+import 'package:android_tile_launcher/services/alarm_tile_source.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
@@ -324,13 +326,24 @@ Widget tileContent(
         ),
       );
     case TileKind.alarm:
-      // Nothing to read from outside (the clock app owns the timers and
-      // alarms), so no poller: it opens the sheet that sets them.
-      return Builder(
-        builder: (context) => AlarmTileContentView(
+      final AlarmService alarm = services.alarm;
+      return TilePoller(
+        source: AlarmTileSource(service: alarm),
+        // The next alarm rarely changes on its own; a resumed launcher and
+        // closing the sheet below both refresh it sooner than this.
+        interval: const Duration(minutes: 1),
+        builder: (context, content, refreshNow) => AlarmTileContentView(
+          next: (content as AlarmContent).next,
           ink: tile.colour.ink,
+          // The sheet only sets or opens lists (never here itself), so the
+          // tile re-reads once it closes rather than waiting on the poll.
           onTap: interactive
-              ? () => unawaited(showAlarmSheet(context, alarm: services.alarm))
+              ? () => unawaited(
+                  showAlarmSheet(
+                    context,
+                    alarm: alarm,
+                  ).then((_) => refreshNow()),
+                )
               : null,
         ),
       );

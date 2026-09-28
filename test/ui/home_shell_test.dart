@@ -2,6 +2,7 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/mail.dart';
@@ -893,6 +894,38 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(alarmCloseKey), findsNothing);
     });
+
+    testWidgets(
+      'the alarm tile shows the next alarm due, and re-reads once the sheet '
+      'closes',
+      (WidgetTester tester) async {
+        final GridState gridState = _gridState();
+        final FakeAlarmService alarm = FakeAlarmService();
+        await pumpShell(
+          tester,
+          FakeAppRepository(),
+          gridState: gridState,
+          alarmService: alarm,
+        );
+        await tester.pump();
+        await gridState.pinSystemTile(TileKind.alarm);
+        await tester.pumpAndSettle();
+
+        expect(_onHome(find.text(Messages.alarmNone)), findsOneWidget);
+
+        // As if an alarm was set from the clock app while the sheet was open.
+        alarm.nextAlarm = DateTime(2026, 9, 28, 7, 30);
+        await tester.tap(_onHome(find.byType(AlarmTileContentView)));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(alarmCloseKey));
+        await tester.pumpAndSettle();
+
+        expect(
+          _onHome(find.text(formatClockTime(alarm.nextAlarm!))),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('the calc tile opens the calculator, which works', (
       WidgetTester tester,

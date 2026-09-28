@@ -129,6 +129,7 @@ abstract final class Messages {
   static const String alarmTitle = 'ALARM';
   static const String alarmTabTimer = 'TIMER';
   static const String alarmTabAlarm = 'ALARM';
+  static const String alarmNone = '--:--';
   static const String alarmStart = 'START';
   static const String alarmSet = 'SET ALARM';
   static const String alarmSeeTimers = 'SEE TIMERS';

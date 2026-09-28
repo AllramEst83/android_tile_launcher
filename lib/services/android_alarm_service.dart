@@ -47,6 +47,23 @@ class AndroidAlarmService implements AlarmService {
   Future<AlarmResult> showAlarms() =>
       _invoke('showAlarms', const <String, Object?>{});
 
+  @override
+  Future<DateTime?> next() async {
+    final int? millis;
+    try {
+      millis = await channel
+          .invokeMethod<int>('next', const <String, Object?>{})
+          .timeout(timeout);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    } on TimeoutException {
+      return null;
+    }
+    return millis == null ? null : DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
   Future<AlarmResult> _invoke(String method, Map<String, Object?> args) async {
     try {
       final bool? done = await channel

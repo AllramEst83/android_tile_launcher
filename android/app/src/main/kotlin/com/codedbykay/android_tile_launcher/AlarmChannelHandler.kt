@@ -1,5 +1,6 @@
 package com.codedbykay.android_tile_launcher
 
+import android.app.AlarmManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -16,9 +17,12 @@ import io.flutter.plugin.common.MethodChannel
  * anything itself. Setting needs the normal permission `SET_ALARM` (granted at
  * install); opening the lists needs none.
  *
- * Every method replies `true` once the intent was handed over, `NO_APP` when
- * nothing answers to it and `NO_PERMISSION` when Android refuses. Never throws
- * into Flutter.
+ * Every set/show method replies `true` once the intent was handed over,
+ * `NO_APP` when nothing answers to it and `NO_PERMISSION` when Android
+ * refuses. `next` reads (never schedules) the trigger time of
+ * `AlarmManager.getNextAlarmClock()` — Android's one system-wide next alarm,
+ * set by whichever app's is soonest, not only this app's, and readable with
+ * no permission. Never throws into Flutter.
  */
 class AlarmChannelHandler(
     private val context: Context,
@@ -81,6 +85,10 @@ class AlarmChannelHandler(
                 start(Intent(action), result)
             }
             "showAlarms" -> start(Intent(AlarmClock.ACTION_SHOW_ALARMS), result)
+            "next" -> {
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                result.success(alarmManager.nextAlarmClock?.triggerTime)
+            }
             else -> result.notImplemented()
         }
     }

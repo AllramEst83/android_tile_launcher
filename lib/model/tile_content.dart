@@ -117,6 +117,25 @@ class TextTvContent extends TileContent {
   String toString() => 'TextTvContent($result)';
 }
 
+/// The alarm tile's content: the next alarm the phone will ring, or `null`
+/// when none is set (across every app — Android tracks one system-wide next
+/// alarm, not only ones set from here). There is no equivalent for a timer;
+/// Android exposes only the next alarm.
+class AlarmContent extends TileContent {
+  const AlarmContent({required this.next});
+
+  final DateTime? next;
+
+  @override
+  bool operator ==(Object other) => other is AlarmContent && other.next == next;
+
+  @override
+  int get hashCode => next.hashCode;
+
+  @override
+  String toString() => 'AlarmContent($next)';
+}
+
 /// The weather tile's content: a forecast, or the reason there is none.
 class WeatherContent extends TileContent {
   const WeatherContent({required this.snapshot});
