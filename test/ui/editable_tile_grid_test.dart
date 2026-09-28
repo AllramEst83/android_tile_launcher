@@ -229,6 +229,90 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
     });
+
+    testWidgets('dropped on the top of a tile: a horizontal line above it', (
+      WidgetTester tester,
+    ) async {
+      final List<(String, String, bool)> reorders = <(String, String, bool)>[];
+      await _pump(tester, _tiles(2, size: TileSize.small), reorders);
+      final Rect target = tester.getRect(find.byKey(const ValueKey('app1')));
+
+      final TestGesture gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('app0'))),
+      );
+      await _hold(tester, gesture);
+      await gesture.moveTo(Offset(target.center.dx, target.top + 4));
+      await tester.pump();
+
+      expect(line(), findsOneWidget);
+      expect(tester.getSize(line()).width, target.width);
+      expect(
+        tester.getCenter(line()).dy,
+        closeTo(target.top - TileMetrics.gutter / 2, 0.5),
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(reorders, <(String, String, bool)>[('app0', 'app1', false)]);
+    });
+
+    testWidgets('dropped on the bottom of a tile: a horizontal line below it', (
+      WidgetTester tester,
+    ) async {
+      final List<(String, String, bool)> reorders = <(String, String, bool)>[];
+      await _pump(tester, _tiles(2, size: TileSize.small), reorders);
+      final Rect target = tester.getRect(find.byKey(const ValueKey('app1')));
+
+      final TestGesture gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('app0'))),
+      );
+      await _hold(tester, gesture);
+      await gesture.moveTo(Offset(target.center.dx, target.bottom - 4));
+      await tester.pump();
+
+      expect(line(), findsOneWidget);
+      expect(tester.getSize(line()).width, target.width);
+      expect(
+        tester.getCenter(line()).dy,
+        closeTo(target.bottom + TileMetrics.gutter / 2, 0.5),
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(reorders, <(String, String, bool)>[('app0', 'app1', true)]);
+    });
+
+    testWidgets('appears while hovering the gutter beside a tile, before the '
+        'neighbour it leads to is reached', (WidgetTester tester) async {
+      await _pump(
+        tester,
+        _tiles(3, size: TileSize.small),
+        <(String, String, bool)>[],
+      );
+      final Rect middle = tester.getRect(find.byKey(const ValueKey('app1')));
+
+      final TestGesture gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('app0'))),
+      );
+      await _hold(tester, gesture);
+      // Just past app1's own right edge, short of app2's tile body: dead
+      // space before the drop target reached into its gutter.
+      await gesture.moveTo(
+        Offset(middle.right + TileMetrics.gutter / 4, middle.center.dy),
+      );
+      await tester.pump();
+
+      expect(line(), findsOneWidget);
+      expect(
+        tester.getCenter(line()).dx,
+        closeTo(middle.right + TileMetrics.gutter / 2, 0.5),
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
   });
 
   testWidgets('a plain drag scrolls the grid and moves nothing', (
