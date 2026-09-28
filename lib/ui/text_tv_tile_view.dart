@@ -123,6 +123,11 @@ class _Headlines extends StatelessWidget {
   /// `MAIL`.
   static const double _headerHeight = 28;
 
+  /// How far a headline sits in from the tile's left edge: the same indent
+  /// the mail tile's messages have under `MAIL` (there, room for the unread
+  /// marker; here, just to match it), so the two list tiles read alike.
+  static const double _indent = 14;
+
   /// The most lines the headline at [index] may wrap to: the lead story, the
   /// one the page leads with, gets an extra one over the rest.
   int _cap(int index) => index == 0 ? 3 : 2;
@@ -130,7 +135,7 @@ class _Headlines extends StatelessWidget {
   /// How many lines [text] actually needs to read in full at [width], up to
   /// [cap]: a short headline costs one line, so the tile fits more of them; a
   /// long one wraps rather than being cut, as far as there is room for.
-  int _linesNeeded(BuildContext context, String text, int cap) {
+  int _linesNeeded(BuildContext context, String text, int cap, double width) {
     final TextPainter painter = TextPainter(
       text: TextSpan(text: text, style: _text(ink, _headline)),
       textScaler: MediaQuery.textScalerOf(context),
@@ -160,11 +165,17 @@ class _Headlines extends StatelessWidget {
     }
     final List<String> headlines = textTvHeadlines(page);
     final double room = height - _headerHeight;
+    final double textWidth = width - _indent;
     final List<Widget> rows = <Widget>[];
     double used = 0;
     for (final (int i, String line) in headlines.indexed) {
       if (i == 0 && room <= 0) break;
-      final int wanted = _linesNeeded(context, line.toUpperCase(), _cap(i));
+      final int wanted = _linesNeeded(
+        context,
+        line.toUpperCase(),
+        _cap(i),
+        textWidth,
+      );
       // The lead story is shown even on a tile too short for all its lines,
       // with however many of them fit; every later one is all or nothing.
       final int lines = i == 0
@@ -175,8 +186,9 @@ class _Headlines extends StatelessWidget {
       rows.add(
         Padding(
           key: textTvHeadlineKey(i),
-          padding: EdgeInsets.only(top: i == 0 ? 0 : _gap),
+          padding: EdgeInsets.only(top: i == 0 ? 0 : _gap, left: _indent),
           child: SizedBox(
+            width: textWidth,
             height: lines * _lineHeight,
             child: Text(
               line.toUpperCase(),
