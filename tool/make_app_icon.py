@@ -1,5 +1,5 @@
-"""Builds the Android launcher icon from icons/tile_launcher_icon.jpg and
-icons/bg/tile_launcher_bg_icon.jpg.
+"""Builds the Android launcher icon from design/icon/source.jpg and
+design/icon/background.jpg.
 
 The source is a JPEG of the four-tile mosaic and rainbow stripe on an off-white
 backdrop, so this first cuts the artwork out (flood-filling the light,
@@ -24,10 +24,10 @@ from collections import deque
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCE = os.path.join(ROOT, 'icons', 'tile_launcher_icon.jpg')
+SOURCE = os.path.join(ROOT, 'design', 'icon', 'source.jpg')
 RES = os.path.join(ROOT, 'android', 'app', 'src', 'main', 'res')
 
-BACKGROUND_SOURCE = os.path.join(ROOT, 'icons', 'bg', 'tile_launcher_bg_icon.jpg')
+BACKGROUND_SOURCE = os.path.join(ROOT, 'design', 'icon', 'background.jpg')
 
 # Adaptive icons are drawn on a 108dp canvas; only the middle 72dp circle is
 # reliably visible, and 66dp is the guaranteed-safe circle. The farthest

@@ -95,7 +95,7 @@ flutter build apk --debug                          # after touching android/
 
 The app icon is generated, not hand-edited: `python tool/make_app_icon.py`
 (needs Pillow) rebuilds every density, the adaptive and monochrome layers and
-the legacy icons from the pictures in `icons/`.
+the legacy icons from the pictures in `design/icon/`.
 
 ### Layout
 
@@ -105,8 +105,7 @@ the legacy icons from the pictures in `icons/`.
 - `android/`: manifest (Home intent filter, package-visibility queries) and the Kotlin channel handlers
 - `test/`: mirrors `lib/`; `test/fakes/` holds the fakes
 - `tool/`: scripts (the icon generator)
-- `icons/`: the source pictures for the icon
-- `design/`: reference material, not code: `commodore64/` is the look and feel, `google.stich/` is structural inspiration only
+- `design/`: reference material and the icon's source pictures, not code ([design/README.md](design/README.md)): `reference/` is the look and feel, `mockups/` is structural inspiration only, `icon/` feeds the icon generator
 
 ### Contributing / agents
 

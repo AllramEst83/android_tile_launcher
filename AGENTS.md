@@ -6,7 +6,7 @@ The look is Commodore-era: the VIC-II palette, hard edges, bevels instead of sha
 ## Layout
 - Repo root (this dir) is the Flutter project: `lib/`, `test/`, `android/`, `pubspec.yaml`, plus `plan.md`, `AGENTS.md`, `CLAUDE.md`, `.agents/` — **run all `flutter`/`dart` commands here**
 - Android app id: `com.codedbykay.android_tile_launcher`
-- `design/` is reference material, not code: `commodore64/` is the look and feel, `google.stich/` is structural inspiration only (its Fluent/acrylic styling is **not** the target look)
+- `design/` is reference material and the icon's sources, not code (see [design/README.md](design/README.md)): `reference/` is the look and feel, `mockups/` is structural inspiration only (its Fluent/acrylic styling is **not** the target look), `icon/` feeds `tool/make_app_icon.py`
 
 ## Read before working
 Guidance lives in [`.agents/`](.agents/README.md). Start with the index, then:
