@@ -138,12 +138,20 @@ class _AgendaSheetState extends State<_AgendaSheet> {
               // The day view is one day, so its heading adds nothing.
               if (_week)
                 Padding(
-                  padding: const EdgeInsets.only(top: TileMetrics.gutter),
-                  child: Text(
-                    formatDayHeading(day.day, _now),
-                    style: text.bodyMedium?.copyWith(
-                      color: TileColors.textBright,
-                    ),
+                  padding: const EdgeInsets.only(top: TileMetrics.margin),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        formatDayHeading(day.day, _now),
+                        style: text.bodyMedium?.copyWith(
+                          color: TileColors.textBright,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // A rule under the heading, so each day reads as a block.
+                      Container(height: 2, color: TileColors.bezel),
+                    ],
                   ),
                 ),
               for (final CalendarEvent event in day.events)
@@ -181,7 +189,7 @@ class _Toggle extends StatelessWidget {
         child: Text(
           selected ? '[$label]' : ' $label ',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: selected ? TileColors.textBright : TileColors.text,
+            color: selected ? TileColors.textBright : C64.lightGrey,
           ),
         ),
       ),
@@ -202,24 +210,31 @@ class _EventRow extends StatelessWidget {
     // The hours sit above the title, not beside it: a span like
     // `12:43-13:13` is too wide for a side column on a narrow phone.
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(top: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
             formatSpan(event, day),
-            style: text.bodySmall?.copyWith(color: TileColors.text),
+            style: text.bodySmall?.copyWith(fontSize: 10, color: C64.cyan),
           ),
+          const SizedBox(height: 2),
           Text(
             event.title.isEmpty
                 ? Messages.agendaUntitled
                 : event.title.toUpperCase(),
-            style: text.bodySmall?.copyWith(color: TileColors.textBright),
+            style: text.bodySmall?.copyWith(
+              fontSize: 10,
+              color: TileColors.textBright,
+            ),
           ),
           if (location != null)
             Text(
               location.toUpperCase(),
-              style: text.bodySmall?.copyWith(color: TileColors.textDim),
+              style: text.bodySmall?.copyWith(
+                fontSize: 8,
+                color: C64.lightGrey,
+              ),
             ),
         ],
       ),

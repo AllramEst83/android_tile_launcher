@@ -285,29 +285,24 @@ class _HomePageState extends State<_HomePage> {
           ),
         ),
         Expanded(
-          child: Stack(
-            children: <Widget>[
-              AppTileGrid(
-                tiles: [for (final PinnedTile p in widget.pinned) p.toTile()],
-                labelFor: (Tile tile) => widget.labelFor(tile.id),
-                services: widget.services,
-                emptyMessage: Messages.nothingPinned,
-                onLaunch: widget.onLaunch,
-                onLongPress: _startEditing,
-                onRefresh: widget.onRefresh,
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: TileMetrics.gutter,
-                child: Center(
-                  child: Text(
-                    Messages.swipeForAllApps,
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ),
-              ),
-            ],
+          child: AppTileGrid(
+            tiles: [for (final PinnedTile p in widget.pinned) p.toTile()],
+            labelFor: (Tile tile) => widget.labelFor(tile.id),
+            services: widget.services,
+            emptyMessage: Messages.nothingPinned,
+            onLaunch: widget.onLaunch,
+            onLongPress: _startEditing,
+            onRefresh: widget.onRefresh,
+          ),
+        ),
+        // Its own row under the grid, not laid over it: tiles that run past
+        // the bottom of the screen scroll up to this line and stop, instead
+        // of passing beneath the text.
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: TileMetrics.gutter),
+          child: Text(
+            Messages.swipeForAllApps,
+            style: Theme.of(context).textTheme.labelSmall,
           ),
         ),
       ],
