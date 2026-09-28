@@ -21,6 +21,11 @@
          is needed because nothing here schedules anything itself. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
+    <!-- Swipe down on Home can pull the notification shade or quick settings
+         down for you. A normal permission, granted at install; it can only
+         open them, not read what is in them. -->
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+
     <!-- Lets the silent-mode/vibration-mode tiles query and (once the user
          grants Do-Not-Disturb access via Settings) set the ringer mode. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />

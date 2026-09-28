@@ -1,10 +1,13 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
+import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
+import 'package:android_tile_launcher/services/home_role_service.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
 import 'package:android_tile_launcher/services/rates_repository.dart';
+import 'package:android_tile_launcher/services/shade_service.dart';
 import 'package:android_tile_launcher/services/sms_service.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/text_tv_repository.dart';
@@ -14,10 +17,13 @@ import 'package:android_tile_launcher/services/whatsapp_service.dart';
 
 import 'fake_agenda_repository.dart';
 import 'fake_alarm_service.dart';
+import 'fake_clipboard_service.dart';
 import 'fake_contacts.dart';
 import 'fake_device_repository.dart';
+import 'fake_home_role_service.dart';
 import 'fake_mail_service.dart';
 import 'fake_rates_repository.dart';
+import 'fake_shade_service.dart';
 import 'fake_system_control_service.dart';
 import 'fake_text_tv_repository.dart';
 import 'fake_weather_repository.dart';
@@ -37,6 +43,9 @@ TileServices fakeTileServices({
   TextTvRepository? textTv,
   RatesRepository? rates,
   AlarmService? alarm,
+  HomeRoleService? homeRole,
+  ClipboardService? clipboard,
+  ShadeService? shade,
 }) => TileServices(
   systemControl: systemControl ?? FakeSystemControlService(),
   device: device ?? FakeDeviceRepository(),
@@ -50,4 +59,7 @@ TileServices fakeTileServices({
   textTv: textTv ?? FakeTextTvRepository(),
   rates: rates ?? FakeRatesRepository(),
   alarm: alarm ?? FakeAlarmService(),
+  homeRole: homeRole ?? FakeHomeRoleService(),
+  clipboard: clipboard ?? FakeClipboardService(),
+  shade: shade ?? FakeShadeService(),
 );

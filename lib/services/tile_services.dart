@@ -1,10 +1,13 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
+import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
+import 'package:android_tile_launcher/services/home_role_service.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
 import 'package:android_tile_launcher/services/rates_repository.dart';
+import 'package:android_tile_launcher/services/shade_service.dart';
 import 'package:android_tile_launcher/services/sms_service.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/text_tv_repository.dart';
@@ -28,6 +31,9 @@ class TileServices {
     required this.textTv,
     required this.rates,
     required this.alarm,
+    required this.homeRole,
+    required this.clipboard,
+    required this.shade,
   });
 
   final SystemControlService systemControl;
@@ -42,4 +48,11 @@ class TileServices {
   final TextTvRepository textTv;
   final RatesRepository rates;
   final AlarmService alarm;
+
+  /// Not for tiles: what the settings screen asks the phone.
+  final HomeRoleService homeRole;
+  final ClipboardService clipboard;
+
+  /// Not for tiles either: what a swipe on Home can pull down.
+  final ShadeService shade;
 }

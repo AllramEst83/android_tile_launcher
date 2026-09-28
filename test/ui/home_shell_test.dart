@@ -5,6 +5,7 @@ import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/text_tv_page.dart';
 import 'package:android_tile_launcher/model/tile.dart';
@@ -13,6 +14,7 @@ import 'package:android_tile_launcher/model/weather.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/alarm_sheet.dart';
@@ -32,6 +34,8 @@ import 'package:android_tile_launcher/ui/home_shell.dart';
 import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
+import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/text_tv_screen.dart';
 import 'package:android_tile_launcher/ui/text_tv_tile_view.dart';
@@ -47,6 +51,7 @@ import '../fakes/fake_app_repository.dart';
 import '../fakes/fake_contacts.dart';
 import '../fakes/fake_device_repository.dart';
 import '../fakes/fake_mail_service.dart';
+import '../fakes/fake_shade_service.dart';
 import '../fakes/fake_system_control_service.dart';
 import '../fakes/fake_text_tv_repository.dart';
 import '../fakes/fake_tile_services.dart';
@@ -79,24 +84,30 @@ Future<void> pumpShell(
   FakeMailService? mailService,
   FakeTextTvRepository? textTvRepository,
   FakeAlarmService? alarmService,
+  SettingsState? settingsState,
+  FakeShadeService? shadeService,
 }) => tester.pumpWidget(
-  MaterialApp(
-    theme: tileLauncherTheme(),
-    home: HomeShell(
-      appRepository: repository,
-      gridState: gridState ?? _gridState(),
-      services: fakeTileServices(
-        systemControl: systemControlService,
-        device: deviceRepository,
-        weather: weatherRepository,
-        agenda: agendaRepository,
-        contacts: contactsRepository,
-        phone: phoneService,
-        sms: smsService,
-        whatsApp: whatsAppService,
-        mail: mailService,
-        textTv: textTvRepository,
-        alarm: alarmService,
+  SettingsScope(
+    state: settingsState ?? SettingsState(store: InMemoryLocalStore()),
+    child: MaterialApp(
+      theme: tileLauncherTheme(),
+      home: HomeShell(
+        appRepository: repository,
+        gridState: gridState ?? _gridState(),
+        services: fakeTileServices(
+          systemControl: systemControlService,
+          device: deviceRepository,
+          weather: weatherRepository,
+          agenda: agendaRepository,
+          contacts: contactsRepository,
+          phone: phoneService,
+          sms: smsService,
+          whatsApp: whatsAppService,
+          mail: mailService,
+          textTv: textTvRepository,
+          alarm: alarmService,
+          shade: shadeService,
+        ),
       ),
     ),
   ),
@@ -931,6 +942,162 @@ void main() {
 
       expect(control.setCalls, [(TileKind.flashlight, true)]);
       expect(_onHome(find.text('[ON]')), findsOneWidget);
+    });
+  });
+  group('settings and swipe gestures', () {
+    Future<(SettingsState, FakeShadeService)> pumpWith(
+      WidgetTester tester,
+      LauncherSettings settings,
+    ) async {
+      final SettingsState state = SettingsState(store: InMemoryLocalStore());
+      await state.update(settings);
+      final FakeShadeService shade = FakeShadeService();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        settingsState: state,
+        shadeService: shade,
+      );
+      await tester.pump();
+      return (state, shade);
+    }
+
+    Future<void> swipe(WidgetTester tester, double dy) async {
+      // From the top corner: in the middle of an empty grid the message is
+      // what is under the finger, not the list.
+      await tester.dragFrom(
+        tester.getTopLeft(find.byType(AppTileGrid)) + const Offset(30, 30),
+        Offset(0, dy),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('SETTINGS opens the settings screen, and it closes again', (
+      WidgetTester tester,
+    ) async {
+      await pumpShell(tester, FakeAppRepository());
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.settingsButton));
+      await tester.pumpAndSettle();
+      expect(find.byKey(settingsCloseKey), findsOneWidget);
+
+      await tester.tap(find.byKey(settingsCloseKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(settingsCloseKey), findsNothing);
+    });
+
+    testWidgets('swipe down can pull the notification shade', (
+      WidgetTester tester,
+    ) async {
+      final (_, FakeShadeService shade) = await pumpWith(
+        tester,
+        const LauncherSettings(swipeDown: GestureAction.notifications),
+      );
+
+      await swipe(tester, 300);
+
+      expect(shade.notificationCalls, 1);
+      expect(shade.quickSettingsCalls, 0);
+    });
+
+    testWidgets('swipe down can pull quick settings', (
+      WidgetTester tester,
+    ) async {
+      final (_, FakeShadeService shade) = await pumpWith(
+        tester,
+        const LauncherSettings(swipeDown: GestureAction.quickSettings),
+      );
+
+      await swipe(tester, 300);
+
+      expect(shade.quickSettingsCalls, 1);
+      expect(shade.notificationCalls, 0);
+    });
+
+    testWidgets('by default swipe down refreshes and pulls nothing down', (
+      WidgetTester tester,
+    ) async {
+      final FakeAppRepository repository = FakeAppRepository();
+      final FakeShadeService shade = FakeShadeService();
+      await pumpShell(tester, repository, shadeService: shade);
+      await tester.pump();
+      final int refreshed = repository.refreshCalls;
+
+      await swipe(tester, 300);
+
+      expect(repository.refreshCalls, refreshed + 1);
+      expect(shade.notificationCalls + shade.quickSettingsCalls, 0);
+    });
+
+    testWidgets('swipe down set to nothing does nothing', (
+      WidgetTester tester,
+    ) async {
+      final (_, FakeShadeService shade) = await pumpWith(
+        tester,
+        const LauncherSettings(swipeDown: GestureAction.none),
+      );
+
+      await swipe(tester, 300);
+
+      expect(shade.notificationCalls + shade.quickSettingsCalls, 0);
+    });
+
+    testWidgets('swipe up does nothing until it is given something to do', (
+      WidgetTester tester,
+    ) async {
+      await pumpWith(tester, const LauncherSettings());
+
+      await swipe(tester, -300);
+
+      final PageView pages = tester.widget<PageView>(find.byType(PageView));
+      expect(pages.controller!.page, 0);
+    });
+
+    testWidgets('swipe up can open All Apps', (WidgetTester tester) async {
+      await pumpWith(
+        tester,
+        const LauncherSettings(swipeUp: GestureAction.allApps),
+      );
+
+      await swipe(tester, -300);
+
+      final PageView pages = tester.widget<PageView>(find.byType(PageView));
+      expect(pages.controller!.page, 1);
+    });
+
+    testWidgets('swipe up can open All Apps with the search field ready', (
+      WidgetTester tester,
+    ) async {
+      await pumpWith(
+        tester,
+        const LauncherSettings(swipeUp: GestureAction.searchApps),
+      );
+
+      await swipe(tester, -300);
+
+      final PageView pages = tester.widget<PageView>(find.byType(PageView));
+      expect(pages.controller!.page, 1);
+      final EditableText field = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byType(AppDrawer),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(field.focusNode.hasFocus, isTrue);
+    });
+
+    testWidgets('a swipe that stops short does not count', (
+      WidgetTester tester,
+    ) async {
+      final (_, FakeShadeService shade) = await pumpWith(
+        tester,
+        const LauncherSettings(swipeDown: GestureAction.notifications),
+      );
+
+      await swipe(tester, 40);
+
+      expect(shade.notificationCalls, 0);
     });
   });
 }

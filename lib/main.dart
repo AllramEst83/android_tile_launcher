@@ -9,9 +9,11 @@ import 'services/android_app_repository.dart';
 import 'services/android_calendar_service.dart';
 import 'services/android_contacts_service.dart';
 import 'services/android_device_repository.dart';
+import 'services/android_home_role_service.dart';
 import 'services/android_location_service.dart';
 import 'services/android_permission_service.dart';
 import 'services/android_phone_service.dart';
+import 'services/android_shade_service.dart';
 import 'services/android_sms_service.dart';
 import 'services/android_system_control_service.dart';
 import 'services/android_whatsapp_service.dart';
@@ -30,6 +32,7 @@ import 'services/mail_account.dart';
 import 'services/settings_state.dart';
 import 'services/shared_preferences_local_store.dart';
 import 'services/smhi.dart';
+import 'services/system_clipboard_service.dart';
 import 'services/text_tv.dart';
 import 'services/tile_services.dart';
 import 'services/weather.dart';
@@ -66,6 +69,9 @@ Future<void> main() async {
         whatsApp: const AndroidWhatsAppService(),
         textTv: LiveTextTvRepository(textTv: TextTv(fetcher: fetcher)),
         alarm: const AndroidAlarmService(),
+        homeRole: const AndroidHomeRoleService(),
+        clipboard: const SystemClipboardService(),
+        shade: const AndroidShadeService(),
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

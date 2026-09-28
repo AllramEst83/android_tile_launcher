@@ -7,11 +7,17 @@ class PlacedTile {
     required this.tile,
     required this.column,
     required this.row,
+    this._span,
   });
 
   final Tile tile;
   final int column;
   final int row;
+  final int? _span;
+
+  /// How many columns the tile takes where it was placed; the default
+  /// four-column footprint when the placement did not say.
+  int get span => _span ?? tile.size.columns;
 }
 
 /// Packs an ordered list of tiles into rows of [columns], skyline-style: each
@@ -24,7 +30,7 @@ List<PlacedTile> packTiles(List<Tile> tiles, {int columns = 4}) {
   final List<PlacedTile> placed = <PlacedTile>[];
 
   for (final Tile tile in tiles) {
-    final int span = tile.size.columns;
+    final int span = tile.size.spanIn(columns);
     assert(span <= columns, 'a tile cannot be wider than the grid');
 
     int bestColumn = 0;
@@ -37,7 +43,9 @@ List<PlacedTile> packTiles(List<Tile> tiles, {int columns = 4}) {
       }
     }
 
-    placed.add(PlacedTile(tile: tile, column: bestColumn, row: bestTop));
+    placed.add(
+      PlacedTile(tile: tile, column: bestColumn, row: bestTop, span: span),
+    );
     for (int c = bestColumn; c < bestColumn + span; c++) {
       nextFreeRow[c] = bestTop + tile.size.rows;
     }

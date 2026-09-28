@@ -4,16 +4,20 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/list_reorder.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
+import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/add_tile_sheet.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
+import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_inspector.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +47,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   late Future<List<AppInfo>> _apps;
   final PageController _pageController = PageController();
+  final FocusNode _searchFocus = FocusNode();
 
   @override
   void initState() {
@@ -53,6 +58,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _pageController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -66,6 +72,34 @@ class _HomeShellState extends State<HomeShell> {
     // Swallowed here: the FutureBuilder below is already watching `next` and
     // renders the error state itself once it completes.
     await next.then((_) {}, onError: (_) {});
+  }
+
+  /// What a swipe down or up on Home was set to do (see settings).
+  /// Pull-to-refresh is not here: the grid does that itself.
+  void _perform(GestureAction action) {
+    switch (action) {
+      case GestureAction.notifications:
+        unawaited(widget.services.shade.expandNotifications());
+      case GestureAction.quickSettings:
+        unawaited(widget.services.shade.expandQuickSettings());
+      case GestureAction.searchApps:
+        unawaited(_showDrawer(search: true));
+      case GestureAction.allApps:
+        unawaited(_showDrawer());
+      case GestureAction.refreshApps:
+      case GestureAction.none:
+        break;
+    }
+  }
+
+  Future<void> _showDrawer({bool search = false}) async {
+    if (!_pageController.hasClients) return;
+    await _pageController.animateToPage(
+      1,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+    if (search && mounted) _searchFocus.requestFocus();
   }
 
   @override
@@ -112,6 +146,7 @@ class _HomeShellState extends State<HomeShell> {
                             services: widget.services,
                             onLaunch: widget.appRepository.launch,
                             onRefresh: _refresh,
+                            onGesture: _perform,
                           ),
                           AppDrawer(
                             apps: apps,
@@ -119,6 +154,7 @@ class _HomeShellState extends State<HomeShell> {
                             onLaunch: widget.appRepository.launch,
                             onOpenDetails: widget.appRepository.openAppDetails,
                             onUninstall: widget.appRepository.uninstall,
+                            searchFocus: _searchFocus,
                           ),
                         ],
                       ),
@@ -147,6 +183,7 @@ class _HomePage extends StatefulWidget {
     required this.services,
     required this.onLaunch,
     required this.onRefresh,
+    required this.onGesture,
   });
 
   final List<PinnedTile> pinned;
@@ -155,6 +192,7 @@ class _HomePage extends StatefulWidget {
   final TileServices services;
   final ValueChanged<String> onLaunch;
   final Future<void> Function() onRefresh;
+  final ValueChanged<GestureAction> onGesture;
 
   @override
   State<_HomePage> createState() => _HomePageState();
@@ -226,6 +264,19 @@ class _HomePageState extends State<_HomePage> {
     return null;
   }
 
+  void _openSettings() {
+    final SettingsState? settings = SettingsScope.stateOf(context);
+    if (settings == null) return;
+    unawaited(
+      showSettings(
+        context,
+        settings: settings,
+        gridState: widget.gridState,
+        services: widget.services,
+      ),
+    );
+  }
+
   void _addTile() {
     unawaited(
       showAddTileSheet(
@@ -281,15 +332,24 @@ class _HomePageState extends State<_HomePage> {
             TileMetrics.margin,
             TileMetrics.gutter,
           ),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: InkWell(
-              onTap: _addTile,
-              child: Text(
-                Messages.addTile,
-                style: Theme.of(context).textTheme.labelSmall,
+          child: Row(
+            children: <Widget>[
+              InkWell(
+                onTap: _openSettings,
+                child: Text(
+                  Messages.settingsButton,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
               ),
-            ),
+              const Spacer(),
+              InkWell(
+                onTap: _addTile,
+                child: Text(
+                  Messages.addTile,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -301,6 +361,7 @@ class _HomePageState extends State<_HomePage> {
             onLaunch: widget.onLaunch,
             onLongPress: _startEditing,
             onRefresh: widget.onRefresh,
+            onGesture: widget.onGesture,
           ),
         ),
         // Its own row under the grid, not laid over it: tiles that run past

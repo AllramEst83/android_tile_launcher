@@ -19,6 +19,7 @@ class AppDrawer extends StatefulWidget {
     required this.onLaunch,
     required this.onOpenDetails,
     required this.onUninstall,
+    this.searchFocus,
   });
 
   final List<AppInfo> apps;
@@ -26,6 +27,10 @@ class AppDrawer extends StatefulWidget {
   final ValueChanged<String> onLaunch;
   final Future<bool> Function(String packageName) onOpenDetails;
   final Future<bool> Function(String packageName) onUninstall;
+
+  /// Lets the caller put the cursor in the search field (the swipe-up
+  /// "search apps" gesture).
+  final FocusNode? searchFocus;
 
   @override
   State<AppDrawer> createState() => _AppDrawerState();
@@ -75,6 +80,7 @@ class _AppDrawerState extends State<AppDrawer> {
           ),
           child: TextField(
             controller: _searchController,
+            focusNode: widget.searchFocus,
             onChanged: _onQueryChanged,
             style: Theme.of(context).textTheme.bodyMedium,
             cursorColor: TileColors.textBright,

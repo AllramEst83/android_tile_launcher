@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:android_tile_launcher/model/pinned_tile.dart';
+import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_layout.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_grid.dart';
 import 'package:android_tile_launcher/ui/tile_view.dart';
@@ -144,25 +146,33 @@ class _EditableTileGridState extends State<EditableTileGrid> {
 
   @override
   Widget build(BuildContext context) {
-    final List<PlacedTile> placed = packTiles([
+    final LauncherSettings settings = SettingsScope.of(context);
+    final List<PlacedTile> placed = packTiles(<Tile>[
       for (final PinnedTile p in widget.tiles) p.toTile(),
-    ]);
+    ], columns: settings.columns);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final List<TileRect> rects = layoutTiles(
           placed,
           maxWidth: constraints.maxWidth,
+          columns: settings.columns,
+          gap: settings.gap.pixels,
         );
         return SizedBox(
           key: _gridKey,
-          height: gridHeight(placed, maxWidth: constraints.maxWidth),
+          height: gridHeight(
+            placed,
+            maxWidth: constraints.maxWidth,
+            columns: settings.columns,
+            gap: settings.gap.pixels,
+          ),
           child: Stack(
             // The line in the outermost gutter sticks out past the grid.
             clipBehavior: Clip.none,
             children: <Widget>[
               for (final TileRect r in rects) _slot(r),
-              ?_dropLine(rects),
+              ?_dropLine(rects, settings.gap.pixels),
             ],
           ),
         );
@@ -172,14 +182,14 @@ class _EditableTileGridState extends State<EditableTileGrid> {
 
   /// The line down the edge of the tile a held one is over, on the side it
   /// would be dropped on; in the gutter, so it never covers a tile.
-  Widget? _dropLine(List<TileRect> rects) {
+  Widget? _dropLine(List<TileRect> rects, double gap) {
     final ({String id, bool after})? drop = _drop;
     if (drop == null) return null;
     for (final TileRect r in rects) {
       if (r.tile.id != drop.id) continue;
       final double edge = drop.after
-          ? r.left + r.width + TileMetrics.gutter / 2
-          : r.left - TileMetrics.gutter / 2;
+          ? r.left + r.width + gap / 2
+          : r.left - gap / 2;
       return Positioned(
         key: const ValueKey('drop-line'),
         left: edge - _lineWidth / 2,

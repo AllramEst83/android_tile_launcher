@@ -124,6 +124,46 @@ abstract final class Messages {
   static String alarmAlarmSet(String when) => 'ALARM SET: $when';
   static String alarmNext(String when) => 'NEXT: $when';
 
+  static const String settingsButton = 'SETTINGS';
+  static const String settingsTitle = 'SETTINGS';
+  static const String settingsTheme = 'THEME';
+  static const String settingsGrid = 'GRID';
+  static const String settingsColumns = 'COLUMNS';
+  static const String settingsGap = 'GAP BETWEEN TILES';
+  static const String settingsGestures = 'GESTURES';
+  static const String settingsSwipeLeft = 'SWIPE LEFT ON HOME OPENS ALL APPS.';
+  static const String settingsSwipeDown = 'SWIPE DOWN';
+  static const String settingsSwipeDownNote =
+      'PULL DOWN WHEN HOME IS AT THE TOP.';
+  static const String settingsSwipeUp = 'SWIPE UP';
+  static const String settingsSwipeUpNote =
+      'PUSH UP WHEN HOME IS AT THE BOTTOM.';
+  static const String settingsSystem = 'SYSTEM';
+  static const String settingsHomeApp = 'DEFAULT HOME APP';
+  static const String settingsHomeActive = 'ACTIVE: THIS IS YOUR HOME APP.';
+  static const String settingsHomeNotSet = 'NOT SET: ANOTHER APP IS HOME.';
+  static const String settingsHomeUnknown = 'COULD NOT FIND OUT.';
+  static const String settingsHomeChecking = 'CHECKING...';
+  static const String settingsOpenHome = 'CHOOSE HOME APP';
+  static const String settingsLayout = 'LAYOUT';
+  static const String settingsExport = 'EXPORT';
+  static const String settingsImport = 'IMPORT';
+  static const String settingsExportNote =
+      'EXPORT COPIES YOUR TILES AND SETTINGS AS TEXT. IMPORT READS THEM BACK FROM THE CLIPBOARD.';
+  static const String settingsClearLayout = 'CLEAR LAYOUT';
+  static const String settingsResetSettings = 'RESET SETTINGS';
+  static const String settingsClipboardRefused = 'THE CLIPBOARD REFUSED IT.';
+  static const String settingsResetAsk =
+      'PUT EVERY SETTING BACK TO ITS DEFAULT?';
+  static String settingsExported(int tiles) =>
+      'COPIED $tiles ${tiles == 1 ? 'TILE' : 'TILES'} AND THE SETTINGS.';
+  static String settingsImported(int tiles) =>
+      'IMPORTED $tiles ${tiles == 1 ? 'TILE' : 'TILES'} AND THE SETTINGS.';
+  static String settingsImportAsk(int tiles, int skipped) =>
+      'REPLACE YOUR LAYOUT AND SETTINGS WITH $tiles ${tiles == 1 ? 'TILE' : 'TILES'} FROM THE CLIPBOARD?${skipped > 0 ? ' ($skipped COULD NOT BE READ.)' : ''}';
+  static String settingsClearAsk(int tiles) =>
+      'REMOVE ${tiles == 1 ? 'THE 1 TILE' : 'ALL $tiles TILES'} FROM HOME?';
+
   static const String textTvTitle = 'TEXT TV';
   static const String textTvTapToOpen = 'TAP TO OPEN';
   static const String textTvNotBroadcast = 'NOT IN BROADCAST.';

@@ -2,6 +2,7 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
@@ -116,7 +117,7 @@ class _SizeButton extends StatelessWidget {
           border: Border.all(color: TileColors.bezel, width: TileMetrics.bevel),
         ),
         child: Text(
-          '${size.columns}x${size.rows}',
+          '${size.spanIn(SettingsScope.of(context).columns)}x${size.rows}',
           style: Theme.of(context).textTheme.labelSmall
               ?.copyWith(color: selected ? C64.black : TileColors.textBright),
         ),
