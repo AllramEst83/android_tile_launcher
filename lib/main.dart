@@ -24,6 +24,7 @@ import 'services/flutter_secret_store.dart';
 import 'services/grid_state.dart';
 import 'services/imap_mail_service.dart';
 import 'services/io_http_fetcher.dart';
+import 'services/launch_stats.dart';
 import 'services/live_agenda_repository.dart';
 import 'services/live_contacts_repository.dart';
 import 'services/live_rates_repository.dart';
@@ -51,6 +52,8 @@ Future<void> main() async {
   await settingsState.load();
   final FirstRun firstRun = FirstRun(store: store);
   await firstRun.load();
+  final LaunchStats launchStats = LaunchStats(store: store);
+  await launchStats.load();
   final IoHttpFetcher fetcher = IoHttpFetcher();
 
   runApp(
@@ -59,6 +62,7 @@ Future<void> main() async {
       gridState: gridState,
       settingsState: settingsState,
       firstRun: firstRun,
+      launchStats: launchStats,
       services: TileServices(
         systemControl: const AndroidSystemControlService(),
         device: const AndroidDeviceRepository(),

@@ -11,6 +11,7 @@ import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/first_run.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/services/launch_stats.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/add_tile_sheet.dart';
@@ -37,6 +38,7 @@ class HomeShell extends StatefulWidget {
     required this.gridState,
     required this.services,
     this.firstRun,
+    this.launchStats,
   });
 
   final AppRepository appRepository;
@@ -46,6 +48,10 @@ class HomeShell extends StatefulWidget {
   /// When it says this is the first run, the boot screen plays its whole
   /// animation (and is remembered as seen). Without one, it never does.
   final FirstRun? firstRun;
+
+  /// When given, every launch from home or the drawer is counted, and the
+  /// most used apps are suggested on the add-tile sheet.
+  final LaunchStats? launchStats;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -80,6 +86,28 @@ class _HomeShellState extends State<HomeShell> {
     // Swallowed here: the FutureBuilder below is already watching `next` and
     // renders the error state itself once it completes.
     await next.then((_) {}, onError: (_) {});
+  }
+
+  void _launch(String packageName) {
+    unawaited(widget.launchStats?.record(packageName));
+    unawaited(widget.appRepository.launch(packageName));
+  }
+
+  /// The apps opened most that are not on home already, for "+ ADD TILE".
+  List<AppSuggestion> _suggestions(List<AppInfo> apps) {
+    final LaunchStats? stats = widget.launchStats;
+    if (stats == null) return const <AppSuggestion>[];
+    final Map<String, String> labels = <String, String>{
+      for (final AppInfo app in apps) app.packageName: app.label,
+    };
+    return <AppSuggestion>[
+      for (final String id in stats.mostUsed(
+        excluding: <String>{for (final p in widget.gridState.pinned) p.id},
+      ))
+        // An app since uninstalled has nothing to pin.
+        if (labels[id] case final String label)
+          (id: id, label: label.toUpperCase()),
+    ];
   }
 
   void _onBootDone() {
@@ -163,14 +191,15 @@ class _HomeShellState extends State<HomeShell> {
                             labelFor: labelFor,
                             gridState: widget.gridState,
                             services: widget.services,
-                            onLaunch: widget.appRepository.launch,
+                            onLaunch: _launch,
                             onRefresh: _refresh,
                             onGesture: _perform,
+                            suggestions: () => _suggestions(apps),
                           ),
                           AppDrawer(
                             apps: apps,
                             gridState: widget.gridState,
-                            onLaunch: widget.appRepository.launch,
+                            onLaunch: _launch,
                             onOpenDetails: widget.appRepository.openAppDetails,
                             onUninstall: widget.appRepository.uninstall,
                             searchFocus: _searchFocus,
@@ -203,6 +232,7 @@ class _HomePage extends StatefulWidget {
     required this.onLaunch,
     required this.onRefresh,
     required this.onGesture,
+    required this.suggestions,
   });
 
   final List<PinnedTile> pinned;
@@ -212,6 +242,7 @@ class _HomePage extends StatefulWidget {
   final ValueChanged<String> onLaunch;
   final Future<void> Function() onRefresh;
   final ValueChanged<GestureAction> onGesture;
+  final List<AppSuggestion> Function() suggestions;
 
   @override
   State<_HomePage> createState() => _HomePageState();
@@ -302,6 +333,7 @@ class _HomePageState extends State<_HomePage> {
         context,
         gridState: widget.gridState,
         contacts: widget.services.contacts,
+        suggestions: widget.suggestions(),
       ),
     );
   }

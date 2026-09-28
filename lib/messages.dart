@@ -31,6 +31,8 @@ abstract final class Messages {
 
   static const String addTile = '+ ADD TILE';
   static const String noTilesToAdd = 'NOTHING LEFT TO ADD.';
+  static const String addTileMostUsed = 'MOST USED';
+  static const String addTileOther = 'OTHER TILES';
 
   static const String weatherTitle = 'WEATHER';
   static const String weatherTapToLocate = 'TAP TO USE MY LOCATION';

@@ -1,12 +1,13 @@
-"""Builds the Android launcher icon from icons/tile_launcher_icon.jpg.
+"""Builds the Android launcher icon from icons/tile_launcher_icon.jpg and
+icons/bg/tile_launcher_bg_icon.jpg.
 
 The source is a JPEG of the four-tile mosaic and rainbow stripe on an off-white
 backdrop, so this first cuts the artwork out (flood-filling the light,
 colourless backdrop in from the edges, which also clears the white gaps in the
 stripe but leaves the pale highlights inside the tiles), then writes:
 
-  * an adaptive icon (Android 8+): the artwork as the foreground layer on a
-    solid C64-blue background colour, sized so that every opaque pixel sits
+  * an adaptive icon (Android 8+): the artwork as the foreground layer on the
+    scanline-blue background picture, sized so that every opaque pixel sits
     inside the guaranteed-safe circle and no launcher mask (circle, squircle,
     teardrop) can clip it;
   * a monochrome layer for themed icons (Android 13+): the artwork as a flat
@@ -26,9 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE = os.path.join(ROOT, 'icons', 'tile_launcher_icon.jpg')
 RES = os.path.join(ROOT, 'android', 'app', 'src', 'main', 'res')
 
-# The launcher's own C64 blue (C64.blue in lib/ui/theme.dart), so the icon and
-# the home screen agree.
-BACKGROUND = (0x2E, 0x2C, 0x9B)
+BACKGROUND_SOURCE = os.path.join(ROOT, 'icons', 'bg', 'tile_launcher_bg_icon.jpg')
 
 # Adaptive icons are drawn on a 108dp canvas; only the middle 72dp circle is
 # reliably visible, and 66dp is the guaranteed-safe circle. The farthest
@@ -136,6 +135,7 @@ def main():
     artwork = cut_out_artwork(Image.open(SOURCE))
     # Work in pixels of the (large) cut-out, scaled per density below.
     radius = farthest_pixel(artwork)
+    background = Image.open(BACKGROUND_SOURCE).convert('RGB')
 
     for name, density in DENSITIES.items():
         size = round(CANVAS_DP * density)
@@ -145,6 +145,11 @@ def main():
         # Adaptive foreground: 108dp, artwork only, transparent around it.
         foreground = centred(fitted, size, Image.new('RGBA', (size, size), (0, 0, 0, 0)))
         save(foreground, f'mipmap-{name}', 'ic_launcher_foreground.png')
+        save(
+            background.resize((size, size), Image.LANCZOS).convert('RGBA'),
+            f'mipmap-{name}',
+            'ic_launcher_background.png',
+        )
         save(
             centred(
                 silhouette(fitted),
@@ -163,7 +168,7 @@ def main():
             (0, 0, size * 4 - 1, size * 4 - 1), radius=size * 4 * 0.18, fill=255
         )
         square = square.resize((size, size), Image.LANCZOS)
-        colour = Image.new('RGBA', (size, size), BACKGROUND + (255,))
+        colour = background.resize((size, size), Image.LANCZOS).convert('RGBA')
         legacy.paste(colour, (0, 0), square)
         legacy = centred(
             scaled(artwork, size * LEGACY_HEIGHT / artwork.height), size, legacy
@@ -174,22 +179,14 @@ def main():
         os.path.join(RES, 'mipmap-anydpi-v26', 'ic_launcher.xml'),
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
-        '    <background android:drawable="@color/ic_launcher_background" />\n'
+        '    <background android:drawable="@mipmap/ic_launcher_background" />\n'
         '    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n'
         '    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />\n'
         '</adaptive-icon>\n',
     )
-    write(
-        os.path.join(RES, 'values', 'ic_launcher_background.xml'),
-        '<?xml version="1.0" encoding="utf-8"?>\n'
-        '<resources>\n'
-        '    <color name="ic_launcher_background">#%02X%02X%02X</color>\n'
-        '</resources>\n' % BACKGROUND,
-    )
-
     # A preview of the finished adaptive icon under a circle mask, for a look.
     preview_size = 432
-    preview = Image.new('RGBA', (preview_size, preview_size), BACKGROUND + (255,))
+    preview = background.resize((preview_size, preview_size), Image.LANCZOS).convert('RGBA')
     fitted = scaled(artwork, SAFE_RADIUS_DP * 4 / radius)
     centred(fitted, preview_size, preview)
     circle = Image.new('L', (preview_size * 2, preview_size * 2), 0)

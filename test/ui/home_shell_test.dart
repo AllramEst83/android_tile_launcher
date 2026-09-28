@@ -15,6 +15,7 @@ import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/first_run.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/services/launch_stats.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
@@ -89,6 +90,7 @@ Future<void> pumpShell(
   SettingsState? settingsState,
   FakeShadeService? shadeService,
   FirstRun? firstRun,
+  LaunchStats? launchStats,
 }) => tester.pumpWidget(
   SettingsScope(
     state: settingsState ?? SettingsState(store: InMemoryLocalStore()),
@@ -96,6 +98,7 @@ Future<void> pumpShell(
       theme: tileLauncherTheme(),
       home: HomeShell(
         firstRun: firstRun,
+        launchStats: launchStats,
         appRepository: repository,
         gridState: gridState ?? _gridState(),
         services: fakeTileServices(
@@ -1180,6 +1183,173 @@ void main() {
 
       expect(find.text(Messages.appListError), findsOneWidget);
       await tester.pumpAndSettle();
+    });
+  });
+  group('most used apps', () {
+    const List<AppInfo> apps = <AppInfo>[
+      AppInfo(label: 'Clock', packageName: 'pkg.clock'),
+      AppInfo(label: 'Maps', packageName: 'pkg.maps'),
+      AppInfo(label: 'Notes', packageName: 'pkg.notes'),
+    ];
+
+    Future<LaunchStats> statsWith(Map<String, int> counts) async {
+      final LaunchStats stats = LaunchStats(store: InMemoryLocalStore());
+      for (final MapEntry<String, int> e in counts.entries) {
+        for (int i = 0; i < e.value; i++) {
+          await stats.record(e.key);
+        }
+      }
+      return stats;
+    }
+
+    Future<void> openAddSheet(WidgetTester tester) async {
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('launching from the drawer counts, and still launches', (
+      WidgetTester tester,
+    ) async {
+      final FakeAppRepository repository = FakeAppRepository(apps: apps);
+      final LaunchStats stats = LaunchStats(store: InMemoryLocalStore());
+      await pumpShell(tester, repository, launchStats: stats);
+      await tester.pump();
+      await _swipeToDrawer(tester);
+
+      await tester.tap(_inDrawer(find.text('MAPS')));
+      await tester.pump();
+
+      expect(repository.launched, <String>['pkg.maps']);
+      expect(stats.countOf('pkg.maps'), 1);
+    });
+
+    testWidgets('launching from a home tile counts', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await gridState.pin('pkg.clock');
+      final FakeAppRepository repository = FakeAppRepository(apps: apps);
+      final LaunchStats stats = LaunchStats(store: InMemoryLocalStore());
+      await pumpShell(
+        tester,
+        repository,
+        gridState: gridState,
+        launchStats: stats,
+      );
+      await tester.pump();
+
+      await tester.tap(_onHome(find.text('CLOCK')));
+      await tester.pump();
+
+      expect(repository.launched, <String>['pkg.clock']);
+      expect(stats.countOf('pkg.clock'), 1);
+    });
+
+    testWidgets('+ ADD TILE offers the ones used most, most first', (
+      WidgetTester tester,
+    ) async {
+      final LaunchStats stats = await statsWith(<String, int>{
+        'pkg.maps': 5,
+        'pkg.notes': 9,
+        'pkg.clock': 1,
+      });
+      await pumpShell(
+        tester,
+        FakeAppRepository(apps: apps),
+        launchStats: stats,
+      );
+      await tester.pump();
+
+      await openAddSheet(tester);
+
+      expect(find.text(Messages.addTileMostUsed), findsOneWidget);
+      expect(find.byKey(const ValueKey('suggest-pkg.notes')), findsOneWidget);
+      expect(find.byKey(const ValueKey('suggest-pkg.maps')), findsOneWidget);
+      // Once is not a habit.
+      expect(find.byKey(const ValueKey('suggest-pkg.clock')), findsNothing);
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('suggest-pkg.notes'))).dy,
+        lessThan(
+          tester.getTopLeft(find.byKey(const ValueKey('suggest-pkg.maps'))).dy,
+        ),
+      );
+      // The other tile kinds are still there below them.
+      expect(find.text(Messages.addTileOther), findsOneWidget);
+    });
+
+    testWidgets('tapping one pins that app', (WidgetTester tester) async {
+      final GridState gridState = _gridState();
+      final LaunchStats stats = await statsWith(<String, int>{'pkg.maps': 4});
+      await pumpShell(
+        tester,
+        FakeAppRepository(apps: apps),
+        gridState: gridState,
+        launchStats: stats,
+      );
+      await tester.pump();
+      await openAddSheet(tester);
+
+      await tester.tap(find.byKey(const ValueKey('suggest-pkg.maps')));
+      await tester.pumpAndSettle();
+
+      expect(gridState.isPinned('pkg.maps'), isTrue);
+      expect(_onHome(find.text('MAPS')), findsOneWidget);
+    });
+
+    testWidgets('an app already on home is not suggested', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await gridState.pin('pkg.maps');
+      final LaunchStats stats = await statsWith(<String, int>{
+        'pkg.maps': 9,
+        'pkg.notes': 3,
+      });
+      await pumpShell(
+        tester,
+        FakeAppRepository(apps: apps),
+        gridState: gridState,
+        launchStats: stats,
+      );
+      await tester.pump();
+
+      await openAddSheet(tester);
+
+      expect(find.byKey(const ValueKey('suggest-pkg.maps')), findsNothing);
+      expect(find.byKey(const ValueKey('suggest-pkg.notes')), findsOneWidget);
+    });
+
+    testWidgets('an app that has since been uninstalled is not suggested', (
+      WidgetTester tester,
+    ) async {
+      final LaunchStats stats = await statsWith(<String, int>{'pkg.gone': 9});
+      await pumpShell(
+        tester,
+        FakeAppRepository(apps: apps),
+        launchStats: stats,
+      );
+      await tester.pump();
+
+      await openAddSheet(tester);
+
+      expect(find.text(Messages.addTileMostUsed), findsNothing);
+      expect(find.text(Messages.addTileOther), findsNothing);
+    });
+
+    testWidgets('without any habits the sheet is as it was', (
+      WidgetTester tester,
+    ) async {
+      await pumpShell(
+        tester,
+        FakeAppRepository(apps: apps),
+        launchStats: LaunchStats(store: InMemoryLocalStore()),
+      );
+      await tester.pump();
+
+      await openAddSheet(tester);
+
+      expect(find.text(Messages.addTileMostUsed), findsNothing);
+      expect(find.text(Messages.addTileOther), findsNothing);
     });
   });
 }

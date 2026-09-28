@@ -5,18 +5,24 @@ import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/ui/contact_picker.dart';
+import 'package:android_tile_launcher/ui/grouped_list.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
+
+/// An app offered on the add-tile sheet: its package name and what it is called.
+typedef AppSuggestion = ({String id, String label});
 
 /// The sheet behind home's "+ ADD TILE": every system tile kind not already
 /// pinned (there is at most one of each — a second clock would show the same
 /// time). Tapping one pins it via [GridState.pinSystemTile] and closes.
 /// CONTACT is always offered (one tile per person) and opens the contact
-/// picker instead of pinning at once.
+/// picker instead of pinning at once. [suggestions] are apps the user opens
+/// often and has not pinned, offered first under MOST USED; tapping one pins it.
 Future<void> showAddTileSheet(
   BuildContext context, {
   required GridState gridState,
   required ContactsRepository contacts,
+  List<AppSuggestion> suggestions = const <AppSuggestion>[],
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -31,7 +37,11 @@ Future<void> showAddTileSheet(
               (kind == TileKind.contact || !gridState.isPinned(kind.name)))
             kind,
       ];
-      if (available.isEmpty) {
+      final List<AppSuggestion> offered = <AppSuggestion>[
+        for (final AppSuggestion s in suggestions)
+          if (!gridState.isPinned(s.id)) s,
+      ];
+      if (available.isEmpty && offered.isEmpty) {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(TileMetrics.margin),
@@ -47,6 +57,20 @@ Future<void> showAddTileSheet(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              if (offered.isNotEmpty) ...<Widget>[
+                const SectionHeader(initial: Messages.addTileMostUsed),
+                for (final AppSuggestion s in offered)
+                  _AddTileOption(
+                    key: ValueKey<String>('suggest-${s.id}'),
+                    label: s.label,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      unawaited(gridState.pin(s.id));
+                    },
+                  ),
+                if (available.isNotEmpty)
+                  const SectionHeader(initial: Messages.addTileOther),
+              ],
               for (final TileKind kind in available)
                 _AddTileOption(
                   label: displayNameOf(kind),
@@ -77,7 +101,7 @@ Future<void> showAddTileSheet(
 }
 
 class _AddTileOption extends StatelessWidget {
-  const _AddTileOption({required this.label, required this.onTap});
+  const _AddTileOption({super.key, required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
