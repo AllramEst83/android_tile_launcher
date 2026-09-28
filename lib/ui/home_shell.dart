@@ -227,7 +227,13 @@ class _HomePageState extends State<_HomePage> {
   }
 
   void _addTile() {
-    unawaited(showAddTileSheet(context, gridState: widget.gridState));
+    unawaited(
+      showAddTileSheet(
+        context,
+        gridState: widget.gridState,
+        contacts: widget.services.contacts,
+      ),
+    );
   }
 
   @override
@@ -253,7 +259,9 @@ class _HomePageState extends State<_HomePage> {
             ),
           ),
           TileInspector(
-            label: selectedTile == null ? '' : widget.labelFor(selectedTile.id),
+            label: selectedTile == null
+                ? ''
+                : selectedTile.label ?? widget.labelFor(selectedTile.id),
             tile: selectedTile,
             onApply: _applyEditing,
             onSizeSelected: _resize,
@@ -287,7 +295,7 @@ class _HomePageState extends State<_HomePage> {
         Expanded(
           child: AppTileGrid(
             tiles: [for (final PinnedTile p in widget.pinned) p.toTile()],
-            labelFor: (Tile tile) => widget.labelFor(tile.id),
+            labelFor: (Tile tile) => tile.label ?? widget.labelFor(tile.id),
             services: widget.services,
             emptyMessage: Messages.nothingPinned,
             onLaunch: widget.onLaunch,

@@ -10,6 +10,12 @@
          more, and precise location is never requested. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Contact tiles: read the phone book. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Asked for only when CALL is tapped; refused, the dialer opens instead. -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- Asked for only when SEND is tapped on a message the user typed. -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
 
     <!-- Lets the silent-mode/vibration-mode tiles query and (once the user
          grants Do-Not-Disturb access via Settings) set the ringer mode. -->

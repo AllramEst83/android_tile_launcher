@@ -199,7 +199,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
       colour: tile.colour,
       content: tileContent(
         tile,
-        labelFor: (t) => widget.labelFor(t.id),
+        labelFor: (t) => t.label ?? widget.labelFor(t.id),
         services: widget.services,
         interactive: false,
       ),

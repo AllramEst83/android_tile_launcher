@@ -11,6 +11,7 @@ class PinnedTile {
     required this.size,
     required this.colour,
     this.kind = TileKind.app,
+    this.label,
   });
 
   /// A freshly-pinned app tile's starting size and colour: always small,
@@ -22,6 +23,21 @@ class PinnedTile {
         size: TileSize.small,
         colour: pinnableColours[index % pinnableColours.length],
       );
+
+  /// A freshly-pinned contact tile: small, like an app's, carrying the person's
+  /// [name] so it can be drawn (and labelled in the editor) without the phone
+  /// book. Cycles colour the same way.
+  factory PinnedTile.contact({
+    required String key,
+    required String name,
+    required int index,
+  }) => PinnedTile(
+    id: contactTileId(key),
+    kind: TileKind.contact,
+    size: TileSize.small,
+    colour: pinnableColours[index % pinnableColours.length],
+    label: name,
+  );
 
   /// A freshly-pinned system tile (anything but [TileKind.app]): wide, so an
   /// oversized numeral has room, cycling colour the same way an app tile
@@ -43,20 +59,26 @@ class PinnedTile {
   final TileSize size;
   final C64Colour colour;
 
+  /// See [Tile.label].
+  final String? label;
+
   PinnedTile copyWith({TileSize? size, C64Colour? colour}) => PinnedTile(
     id: id,
     kind: kind,
     size: size ?? this.size,
     colour: colour ?? this.colour,
+    label: label,
   );
 
-  Tile toTile() => Tile(id: id, kind: kind, size: size, colour: colour);
+  Tile toTile() =>
+      Tile(id: id, kind: kind, size: size, colour: colour, label: label);
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
     'kind': kind.name,
     'size': size.name,
     'colour': colour.name,
+    'label': ?label,
   };
 
   /// `null` for anything malformed — a bad entry is dropped, not fatal.
@@ -69,7 +91,14 @@ class PinnedTile {
     if (id is! String || kind == null || size == null || colour == null) {
       return null;
     }
-    return PinnedTile(id: id, kind: kind, size: size, colour: colour);
+    final Object? label = json['label'];
+    return PinnedTile(
+      id: id,
+      kind: kind,
+      size: size,
+      colour: colour,
+      label: label is String ? label : null,
+    );
   }
 
   @override
@@ -78,10 +107,11 @@ class PinnedTile {
       other.id == id &&
       other.kind == kind &&
       other.size == size &&
-      other.colour == colour;
+      other.colour == colour &&
+      other.label == label;
 
   @override
-  int get hashCode => Object.hash(id, kind, size, colour);
+  int get hashCode => Object.hash(id, kind, size, colour, label);
 
   @override
   String toString() => 'PinnedTile($id, $kind, $size, $colour)';

@@ -159,4 +159,49 @@ void main() {
       );
     });
   });
+
+  group('PinnedTile.contact', () {
+    test('starts small, keyed by the person, carrying their name', () {
+      final tile = PinnedTile.contact(key: 'k1', name: 'Anna', index: 0);
+
+      expect(tile.size, TileSize.small);
+      expect(tile.kind, TileKind.contact);
+      expect(tile.id, 'contact:k1');
+      expect(tile.label, 'Anna');
+      expect(tile.toTile().label, 'Anna');
+      expect(contactKeyOf(tile.toTile()), 'k1');
+    });
+
+    test('the label round-trips through JSON, and is optional', () {
+      final tile = PinnedTile.contact(key: 'k1', name: 'Anna', index: 2);
+
+      expect(PinnedTile.fromJson(tile.toJson()), tile);
+      expect(
+        PinnedTile.fromJson({
+          'id': 'pkg.clock',
+          'kind': 'app',
+          'size': 'small',
+          'colour': 'red',
+        })?.label,
+        isNull,
+      );
+      expect(
+        PinnedTile.app(packageName: 'a', index: 0).toJson(),
+        isNot(contains('label')),
+      );
+    });
+
+    test('copyWith keeps the label', () {
+      final tile = PinnedTile.contact(key: 'k1', name: 'Anna', index: 0);
+
+      expect(tile.copyWith(size: TileSize.wide).label, 'Anna');
+    });
+
+    test('only a contact tile has a contact key', () {
+      expect(
+        contactKeyOf(PinnedTile.app(packageName: 'a', index: 0).toTile()),
+        isNull,
+      );
+    });
+  });
 }

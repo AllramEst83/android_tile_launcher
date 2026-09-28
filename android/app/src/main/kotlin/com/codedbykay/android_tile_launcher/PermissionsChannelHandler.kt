@@ -110,11 +110,16 @@ class PermissionsChannelHandler(
 
         // Coarse is all a forecast needs, so precise location is never asked for
         // (and is not declared in the manifest). More capabilities arrive with
-        // the phases that need them (contacts, ...).
+        // the phases that need them.
         private val PERMISSIONS = mapOf(
             "location" to arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
             // Read only: the agenda tile shows events, it never changes them.
             "calendar" to arrayOf(Manifest.permission.READ_CALENDAR),
+            // A contact tile reads the phone book; calling and texting are asked
+            // for only when CALL or SEND is tapped.
+            "contacts" to arrayOf(Manifest.permission.READ_CONTACTS),
+            "phone" to arrayOf(Manifest.permission.CALL_PHONE),
+            "sms" to arrayOf(Manifest.permission.SEND_SMS),
         )
     }
 }

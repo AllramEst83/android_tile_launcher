@@ -1,11 +1,12 @@
-import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/ui/add_tile_sheet.dart';
+import 'package:android_tile_launcher/ui/contact_picker.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../fakes/fake_contacts.dart';
 import '../fakes/in_memory_local_store.dart';
 
 GridState _gridState() => GridState(store: InMemoryLocalStore());
@@ -17,7 +18,11 @@ Future<void> _open(WidgetTester tester, GridState gridState) async {
       home: Scaffold(
         body: Builder(
           builder: (context) => TextButton(
-            onPressed: () => showAddTileSheet(context, gridState: gridState),
+            onPressed: () => showAddTileSheet(
+              context,
+              gridState: gridState,
+              contacts: FakeContactsRepository(),
+            ),
             child: const Text('open'),
           ),
         ),
@@ -61,11 +66,32 @@ void main() {
   ) async {
     final GridState gridState = _gridState();
     for (final TileKind kind in TileKind.values) {
-      if (kind != TileKind.app) await gridState.pinSystemTile(kind);
+      if (kind != TileKind.app && kind != TileKind.contact) {
+        await gridState.pinSystemTile(kind);
+      }
     }
 
     await _open(tester, gridState);
 
-    expect(find.text(Messages.noTilesToAdd), findsOneWidget);
+    // Every system tile is pinned; only CONTACT is still on offer.
+    expect(find.text('CLOCK'), findsNothing);
+    expect(find.text('SOUND'), findsNothing);
+    expect(find.text('CONTACT'), findsOneWidget);
+  });
+
+  testWidgets('CONTACT is always offered, and opens the picker', (
+    WidgetTester tester,
+  ) async {
+    final GridState gridState = _gridState();
+    await gridState.pinContact(key: 'k0', name: 'Someone Else');
+
+    await _open(tester, gridState);
+    expect(find.text('CONTACT'), findsOneWidget);
+    await tester.tap(find.text('CONTACT'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(contactSearchKey), findsOneWidget);
+    // Nothing was pinned by choosing the kind itself.
+    expect(gridState.pinned, hasLength(1));
   });
 }

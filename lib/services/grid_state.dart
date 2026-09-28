@@ -59,6 +59,13 @@ class GridState extends ChangeNotifier {
   Future<void> pinSystemTile(TileKind kind) =>
       _add(() => PinnedTile.system(kind: kind, index: _pinned.length));
 
+  /// Pins the contact with lookup [key], remembering [name] to draw it with,
+  /// and saves. One tile per person; pinning one already pinned changes
+  /// nothing. Same failure contract as [pin].
+  Future<void> pinContact({required String key, required String name}) => _add(
+    () => PinnedTile.contact(key: key, name: name, index: _pinned.length),
+  );
+
   Future<void> _add(PinnedTile Function() tile) {
     final PinnedTile next = tile();
     if (isPinned(next.id)) return Future<void>.value();

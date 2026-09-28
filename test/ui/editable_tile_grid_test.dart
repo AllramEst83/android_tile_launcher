@@ -7,17 +7,9 @@ import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../fakes/fake_agenda_repository.dart';
-import '../fakes/fake_device_repository.dart';
-import '../fakes/fake_system_control_service.dart';
-import '../fakes/fake_weather_repository.dart';
+import '../fakes/fake_tile_services.dart';
 
-final TileServices _services = TileServices(
-  systemControl: FakeSystemControlService(),
-  device: FakeDeviceRepository(),
-  weather: FakeWeatherRepository(),
-  agenda: FakeAgendaRepository(),
-);
+final TileServices _services = fakeTileServices();
 
 /// [count] tiles of [size]. Large ones are a full grid width square, so a few
 /// of them are far taller than the viewport the tests give them.

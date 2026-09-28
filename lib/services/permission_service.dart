@@ -1,8 +1,9 @@
 /// What a feature may need Android's permission for. One entry per capability
 /// (not per manifest string), so a feature never names an Android permission;
 /// `PermissionsChannelHandler.kt` maps each to the real one(s). More arrive
-/// with the phases that need them (contacts, ...). `calendar` is read access.
-enum AppPermission { location, calendar }
+/// with the phases that need them. `calendar` is read access; `phone` is placing
+/// a call and `sms` sending a text.
+enum AppPermission { location, calendar, contacts, phone, sms }
 
 enum PermissionStatus {
   granted,

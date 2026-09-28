@@ -2,6 +2,7 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
@@ -10,12 +11,13 @@ import 'package:android_tile_launcher/model/weather.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
-import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
+import 'package:android_tile_launcher/ui/contact_picker.dart';
+import 'package:android_tile_launcher/ui/contact_sheet.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
@@ -27,8 +29,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_agenda_repository.dart';
 import '../fakes/fake_app_repository.dart';
+import '../fakes/fake_contacts.dart';
 import '../fakes/fake_device_repository.dart';
 import '../fakes/fake_system_control_service.dart';
+import '../fakes/fake_tile_services.dart';
 import '../fakes/fake_weather_repository.dart';
 import '../fakes/in_memory_local_store.dart';
 
@@ -51,17 +55,25 @@ Future<void> pumpShell(
   FakeDeviceRepository? deviceRepository,
   FakeWeatherRepository? weatherRepository,
   FakeAgendaRepository? agendaRepository,
+  FakeContactsRepository? contactsRepository,
+  FakePhoneService? phoneService,
+  FakeSmsService? smsService,
+  FakeWhatsAppService? whatsAppService,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
     home: HomeShell(
       appRepository: repository,
       gridState: gridState ?? _gridState(),
-      services: TileServices(
-        systemControl: systemControlService ?? FakeSystemControlService(),
-        device: deviceRepository ?? FakeDeviceRepository(),
-        weather: weatherRepository ?? FakeWeatherRepository(),
-        agenda: agendaRepository ?? FakeAgendaRepository(),
+      services: fakeTileServices(
+        systemControl: systemControlService,
+        device: deviceRepository,
+        weather: weatherRepository,
+        agenda: agendaRepository,
+        contacts: contactsRepository,
+        phone: phoneService,
+        sms: smsService,
+        whatsApp: whatsAppService,
       ),
     ),
   ),
@@ -553,6 +565,94 @@ void main() {
         _onHome(find.text(Messages.agendaAllowInSettings)),
         findsOneWidget,
       );
+    });
+
+    testWidgets('pinning a contact from ADD TILE puts their tile on home', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        contactsRepository: FakeContactsRepository(<Contact>[
+          const Contact(
+            key: 'k1',
+            name: 'Anna Andersson',
+            numbers: <PhoneNumber>[PhoneNumber('070-123 45 67', 'MOBILE')],
+          ),
+        ]),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CONTACT'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(contactRowKey('k1')));
+      await tester.pumpAndSettle();
+
+      expect(gridState.isPinned(contactTileId('k1')), isTrue);
+      expect(_onHome(find.text('ANNA ANDERSSON')), findsOneWidget);
+    });
+
+    testWidgets('a contact tile opens its sheet, and does nothing by itself', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await gridState.pinContact(key: 'k1', name: 'Anna Andersson');
+      final FakePhoneService phone = FakePhoneService();
+      final FakeSmsService sms = FakeSmsService();
+      final FakeWhatsAppService whatsApp = FakeWhatsAppService();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        contactsRepository: FakeContactsRepository(<Contact>[
+          const Contact(
+            key: 'k1',
+            name: 'Anna Andersson',
+            numbers: <PhoneNumber>[PhoneNumber('070-123 45 67', 'MOBILE')],
+          ),
+        ]),
+        phoneService: phone,
+        smsService: sms,
+        whatsAppService: whatsApp,
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.text('ANNA ANDERSSON')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(contactCallKey), findsOneWidget);
+      expect(phone.called, isEmpty);
+      expect(sms.sent, isEmpty);
+      expect(whatsApp.opened, isEmpty);
+
+      await tester.tap(find.byKey(contactCallKey));
+      await tester.pumpAndSettle();
+
+      expect(phone.called, <String>['0701234567']);
+    });
+
+    testWidgets('a contact tile is labelled by name in the grid editor', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await gridState.pinContact(key: 'k1', name: 'Anna Andersson');
+      await pumpShell(tester, FakeAppRepository(), gridState: gridState);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      await tester.longPress(_onHome(find.text('ANNA ANDERSSON')));
+      await tester.pumpAndSettle();
+
+      // In the editor a tap selects the tile (the inspector names it), and
+      // never opens the sheet.
+      expect(_inEditor(find.text('ANNA ANDERSSON')), findsOneWidget);
+      expect(find.byKey(contactCallKey), findsNothing);
+      expect(find.text('ANNA ANDERSSON'), findsWidgets);
     });
 
     testWidgets('tapping the sound tile cycles normal, vibrate, silent', (

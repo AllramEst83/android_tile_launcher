@@ -244,4 +244,45 @@ void main() {
       expect(state.pinned.map((p) => p.id), ['pkg.clock', 'clock']);
     });
   });
+
+  group('pinContact', () {
+    test(
+      'adds a small tile per person, carrying the name, and saves',
+      () async {
+        final InMemoryLocalStore store = InMemoryLocalStore();
+        final GridState state = _state(store);
+
+        await state.pinContact(key: 'k1', name: 'Anna');
+
+        final PinnedTile tile = state.pinned.single;
+        expect(tile.kind, TileKind.contact);
+        expect(tile.id, contactTileId('k1'));
+        expect(tile.size, TileSize.small);
+        expect(tile.label, 'Anna');
+        expect(state.isPinned(contactTileId('k1')), isTrue);
+        expect(store.writes, 1);
+      },
+    );
+
+    test('two people are two tiles; the same person twice is one', () async {
+      final GridState state = _state(InMemoryLocalStore());
+
+      await state.pinContact(key: 'k1', name: 'Anna');
+      await state.pinContact(key: 'k2', name: 'Bo');
+      await state.pinContact(key: 'k1', name: 'Anna');
+
+      expect(state.pinned.map((p) => p.label), <String?>['Anna', 'Bo']);
+    });
+
+    test('the name survives a restart', () async {
+      final InMemoryLocalStore store = InMemoryLocalStore();
+      await _state(store).pinContact(key: 'k1', name: 'Anna');
+
+      final GridState restarted = _state(store);
+      await restarted.load();
+
+      expect(restarted.pinned.single.label, 'Anna');
+      expect(restarted.pinned.single.id, contactTileId('k1'));
+    });
+  });
 }

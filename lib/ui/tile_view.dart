@@ -19,6 +19,7 @@ import 'package:android_tile_launcher/services/weather_tile_source.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
+import 'package:android_tile_launcher/ui/contact_sheet.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -165,6 +166,28 @@ Widget tileContent(
                 : null,
           );
         },
+      );
+    case TileKind.contact:
+      final Widget person = AppTileContent(
+        label: labelFor(tile),
+        ink: tile.colour.ink,
+      );
+      final String? key = contactKeyOf(tile);
+      if (!interactive || key == null) return person;
+      // Opens the person's sheet; nothing is dialled or sent by this tap.
+      return Builder(
+        builder: (context) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => unawaited(
+            showContactSheet(
+              context,
+              services: services,
+              contactKey: key,
+              name: labelFor(tile),
+            ),
+          ),
+          child: SizedBox.expand(child: person),
+        ),
       );
     case TileKind.soundMode:
       return TilePoller(

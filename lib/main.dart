@@ -6,13 +6,18 @@ import 'package:flutter/services.dart';
 import 'app.dart';
 import 'services/android_app_repository.dart';
 import 'services/android_calendar_service.dart';
+import 'services/android_contacts_service.dart';
 import 'services/android_device_repository.dart';
 import 'services/android_location_service.dart';
 import 'services/android_permission_service.dart';
+import 'services/android_phone_service.dart';
+import 'services/android_sms_service.dart';
 import 'services/android_system_control_service.dart';
+import 'services/android_whatsapp_service.dart';
 import 'services/grid_state.dart';
 import 'services/io_http_fetcher.dart';
 import 'services/live_agenda_repository.dart';
+import 'services/live_contacts_repository.dart';
 import 'services/live_weather_repository.dart';
 import 'services/shared_preferences_local_store.dart';
 import 'services/smhi.dart';
@@ -46,6 +51,15 @@ Future<void> main() async {
       services: TileServices(
         systemControl: const AndroidSystemControlService(),
         device: const AndroidDeviceRepository(),
+        contacts: const LiveContactsRepository(
+          contacts: AndroidContactsService(),
+          permissions: AndroidPermissionService(),
+        ),
+        phone: const AndroidPhoneService(
+          permissions: AndroidPermissionService(),
+        ),
+        sms: const AndroidSmsService(permissions: AndroidPermissionService()),
+        whatsApp: const AndroidWhatsAppService(),
         agenda: LiveAgendaRepository(
           calendar: const AndroidCalendarService(),
           permissions: const AndroidPermissionService(),

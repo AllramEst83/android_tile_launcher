@@ -13,11 +13,12 @@ lib/
   messages.dart              # user-facing strings
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
-    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed
+    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, contact, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed, contactTileId/contactKeyOf; Tile.label
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder
+    contact.dart             # PhoneNumber, Contact(key, name, numbers, preferredNumber), dialable, whatsAppNumber (default country code 46), findContact
     calendar_event.dart      # CalendarEvent: id, title, start/end (local; all-day = half-open dates), allDay, location
     agenda_snapshot.dart     # AgendaSnapshot (sealed): AgendaReady(events) / NeedsPermission / Denied(permanent) / Unavailable(reason)
     agenda_format.dart       # startOfDay/addDays, occursOn, groupByDay, nextEvent, formatDayHeading/formatWhen/formatSpan
@@ -56,12 +57,22 @@ lib/
     android_location_service.dart  # asks PermissionService for location, then the Kotlin channel
     permission_service.dart  # abstract: request(AppPermission) -> granted / denied / permanentlyDenied (only `location` so far)
     android_permission_service.dart  # MethodChannel implementation
+    contacts_service.dart    # abstract read-only: all() -> ContactsRead / ContactsNoAccess / ContactsDenied / ContactsUnavailable
+    android_contacts_service.dart  # MethodChannel implementation: rows grouped per lookup key, same number written two ways merged
+    contacts_repository.dart # abstract: all() — asks for READ_CONTACTS itself when there is no access (only called from a tap)
+    live_contacts_repository.dart  # LiveContactsRepository: ContactsService + PermissionService
+    phone_service.dart       # abstract: call(number) -> CallPlaced / DialerOpened / CallFailed
+    android_phone_service.dart  # asks for CALL_PHONE, falls back to the dialer when refused or for numbers apps may not call (emergency)
+    sms_service.dart         # abstract: send(number, text) -> SmsSent / SmsDenied / SmsFailed
+    android_sms_service.dart # asks for SEND_SMS; the Kotlin side reports the network's per-part answer
+    whatsapp_service.dart    # abstract: openChat(number) -> WhatsAppOpened / WhatsAppFailed (wa.me hand-off, no permission, opens only)
+    android_whatsapp_service.dart  # MethodChannel implementation
     calendar_service.dart    # abstract read-only: events(from, to) -> CalendarEvents / CalendarNoAccess / CalendarUnavailable; never asks for permission
     android_calendar_service.dart  # MethodChannel implementation: all-day UTC midnights -> local dates, range filter, sort
     agenda_repository.dart   # abstract: between(from, to) -> AgendaSnapshot; allow() asks for calendar access (tap only)
     live_agenda_repository.dart  # LiveAgendaRepository: CalendarService + PermissionService; remembers a refusal until a read succeeds
     agenda_tile_source.dart  # AgendaTileSource: now .. end of the 7th day, with the moment it read (AgendaContent.now)
-    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather, agenda), bundled
+    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather, agenda, contacts, phone, sms, whatsApp), bundled
     device_repository.dart   # abstract: Future<DeviceStatus> status(); never throws
     android_device_repository.dart  # MethodChannel implementation
     device_tile_source.dart  # DeviceTileSource: the repository's status as DeviceContent
@@ -75,6 +86,8 @@ lib/
     tile_view.dart           # chrome shell (fill, bevel/selection, delete badge) + tileContent(tile) dispatcher + AppTileContent
     tile_poller.dart         # TilePoller: rebuilds from a TileSource on an interval, paused while backgrounded; builder gets a refreshNow to re-read early
     clock_tile_view.dart     # ClockTileContentView: the clock's content -- time large, date small
+    contact_picker.dart      # showContactPicker: searchable phone book (Swedish order), tap pins the person; opening it asks for contacts
+    contact_sheet.dart       # showContactSheet: numbers + CALL / SMS / WHATSAPP; every action its own tap, a text typed and SENT
     agenda_tile_view.dart    # AgendaTileContentView: fits its size (small: when+title; medium: +place, +N more; wide: as many one-line events as the height holds)
     agenda_sheet.dart        # showAgendaSheet: DAY / WEEK toggle, events under a heading per day (opened by tapping a ready agenda tile)
     weather_tile_view.dart   # WeatherTileContentView: fits its size (small: sky+temp; medium: +words/place/source; wide: +5 days); states without a forecast say why
@@ -89,6 +102,10 @@ lib/
 android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   MainActivity.kt            # wires channel handlers into the Flutter engine
   AppsChannelHandler.kt      # list/launch/uninstall/openAppDetails; listing runs off the main thread
+  ContactsChannelHandler.kt  # phone numbers with their lookup key, sorted by name, off the main thread
+  PhoneChannelHandler.kt     # ACTION_CALL / ACTION_DIAL
+  SmsChannelHandler.kt       # SmsManager, replies only once the network accepted every part
+  WhatsAppChannelHandler.kt  # ACTION_VIEW on https://wa.me/<number>
   CalendarChannelHandler.kt  # read-only CalendarContract.Instances query (visible calendars, not cancelled), raw times, off the main thread
   LocationChannelHandler.kt  # coarse position from the network (else fused) provider, named by Android's geocoder when it can
   PermissionsChannelHandler.kt  # runtime permission requests; MainActivity forwards onRequestPermissionsResult
@@ -187,3 +204,9 @@ Record decisions that future agents can't derive from code (append, newest last)
 - The "SWIPE LEFT FOR ALL APPS" hint is its own row under the tile grid, not laid over it (it was a `Positioned` in a `Stack`). Found on the phone: once the tiles ran past the bottom of the screen they scrolled underneath the text. As a row, the grid ends where the hint begins, so nothing can pass beneath it. In the agenda sheet the hierarchy is size first, then colour: day heading 14 white with a 2px rule under it, hours 10 in cyan (the old light-blue was 706DEB on 2E2C9B, too dim to read), title 10 white, location 8 light grey. The dim grey and light-blue text colours are for chrome on the canvas, not for anything that has to be read on it.
 - Grid editor drag, reworked after the user found it hard to use on the phone ("not possible sometimes"). Three causes, all fixed: (1) `moveItem` followed `ReorderableListView` (moving forward lands *before* the target), so dropping a tile on its next neighbour was a no-op and no tile could be dropped last by dropping on the last one; it now always puts the moved item at the target's index, i.e. swaps neighbours. (2) A grid taller than the viewport could not be scrolled while dragging, so tiles below the fold were unreachable; a held tile within 96px of the top or bottom of the scrolling area now scrolls it (a 16 ms `Timer` in `EditableTileGrid`'s state, faster the closer to the edge, cancelled on drag end and dispose). Flutter's `EdgeDraggingAutoScroller` was rejected: it only scrolls once the drag has gone *past* the viewport edge, which here is the inspector panel. (3) `Draggable` started on the first pixel of movement, so a plain finger drag over the tiles (most of the canvas) could never scroll; it is a `LongPressDraggable` (200 ms hold) now. The tile a held one is over gets a 4px yellow frame (where it will land), and the ghost is held by its centre (`dragAnchorStrategy`) so the target is the tile under the middle of the ghost. Dropping on empty canvas still does nothing; to put a tile last, drop it on the last one.
 - Grid editor drop feedback changed to an insertion line at the user's request ("a line in between the destination tiles" rather than a frame that read as "replaces that tile"). The reorder is now `moveBeside(items, from, target, after)`, replacing `moveItem`: a held tile over the left half of a tile goes before it, over the right half after it, and a 6px yellow line in the gutter down that edge of the target shows which (`EditableTileGrid`, key `drop-line`; the `Stack` has `clipBehavior: Clip.none` so the line at the grid's outer edge is not cut). The order in the list is what the skyline packer lays out, so the tile lands where the packer puts it in that order, which is next to the target when there is room and on the next row otherwise. Two Flutter details found by the tests: `DragTarget.onMove` fires for *every* target under the finger, the held tile's own included (ignored by id), and the drag's `onDragUpdate` can arrive after a target's `onMove`, so the finger is derived from `details.offset` (the ghost's top-left) plus half the held tile's size (the ghost is anchored by its middle) rather than tracked separately.
+- Phase 11's contacts, phone, SMS and WhatsApp code is a port of the sibling's (`contacts_service`, `phone_service`, `sms_service`, `whatsapp_service` and their Kotlin handlers). Differences: the contacts service never asks for permission itself (`LiveContactsRepository` does, and is only called from a tap: choosing CONTACT in the add-tile sheet, or opening a contact tile); a person is identified by Android's lookup key, not merged by name; WhatsApp only opens the chat (no prefilled text). `PermissionService` gained `contacts`, `phone`, `sms`.
+- A contact tile is `TileKind.contact` with id `contact:<lookupKey>` (one per person, unlike a system kind, which is at most one) and carries the person's name as `PinnedTile.label` / `Tile.label`, persisted in the pinned-tiles JSON. The name is stored so the tile and the editor's inspector can be drawn without the phone book or its permission; numbers are never stored, they are read when the sheet opens, so a changed number is always current. If the key stops resolving (contacts merged) the sheet falls back to the stored name (`findContact`). `labelFor` callers prefer `tile.label` over the id lookup. The add-tile sheet always offers CONTACT and opens the picker instead of pinning.
+- "Anything that acts on a tap asks first", in this launcher: tapping the tile only opens the sheet, it never dials or sends. CALL, SMS and WHATSAPP are each their own button; SMS additionally needs text to be typed and SEND tapped, and the sheet shows the number an action will use (mobile preselected, the others selectable). Permissions are asked only when the action needs them: CALL_PHONE at CALL (refused, the dialer opens with the number instead, no dead end), SEND_SMS at SEND (refused is final: no fallback exists). SEND_SMS is a restricted permission on Google Play; the app is sideloaded, like the sibling.
+- WhatsApp needs the number international, digits only. `whatsAppNumber` turns `+46 70…` / `0046 70…` into `4670…` and a national `070…` into `4670…` using `defaultCountryCode` = 46 (Sweden, like the Swedish collation and SMHI); a later settings phase can make that a choice. Calls and texts go through the phone's own network as written and need none of this.
+- The contact picker orders by `alphabeticalKey` (Å Ä Ö after Z), as the app drawer does, rather than the provider's order, which put "Ärla" among the A's (seen on the emulator). The add-tile sheet became `isScrollControlled` with a scrolling column once it grew to seven rows and overflowed the default sheet height.
+- Testing contacts on the emulator: `content insert --uri content://com.android.contacts/raw_contacts --bind account_type:s:LOCAL --bind account_name:s:tiletest`, then `.../data` rows (mimetype `vnd.android.cursor.item/name` with `data1`, and `vnd.android.cursor.item/phone_v2` with `data1` = number, `data2` = 2 for mobile) for that `raw_contact_id`; delete with `content delete --uri 'content://com.android.contacts/raw_contacts?caller_is_syncadapter=true' --where "account_name='tiletest'"`. Refusing CALL_PHONE and checking `dumpsys activity activities | grep tel:` shows the `DIAL tel:` hand-off without placing a call; do not send real SMS or open WhatsApp from the emulator.

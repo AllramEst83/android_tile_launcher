@@ -47,4 +47,23 @@ abstract final class Messages {
   static const String agendaDay = 'DAY';
   static const String agendaWeek = 'WEEK';
   static const String agendaUntitled = '(NO TITLE)';
+
+  static const String contactSearch = 'SEARCH CONTACTS...';
+  static const String contactsLoading = 'LOADING...';
+  static const String contactsNone = 'NO CONTACTS WITH A NUMBER.';
+  static const String contactsNoMatch = 'NOBODY MATCHES.';
+  static const String contactsNotAllowed = 'CONTACTS NOT ALLOWED.';
+  static const String contactsAllowInSettings =
+      'ALLOW CONTACTS IN ANDROID SETTINGS';
+  static const String contactGone = 'NOT IN THE PHONE BOOK ANY MORE.';
+  static const String contactCall = 'CALL';
+  static const String contactSms = 'SMS';
+  static const String contactWhatsApp = 'WHATSAPP';
+  static const String contactSend = 'SEND';
+  static const String contactMessageHint = 'MESSAGE...';
+  static const String contactSending = 'SENDING...';
+  static const String contactSent = 'SENT.';
+  static const String smsNotAllowed = 'SMS NOT ALLOWED.';
+  static const String smsAllowInSettings = 'ALLOW SMS IN ANDROID SETTINGS';
+  static const String failedPrefix = 'FAILED: ';
 }

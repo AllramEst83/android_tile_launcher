@@ -10,6 +10,10 @@ class MainActivity : FlutterActivity() {
     private var permissionsChannel: PermissionsChannelHandler? = null
     private var locationChannel: LocationChannelHandler? = null
     private var calendarChannel: CalendarChannelHandler? = null
+    private var contactsChannel: ContactsChannelHandler? = null
+    private var phoneChannel: PhoneChannelHandler? = null
+    private var smsChannel: SmsChannelHandler? = null
+    private var whatsAppChannel: WhatsAppChannelHandler? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -22,6 +26,10 @@ class MainActivity : FlutterActivity() {
         permissionsChannel = PermissionsChannelHandler(this, messenger)
         locationChannel = LocationChannelHandler(applicationContext, messenger)
         calendarChannel = CalendarChannelHandler(applicationContext, messenger)
+        contactsChannel = ContactsChannelHandler(applicationContext, messenger)
+        phoneChannel = PhoneChannelHandler(applicationContext, messenger)
+        smsChannel = SmsChannelHandler(applicationContext, messenger)
+        whatsAppChannel = WhatsAppChannelHandler(applicationContext, messenger)
     }
 
     override fun onRequestPermissionsResult(
@@ -49,6 +57,14 @@ class MainActivity : FlutterActivity() {
         locationChannel = null
         calendarChannel?.dispose()
         calendarChannel = null
+        contactsChannel?.dispose()
+        contactsChannel = null
+        phoneChannel?.dispose()
+        phoneChannel = null
+        smsChannel?.dispose()
+        smsChannel = null
+        whatsAppChannel?.dispose()
+        whatsAppChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }
