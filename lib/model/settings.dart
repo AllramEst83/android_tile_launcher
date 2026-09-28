@@ -26,6 +26,22 @@ enum GridGap {
   final String label;
 }
 
+/// How large every text style in the launcher is drawn, as a multiplier on
+/// top of whatever the phone's own accessibility text size already asks for
+/// (so this setting only ever makes text bigger or smaller than that, never
+/// overrides it outright).
+enum FontScale {
+  small(0.9, 'SMALL'),
+  normal(1.0, 'NORMAL'),
+  large(1.15, 'LARGE'),
+  extraLarge(1.3, 'EXTRA LARGE');
+
+  const FontScale(this.factor, this.label);
+
+  final double factor;
+  final String label;
+}
+
 /// What a swipe on the home screen does.
 enum GestureAction {
   none('NOTHING'),
@@ -57,6 +73,7 @@ class LauncherSettings {
     this.theme = ThemeVariant.c64,
     this.columns = 4,
     this.gap = GridGap.normal,
+    this.fontScale = FontScale.normal,
     this.swipeDown = GestureAction.refreshApps,
     this.swipeUp = GestureAction.none,
     this.haptics = true,
@@ -69,6 +86,7 @@ class LauncherSettings {
   /// Columns on the home mosaic: 4 or 6.
   final int columns;
   final GridGap gap;
+  final FontScale fontScale;
 
   /// What pulling down at the top of home does, and what pushing up at the
   /// bottom of it does.
@@ -104,6 +122,7 @@ class LauncherSettings {
     ThemeVariant? theme,
     int? columns,
     GridGap? gap,
+    FontScale? fontScale,
     GestureAction? swipeDown,
     GestureAction? swipeUp,
     bool? haptics,
@@ -113,6 +132,7 @@ class LauncherSettings {
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
     gap: gap ?? this.gap,
+    fontScale: fontScale ?? this.fontScale,
     swipeDown: swipeDown ?? this.swipeDown,
     swipeUp: swipeUp ?? this.swipeUp,
     haptics: haptics ?? this.haptics,
@@ -124,6 +144,7 @@ class LauncherSettings {
     'theme': theme.name,
     'columns': columns,
     'gap': gap.name,
+    'fontScale': fontScale.name,
     'swipeDown': swipeDown.name,
     'swipeUp': swipeUp.name,
     'haptics': haptics,
@@ -161,6 +182,7 @@ class LauncherSettings {
           ? columns! as int
           : defaults.columns,
       gap: pick(GridGap.values, json['gap'], defaults.gap),
+      fontScale: pick(FontScale.values, json['fontScale'], defaults.fontScale),
       swipeDown: swipeDownChoices.contains(down) ? down : defaults.swipeDown,
       swipeUp: swipeUpChoices.contains(up) ? up : defaults.swipeUp,
       haptics: json['haptics'] is bool
@@ -181,6 +203,7 @@ class LauncherSettings {
       other.theme == theme &&
       other.columns == columns &&
       other.gap == gap &&
+      other.fontScale == fontScale &&
       other.swipeDown == swipeDown &&
       other.swipeUp == swipeUp &&
       other.haptics == haptics &&
@@ -192,6 +215,7 @@ class LauncherSettings {
     theme,
     columns,
     gap,
+    fontScale,
     swipeDown,
     swipeUp,
     haptics,
@@ -201,5 +225,5 @@ class LauncherSettings {
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons)';
 }

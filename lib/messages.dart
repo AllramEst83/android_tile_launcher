@@ -150,6 +150,10 @@ abstract final class Messages {
   static const String settingsGrid = 'GRID';
   static const String settingsColumns = 'COLUMNS';
   static const String settingsGap = 'GAP BETWEEN TILES';
+  static const String settingsTextSize = 'TEXT SIZE';
+  static const String settingsTextSizeNote =
+      'ON TOP OF THE PHONE\'S OWN TEXT SIZE, NOT INSTEAD OF IT.';
+  static const String settingsTextSizePreview = 'THE QUICK BROWN FOX';
   static const String settingsGestures = 'GESTURES';
   static const String settingsSwipeLeft = 'SWIPE LEFT ON HOME OPENS ALL APPS.';
   static const String settingsSwipeDown = 'SWIPE DOWN';
