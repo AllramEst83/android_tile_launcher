@@ -123,6 +123,33 @@ void main() {
     expect(inner.counts, hasLength(2));
   });
 
+  test('opening a message drops the kept listing, and passes it on', () async {
+    await mail.latest(count: 10);
+    inner.readResult = const MailReadGone();
+
+    final MailReadResult result = await mail.read(100, validity: 7);
+    await mail.latest(count: 10);
+
+    expect(result, isA<MailReadGone>());
+    expect(inner.reads, <(int, int?)>[(100, 7)]);
+    expect(inner.counts, hasLength(2));
+  });
+
+  test('marking a message drops the kept listing, and passes it on', () async {
+    await mail.latest(count: 10);
+
+    final MailMarkResult result = await mail.mark(
+      100,
+      read: false,
+      validity: 7,
+    );
+    await mail.latest(count: 10);
+
+    expect((result as MailMarked).read, isFalse);
+    expect(inner.marks, <(int, bool, int?)>[(100, false, 7)]);
+    expect(inner.counts, hasLength(2));
+  });
+
   test('setting up or forgetting an account drops it too', () async {
     await mail.latest(count: 10);
     await mail.setUp(email: 'a@b.se', host: 'imap.b.se', password: 'x');

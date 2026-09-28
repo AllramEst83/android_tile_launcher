@@ -88,6 +88,20 @@ abstract final class Messages {
   static const String mailConnect = 'CONNECT';
   static const String mailChecking = 'CHECKING...';
   static const String mailTrash = 'TRASH';
+  static const String mailBack = '< BACK';
+  static const String mailMarkRead = 'MARK AS READ';
+  static const String mailMarkUnread = 'MARK AS UNREAD';
+  static const String mailOpening = 'OPENING...';
+  static const String mailMarkedRead = 'MARKED AS READ.';
+  static const String mailMarkedUnread = 'MARKED AS UNREAD.';
+  static const String mailNotMarked = 'OPENED, BUT COULD NOT MARK IT READ.';
+  static const String mailFrom = 'FROM';
+  static const String mailDate = 'DATE';
+  static const String mailNoText = '(NOTHING TO SHOW: NO TEXT IN THIS MESSAGE)';
+  static const String mailCutOff =
+      '... CUT SHORT. OPEN IT IN YOUR MAIL APP FOR THE REST.';
+  static String mailAttachments(int n) =>
+      '$n ${n == 1 ? 'ATTACHMENT' : 'ATTACHMENTS'} NOT SHOWN.';
   static const String mailTrashAsk = 'MOVE TO TRASH?';
   static const String mailYes = 'YES';
   static const String mailNo = 'NO';

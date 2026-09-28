@@ -13,6 +13,10 @@ class FakeImapMessage {
     required this.address,
     this.name,
     this.seen = false,
+    this.text,
+    this.html,
+    this.raw,
+    this.size,
   });
 
   final int uid;
@@ -21,6 +25,47 @@ class FakeImapMessage {
   final String address;
   final String? name;
   final bool seen;
+
+  /// The plain text and/or HTML body of the message when it is fetched whole.
+  /// Both make a `multipart/alternative`; neither makes an empty text message.
+  final String? text;
+  final String? html;
+
+  /// The whole message exactly as it goes on the wire, instead of one built
+  /// from the fields above (for attachments and other odd shapes).
+  final String? raw;
+
+  /// What `RFC822.SIZE` says, instead of the real length of the message.
+  final int? size;
+
+  /// The message as sent: headers, a blank line and the body.
+  String rfc822() {
+    final custom = raw;
+    if (custom != null) return custom;
+    final subjectText = subject.length >= 2 && subject.startsWith('"')
+        ? subject.substring(1, subject.length - 1)
+        : (subject == 'NIL' ? '' : subject);
+    final from = name == null ? address : '$name <$address>';
+    final head =
+        'From: $from\r\n'
+        'To: kay@example.com\r\n'
+        'Subject: $subjectText\r\n'
+        'Date: $date\r\n'
+        'Message-ID: <$uid@example.com>\r\n'
+        'MIME-Version: 1.0\r\n';
+    final plain = text;
+    final markup = html;
+    if (plain != null && markup != null) {
+      return '${head}Content-Type: multipart/alternative; boundary="b1"\r\n\r\n'
+          '--b1\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n$plain\r\n'
+          '--b1\r\nContent-Type: text/html; charset=utf-8\r\n\r\n$markup\r\n'
+          '--b1--\r\n';
+    }
+    if (markup != null) {
+      return '${head}Content-Type: text/html; charset=utf-8\r\n\r\n$markup\r\n';
+    }
+    return '${head}Content-Type: text/plain; charset=utf-8\r\n\r\n${plain ?? ''}\r\n';
+  }
 }
 
 /// A small IMAP server on a local port, just enough for `ImapMailService` to
@@ -33,7 +78,11 @@ class FakeImapServer {
     required this.user,
     required this.password,
     List<FakeImapMessage> messages = const [],
-  }) : inbox = List.of(messages);
+  }) : inbox = List.of(messages) {
+    for (final message in messages) {
+      if (message.seen) seen.add(message.uid);
+    }
+  }
 
   final String user;
   final String password;
@@ -65,6 +114,13 @@ class FakeImapServer {
 
   /// The inbox's `UIDVALIDITY`.
   int uidValidity = 1;
+
+  /// The uids that carry `\Seen` now: it starts from the messages given, and a
+  /// `STORE` changes it.
+  final Set<int> seen = {};
+
+  /// Set to make the next `STORE` of `\Seen` fail with a server error.
+  bool failStoreSeen = false;
 
   /// Uids marked `\Deleted` by a `STORE`, until an `EXPUNGE` removes them.
   final Set<int> _deleted = {};
@@ -135,7 +191,7 @@ class FakeImapServer {
           '$tag OK [READ-WRITE] SELECT completed\r\n',
         );
       case 'STATUS':
-        final unseen = inbox.where((m) => !m.seen).length;
+        final unseen = inbox.where((m) => !seen.contains(m.uid)).length;
         socket.write(
           '* STATUS "INBOX" (UNSEEN $unseen)\r\n$tag OK STATUS completed\r\n',
         );
@@ -164,12 +220,28 @@ class FakeImapServer {
     final index = inbox.indexWhere((m) => m.uid == uid);
     switch (words[1].toUpperCase()) {
       case 'FETCH':
-        socket.write(
-          index < 0
-              ? '$tag OK UID FETCH completed\r\n'
-              : '* ${index + 1} FETCH (UID $uid)\r\n'
-                    '$tag OK UID FETCH completed\r\n',
-        );
+        if (index < 0) {
+          socket.write('$tag OK UID FETCH completed\r\n');
+          return;
+        }
+        final message = inbox[index];
+        final items = words.skip(3).join(' ').toUpperCase();
+        final flags = 'FLAGS (${seen.contains(uid) ? r'\Seen' : ''})';
+        final out = StringBuffer('* ${index + 1} FETCH (UID $uid');
+        if (items.contains('FLAGS')) out.write(' $flags');
+        if (items.contains('RFC822.SIZE')) {
+          out.write(
+            ' RFC822.SIZE ${message.size ?? utf8.encode(message.rfc822()).length}',
+          );
+        }
+        if (items.contains('ENVELOPE')) out.write(' ${_envelope(message)}');
+        if (items.contains('BODY.PEEK[]') || items.contains('BODY[]')) {
+          final whole = message.rfc822();
+          // A literal: its length in bytes, then exactly that many.
+          out.write(' BODY[] {${utf8.encode(whole).length}}\r\n$whole');
+        }
+        out.write(')\r\n');
+        socket.write('$out$tag OK UID FETCH completed\r\n');
       case 'MOVE':
         if (index < 0) {
           socket.write('$tag OK UID MOVE completed\r\n');
@@ -185,7 +257,19 @@ class FakeImapServer {
         if (index >= 0) trash.add(inbox[index]);
         socket.write('$tag OK UID COPY completed\r\n');
       case 'STORE':
-        if (uid != null && index >= 0) _deleted.add(uid);
+        final flags = words.skip(4).join(' ');
+        if (flags.contains(r'\Seen')) {
+          if (failStoreSeen) {
+            socket.write('$tag NO [SERVERBUG] cannot set flags\r\n');
+            return;
+          }
+          final adding = words[3].startsWith('+');
+          if (uid != null && index >= 0) {
+            adding ? seen.add(uid) : seen.remove(uid);
+          }
+        } else if (uid != null && index >= 0) {
+          _deleted.add(uid);
+        }
         socket.write('$tag OK UID STORE completed\r\n');
       case 'EXPUNGE':
         // Only what was asked for, as a real UIDPLUS server does.
@@ -199,13 +283,17 @@ class FakeImapServer {
     }
   }
 
-  String _fetchLine(int seq, FakeImapMessage m) {
+  String _envelope(FakeImapMessage m) {
     final at = m.address.split('@');
     final person =
         '(${m.name == null ? 'NIL' : '"${m.name}"'} NIL "${at[0]}" "${at[1]}")';
+    return 'ENVELOPE ("${m.date}" ${m.subject} ($person) ($person) ($person) '
+        'NIL NIL NIL NIL "<${m.uid}@example.com>")';
+  }
+
+  String _fetchLine(int seq, FakeImapMessage m) {
     return '* $seq FETCH (UID ${m.uid} '
-        'FLAGS (${m.seen ? r'\Seen' : ''}) '
-        'ENVELOPE ("${m.date}" ${m.subject} ($person) ($person) ($person) '
-        'NIL NIL NIL NIL "<${m.uid}@example.com>"))\r\n';
+        'FLAGS (${seen.contains(m.uid) ? r'\Seen' : ''}) '
+        '${_envelope(m)})\r\n';
   }
 }

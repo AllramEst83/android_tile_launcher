@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
@@ -40,12 +42,50 @@ MailMessages _inbox() => MailMessages(
   validity: 77,
 );
 
+MailOpened _opened(
+  int uid,
+  String from,
+  String subject, {
+  String text = 'Hello, this is the whole message.',
+  bool truncated = false,
+  int attachments = 0,
+  bool markedRead = true,
+  DateTime? date,
+}) => MailOpened(
+  MailBody(
+    uid: uid,
+    from: from,
+    subject: subject,
+    text: text,
+    truncated: truncated,
+    attachments: attachments,
+    markedRead: markedRead,
+    date: date,
+  ),
+);
+
 FakeMailService _service([MailResult? result]) =>
     FakeMailService(result ?? _inbox())
       ..saved = const MailAccountInfo(
         email: 'kay@gmail.com',
         host: 'imap.gmail.com',
-      );
+      )
+      ..readResults.addAll(<int, MailReadResult>{
+        12: _opened(
+          12,
+          'Anna Andersson',
+          'Lunch on Friday?',
+          text: 'Hi Kay,\n\nShall we have lunch on Friday?\n\nAnna',
+          date: DateTime(2026, 9, 28, 9, 5),
+        ),
+        11: _opened(11, 'Bo Berg', 'Invoice 42'),
+      });
+
+/// Opens message [uid] from the list into the reader pane.
+Future<void> _read(WidgetTester tester, int uid) async {
+  await tester.tap(find.byKey(mailMessageKey(uid)));
+  await tester.pumpAndSettle();
+}
 
 Future<void> _open(WidgetTester tester, FakeMailService mail) async {
   await tester.pumpWidget(
@@ -110,15 +150,357 @@ void main() {
     expect(mail.freshCalls, 2);
   });
 
+  group('reading a message', () {
+    testWidgets('tapping a message opens it in a pane, with its whole text', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+
+      await _read(tester, 12);
+
+      expect(find.byKey(mailReaderKey), findsOneWidget);
+      expect(find.text('ANNA ANDERSSON'), findsOneWidget);
+      expect(find.text('LUNCH ON FRIDAY?'), findsOneWidget);
+      expect(
+        tester.widget<SelectableText>(find.byKey(mailBodyKey)).data,
+        'Hi Kay,\n\nShall we have lunch on Friday?\n\nAnna',
+      );
+      // The list gives way to the pane.
+      expect(find.byKey(mailMessageKey(11)), findsNothing);
+      expect(find.byKey(mailRefreshKey), findsNothing);
+      expect(find.byKey(mailForgetKey), findsNothing);
+      expect(mail.reads, <(int, int?)>[(12, 77)]);
+    });
+
+    testWidgets('shows when it was sent', (WidgetTester tester) async {
+      await _open(tester, _service());
+
+      await _read(tester, 12);
+
+      expect(find.text('MON 28 SEP 09:05'), findsOneWidget);
+    });
+
+    testWidgets('says so while it is opening', (WidgetTester tester) async {
+      final FakeMailService mail = _service()..readGate = Completer<void>();
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+
+      expect(find.text(Messages.mailOpening), findsOneWidget);
+      expect(find.byKey(mailBodyKey), findsNothing);
+
+      mail.readGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text(Messages.mailOpening), findsNothing);
+      expect(find.byKey(mailBodyKey), findsOneWidget);
+    });
+
+    testWidgets('opening it marks it read in the list behind', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      expect(find.text('* ANNA ANDERSSON'), findsOneWidget);
+
+      await _read(tester, 12);
+      await tester.tap(find.byKey(mailBackKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text('* ANNA ANDERSSON'), findsNothing);
+      expect(find.text('ANNA ANDERSSON'), findsOneWidget);
+    });
+
+    testWidgets('BACK returns to the list', (WidgetTester tester) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailBackKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailReaderKey), findsNothing);
+      expect(find.byKey(mailMessageKey(11)), findsOneWidget);
+      expect(find.byKey(mailMessageKey(12)), findsOneWidget);
+    });
+
+    testWidgets('an empty message says there is nothing to show', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[11] = _opened(11, 'Bo Berg', 'Invoice 42', text: '');
+      await _open(tester, mail);
+
+      await _read(tester, 11);
+
+      expect(find.text(Messages.mailNoText), findsOneWidget);
+    });
+
+    testWidgets('says when the text was cut, and how many attachments', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[11] = _opened(
+        11,
+        'Bo Berg',
+        'Invoice 42',
+        truncated: true,
+        attachments: 2,
+      );
+      await _open(tester, mail);
+
+      await _read(tester, 11);
+
+      expect(find.text(Messages.mailCutOff), findsOneWidget);
+      expect(find.text(Messages.mailAttachments(2)), findsOneWidget);
+    });
+
+    testWidgets('one attachment is singular', (WidgetTester tester) async {
+      final FakeMailService mail = _service();
+      mail.readResults[11] = _opened(11, 'Bo', 'x', attachments: 1);
+      await _open(tester, mail);
+
+      await _read(tester, 11);
+
+      expect(find.text('1 ATTACHMENT NOT SHOWN.'), findsOneWidget);
+    });
+
+    testWidgets('a long message scrolls', (WidgetTester tester) async {
+      final FakeMailService mail = _service();
+      mail.readResults[11] = _opened(
+        11,
+        'Bo Berg',
+        'Invoice 42',
+        text: List<String>.generate(80, (int i) => 'Line number $i').join('\n'),
+      );
+      await _open(tester, mail);
+      await _read(tester, 11);
+
+      final ScrollableState scrollable = tester.state<ScrollableState>(
+        // The pane's own scrolling: the selectable text has one inside too.
+        find
+            .descendant(
+              of: find.byKey(mailReaderKey),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(scrollable.position.maxScrollExtent, greaterThan(0));
+      expect(scrollable.position.pixels, 0);
+
+      await tester.drag(find.byKey(mailReaderKey), const Offset(0, -400));
+      await tester.pump();
+
+      expect(scrollable.position.pixels, greaterThan(0));
+    });
+
+    testWidgets('a message that is gone is dropped from the list', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[11] = const MailReadGone();
+      await _open(tester, mail);
+
+      await _read(tester, 11);
+
+      expect(find.byKey(mailReaderKey), findsNothing);
+      expect(find.byKey(mailMessageKey(11)), findsNothing);
+      expect(find.byKey(mailMessageKey(12)), findsOneWidget);
+      expect(find.text(Messages.mailGone), findsOneWidget);
+    });
+
+    testWidgets('a failure to open says why, and BACK still works', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[11] = const MailReadFailed(
+        'this message is 30.0 MB, too big to show here',
+      );
+      await _open(tester, mail);
+
+      await _read(tester, 11);
+
+      expect(
+        find.text('THIS MESSAGE IS 30.0 MB, TOO BIG TO SHOW HERE'),
+        findsOneWidget,
+      );
+      expect(find.byKey(mailMarkKey), findsNothing);
+      expect(find.byKey(mailTrashKey), findsNothing);
+
+      await tester.tap(find.byKey(mailBackKey));
+      await tester.pumpAndSettle();
+      // Still unread: nothing was changed.
+      expect(find.byKey(mailMessageKey(11)), findsOneWidget);
+    });
+
+    testWidgets('an account that is not set up says to set it up', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[11] = const MailReadNotSetUp();
+      await _open(tester, mail);
+
+      await _read(tester, 11);
+
+      expect(find.text(Messages.mailTapToSetUp), findsOneWidget);
+    });
+
+    testWidgets('if only the marking failed, it is shown and says so', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        markedRead: false,
+      );
+      await _open(tester, mail);
+
+      await _read(tester, 12);
+
+      expect(find.byKey(mailBodyKey), findsOneWidget);
+      expect(find.text(Messages.mailNotMarked), findsOneWidget);
+      // And the list still shows it unread.
+      await tester.tap(find.byKey(mailBackKey));
+      await tester.pumpAndSettle();
+      expect(find.text('* ANNA ANDERSSON'), findsOneWidget);
+    });
+  });
+
+  group('mark as read or unread', () {
+    testWidgets('an opened message offers MARK AS UNREAD, beside TRASH', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+
+      await _read(tester, 12);
+
+      expect(find.text(Messages.mailMarkUnread), findsOneWidget);
+      expect(find.text(Messages.mailMarkRead), findsNothing);
+      expect(find.byKey(mailTrashKey), findsOneWidget);
+    });
+
+    testWidgets('with room between the two buttons, on one row', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      final Rect mark = tester.getRect(find.byKey(mailMarkKey));
+      final Rect trash = tester.getRect(find.byKey(mailTrashKey));
+
+      expect(mark.top, closeTo(trash.top, 1));
+      expect(trash.left - mark.right, greaterThanOrEqualTo(TileMetrics.margin));
+      expect(mark.left, lessThan(trash.left));
+    });
+
+    testWidgets('MARK AS UNREAD marks it unread and the button flips', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailMarkKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.marks, <(int, bool, int?)>[(12, false, 77)]);
+      expect(find.text(Messages.mailMarkedUnread), findsOneWidget);
+      expect(find.text(Messages.mailMarkRead), findsOneWidget);
+      expect(find.text(Messages.mailMarkUnread), findsNothing);
+    });
+
+    testWidgets('and MARK AS READ marks it read again: it toggles', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await _read(tester, 12);
+      await tester.tap(find.byKey(mailMarkKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(mailMarkKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.marks, <(int, bool, int?)>[(12, false, 77), (12, true, 77)]);
+      expect(find.text(Messages.mailMarkedRead), findsOneWidget);
+      expect(find.text(Messages.mailMarkUnread), findsOneWidget);
+    });
+
+    testWidgets('the list behind follows what was marked', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+      await tester.tap(find.byKey(mailMarkKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(mailBackKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text('* ANNA ANDERSSON'), findsOneWidget);
+    });
+
+    testWidgets('a failure changes nothing and says why', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service()
+        ..markResult = const MailMarkFailed('imap.gmail.com did not answer');
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailMarkKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('FAILED: IMAP.GMAIL.COM DID NOT ANSWER'),
+        findsOneWidget,
+      );
+      // Still the same wish: it is read, so it offers MARK AS UNREAD.
+      expect(find.text(Messages.mailMarkUnread), findsOneWidget);
+    });
+
+    testWidgets('a message that has gone is dropped', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service()
+        ..markResult = const MailMarkGone();
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailMarkKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailReaderKey), findsNothing);
+      expect(find.byKey(mailMessageKey(12)), findsNothing);
+      expect(find.text(Messages.mailGone), findsOneWidget);
+    });
+
+    testWidgets('a message that was unread and fails to mark on opening '
+        'offers MARK AS READ', (WidgetTester tester) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        markedRead: false,
+      );
+      await _open(tester, mail);
+
+      await _read(tester, 12);
+
+      expect(find.text(Messages.mailMarkRead), findsOneWidget);
+    });
+  });
+
   group('trash', () {
-    testWidgets('a message offers TRASH only once tapped', (
+    testWidgets('a message offers TRASH only once it is opened', (
       WidgetTester tester,
     ) async {
       await _open(tester, _service());
       expect(find.byKey(mailTrashKey), findsNothing);
 
-      await tester.tap(find.byKey(mailMessageKey(11)));
-      await tester.pump();
+      await _read(tester, 11);
 
       expect(find.byKey(mailTrashKey), findsOneWidget);
     });
@@ -128,8 +510,7 @@ void main() {
     ) async {
       final FakeMailService mail = _service();
       await _open(tester, mail);
-      await tester.tap(find.byKey(mailMessageKey(11)));
-      await tester.pump();
+      await _read(tester, 11);
 
       await tester.tap(find.byKey(mailTrashKey));
       await tester.pump();
@@ -141,8 +522,7 @@ void main() {
     testWidgets('NO backs out and moves nothing', (WidgetTester tester) async {
       final FakeMailService mail = _service();
       await _open(tester, mail);
-      await tester.tap(find.byKey(mailMessageKey(11)));
-      await tester.pump();
+      await _read(tester, 11);
       await tester.tap(find.byKey(mailTrashKey));
       await tester.pump();
 
@@ -151,16 +531,16 @@ void main() {
 
       expect(find.text(Messages.mailTrashAsk), findsNothing);
       expect(find.byKey(mailTrashKey), findsOneWidget);
+      expect(find.byKey(mailMarkKey), findsOneWidget);
       expect(mail.moves, isEmpty);
     });
 
     testWidgets(
-      'YES moves that message, with the inbox validity, and drops it',
+      'YES moves that message, with the inbox validity, and returns to the list',
       (WidgetTester tester) async {
         final FakeMailService mail = _service();
         await _open(tester, mail);
-        await tester.tap(find.byKey(mailMessageKey(11)));
-        await tester.pump();
+        await _read(tester, 11);
         await tester.tap(find.byKey(mailTrashKey));
         await tester.pump();
 
@@ -168,6 +548,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(mail.moves, <(int, int?)>[(11, 77)]);
+        expect(find.byKey(mailReaderKey), findsNothing);
         expect(find.byKey(mailMessageKey(11)), findsNothing);
         expect(find.byKey(mailMessageKey(12)), findsOneWidget);
         expect(find.text(Messages.mailMoved), findsOneWidget);
@@ -179,8 +560,7 @@ void main() {
     ) async {
       final FakeMailService mail = _service()..moveResult = const MailGone();
       await _open(tester, mail);
-      await tester.tap(find.byKey(mailMessageKey(11)));
-      await tester.pump();
+      await _read(tester, 11);
       await tester.tap(find.byKey(mailTrashKey));
       await tester.pump();
 
@@ -191,7 +571,7 @@ void main() {
       expect(find.text(Messages.mailGone), findsOneWidget);
     });
 
-    testWidgets('a failure keeps the message and says why', (
+    testWidgets('a failure keeps the message open and says why', (
       WidgetTester tester,
     ) async {
       final FakeMailService mail = _service()
@@ -199,15 +579,14 @@ void main() {
           'no Trash folder on imap.gmail.com',
         );
       await _open(tester, mail);
-      await tester.tap(find.byKey(mailMessageKey(11)));
-      await tester.pump();
+      await _read(tester, 11);
       await tester.tap(find.byKey(mailTrashKey));
       await tester.pump();
 
       await tester.tap(find.byKey(mailTrashYesKey));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(mailMessageKey(11)), findsOneWidget);
+      expect(find.byKey(mailReaderKey), findsOneWidget);
       expect(
         find.text('FAILED: NO TRASH FOLDER ON IMAP.GMAIL.COM'),
         findsOneWidget,

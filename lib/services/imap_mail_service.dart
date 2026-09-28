@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:android_tile_launcher/services/local_store_exception.dart';
 import 'package:android_tile_launcher/services/mail_account.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:enough_mail/enough_mail.dart'
     show
+        ContentDisposition,
         ImapClient,
         ImapException,
         MessageFlags,
@@ -27,6 +29,9 @@ class ImapMailService implements MailService {
   });
 
   final MailAccountStore _accounts;
+
+  /// The largest message [read] will fetch, in bytes.
+  static const int maxReadBytes = 8 * 1024 * 1024;
 
   /// TLS to the server. Only a test against a local server turns it off.
   final bool secure;
@@ -175,6 +180,110 @@ class ImapMailService implements MailService {
     };
   }
 
+  @override
+  Future<MailReadResult> read(int uid, {int? validity}) async {
+    final MailAccount? saved;
+    try {
+      saved = await _accounts.load();
+    } on LocalStoreException catch (error) {
+      return MailReadFailed(error.message);
+    }
+    if (saved == null) return const MailReadNotSetUp();
+
+    final outcome = await _session<MailReadResult>(saved, (client) async {
+      final inbox = await client.selectInbox();
+      if (validity != null && inbox.uidValidity != validity) {
+        return const MailReadFailed(
+          'the server renumbered the inbox; refresh the list',
+        );
+      }
+      final sequence = MessageSequence.fromId(uid, isUid: true);
+
+      // How big it is first, so a message with a huge attachment is not
+      // pulled down just to be looked at.
+      final sizes = await client.uidFetchMessages(
+        sequence,
+        '(UID FLAGS RFC822.SIZE)',
+        responseTimeout: timeout,
+      );
+      final sized = sizes.messages.firstOrNull;
+      if (sized == null) return const MailReadGone();
+      final size = sized.size;
+      if (size != null && size > maxReadBytes) {
+        final mb = (size / (1024 * 1024)).toStringAsFixed(1);
+        return MailReadFailed(
+          'this message is $mb MB, too big to show here; open it in your mail app',
+        );
+      }
+
+      // PEEK: reading it does not set \Seen by itself. That is done below, on
+      // purpose, so a message that fails to open is left as it was.
+      final fetched = await client.uidFetchMessages(
+        sequence,
+        '(UID FLAGS ENVELOPE BODY.PEEK[])',
+        responseTimeout: timeout,
+      );
+      final message = fetched.messages.firstOrNull;
+      final entry = message == null ? null : mailMessageFrom(message);
+      if (message == null || entry == null) return const MailReadGone();
+
+      var marked = true;
+      try {
+        await client.uidStore(
+          sequence,
+          [MessageFlags.seen],
+          action: StoreAction.add,
+          silent: true,
+        );
+      } on ImapException {
+        marked = false;
+      }
+      return MailOpened(mailBodyFrom(message, entry, markedRead: marked));
+    });
+    return switch (outcome) {
+      _Done(:final value) => value,
+      _Failed(:final reason) => MailReadFailed(reason),
+    };
+  }
+
+  @override
+  Future<MailMarkResult> mark(
+    int uid, {
+    required bool read,
+    int? validity,
+  }) async {
+    final MailAccount? saved;
+    try {
+      saved = await _accounts.load();
+    } on LocalStoreException catch (error) {
+      return MailMarkFailed(error.message);
+    }
+    if (saved == null) return const MailMarkNotSetUp();
+
+    final outcome = await _session<MailMarkResult>(saved, (client) async {
+      final inbox = await client.selectInbox();
+      if (validity != null && inbox.uidValidity != validity) {
+        return const MailMarkFailed(
+          'the server renumbered the inbox; refresh the list',
+        );
+      }
+      final sequence = MessageSequence.fromId(uid, isUid: true);
+      final present = await client.uidFetchMessages(sequence, '(UID)');
+      if (present.messages.isEmpty) return const MailMarkGone();
+      await client.uidStore(
+        sequence,
+        [MessageFlags.seen],
+        action: read ? StoreAction.add : StoreAction.remove,
+        silent: true,
+      );
+      return MailMarked(read: read);
+    });
+    return switch (outcome) {
+      _Done(:final value) => value,
+      _Failed(:final reason) => MailMarkFailed(reason),
+    };
+  }
+
   /// Connects, logs in, runs [body] and always hangs up. Every way it can go
   /// wrong is a [_Failed] with a sentence for the user; none contains the
   /// password.
@@ -286,5 +395,45 @@ MailMessage? mailMessageFrom(MimeMessage message) {
     subject: subject.trim(),
     date: sent?.toLocal(),
     unread: !message.isSeen,
+  );
+}
+
+/// [message] (fetched whole) as what the reader shows, given its list [entry]
+/// for who, when and what. The plain text part if there is one, else the
+/// readable text of the HTML part; tidied and cut at [mailTextLimit]. Kept apart
+/// from the network so it can be tested on its own.
+MailBody mailBodyFrom(
+  MimeMessage message,
+  MailMessage entry, {
+  bool markedRead = true,
+}) {
+  String raw = '';
+  try {
+    raw = message.decodeTextPlainPart() ?? '';
+    if (raw.trim().isEmpty) {
+      final html = message.decodeTextHtmlPart();
+      if (html != null) raw = plainTextFromHtml(html);
+    }
+  } on Object {
+    raw = '';
+  }
+  var attachments = 0;
+  try {
+    attachments = message
+        .findContentInfo(disposition: ContentDisposition.attachment)
+        .length;
+  } on Object {
+    attachments = 0;
+  }
+  final tidy = tidyMailText(raw);
+  return MailBody(
+    uid: entry.uid,
+    from: entry.from,
+    subject: entry.subject,
+    date: entry.date,
+    text: tidy.text,
+    truncated: tidy.truncated,
+    attachments: attachments,
+    markedRead: markedRead,
   );
 }

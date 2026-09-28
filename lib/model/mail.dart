@@ -23,6 +23,14 @@ class MailMessage {
   /// unreadable.
   final DateTime? date;
   final bool unread;
+
+  MailMessage copyWith({bool? unread}) => MailMessage(
+    uid: uid,
+    from: from,
+    subject: subject,
+    date: date,
+    unread: unread ?? this.unread,
+  );
 }
 
 sealed class MailResult {
@@ -92,6 +100,95 @@ class MailMoveNotSetUp extends MailMoveResult {
 /// Nothing was changed; [reason] is short and printable.
 class MailMoveFailed extends MailMoveResult {
   const MailMoveFailed(this.reason);
+
+  final String reason;
+}
+
+/// One message in full, as far as this launcher shows one: who, when, what,
+/// and its text (plain text, or the readable part of an HTML-only message).
+/// Attachments and pictures are counted, never downloaded to the screen.
+class MailBody {
+  const MailBody({
+    required this.uid,
+    required this.from,
+    required this.subject,
+    required this.text,
+    this.date,
+    this.truncated = false,
+    this.attachments = 0,
+    this.markedRead = true,
+  });
+
+  final int uid;
+  final String from;
+  final String subject;
+  final DateTime? date;
+
+  /// Never empty: a message with nothing to show says so in [text]'s place
+  /// on the screen, not here.
+  final String text;
+
+  /// Whether [text] was cut short because the message is very long.
+  final bool truncated;
+
+  /// How many attachments the message carries.
+  final int attachments;
+
+  /// Whether opening it marked it read on the server (it should; when that one
+  /// step failed the message is still shown, and this is false).
+  final bool markedRead;
+}
+
+sealed class MailReadResult {
+  const MailReadResult();
+}
+
+/// The message, opened. Opening it has marked it read (see [MailBody.markedRead]).
+class MailOpened extends MailReadResult {
+  const MailOpened(this.body);
+
+  final MailBody body;
+}
+
+/// There is no such message in the inbox any more.
+class MailReadGone extends MailReadResult {
+  const MailReadGone();
+}
+
+class MailReadNotSetUp extends MailReadResult {
+  const MailReadNotSetUp();
+}
+
+/// The message could not be opened and nothing was changed; [reason] is short
+/// and printable.
+class MailReadFailed extends MailReadResult {
+  const MailReadFailed(this.reason);
+
+  final String reason;
+}
+
+sealed class MailMarkResult {
+  const MailMarkResult();
+}
+
+/// The message is now [read] (or unread) on the server.
+class MailMarked extends MailMarkResult {
+  const MailMarked({required this.read});
+
+  final bool read;
+}
+
+class MailMarkGone extends MailMarkResult {
+  const MailMarkGone();
+}
+
+class MailMarkNotSetUp extends MailMarkResult {
+  const MailMarkNotSetUp();
+}
+
+/// Nothing was changed; [reason] is short and printable.
+class MailMarkFailed extends MailMarkResult {
+  const MailMarkFailed(this.reason);
 
   final String reason;
 }

@@ -45,4 +45,98 @@ void main() {
       expect(formatMailDate(null, now), '');
     });
   });
+  group('tidyMailText', () {
+    test('makes the line ends the same and trims each line', () {
+      expect(tidyMailText('one  \r\ntwo\rthree\t \n').text, 'one\ntwo\nthree');
+    });
+
+    test('squeezes blank lines to one', () {
+      expect(tidyMailText('a\n\n\n\n\nb').text, 'a\n\nb');
+    });
+
+    test('drops control and invisible characters, keeps tabs and newlines', () {
+      expect(
+        tidyMailText('a\u0000b\u200Bc\uFEFFd\u0007e\tf\ng').text,
+        'abcde\tf\ng',
+      );
+    });
+
+    test('a no-break space is a space', () {
+      expect(tidyMailText('a\u00A0b').text, 'a b');
+    });
+
+    test('short text is not cut', () {
+      final result = tidyMailText('short', limit: 100);
+
+      expect(result.text, 'short');
+      expect(result.truncated, isFalse);
+    });
+
+    test('long text is cut at a word, and says so', () {
+      final result = tidyMailText('alpha beta gamma delta epsilon', limit: 18);
+
+      expect(result.truncated, isTrue);
+      expect(result.text, 'alpha beta gamma');
+    });
+
+    test('a word longer than the limit is cut where it is', () {
+      final result = tidyMailText('x' * 50, limit: 10);
+
+      expect(result.text, 'x' * 10);
+      expect(result.truncated, isTrue);
+    });
+
+    test('empty stays empty', () {
+      expect(tidyMailText('  \n\n ').text, '');
+    });
+  });
+
+  group('plainTextFromHtml', () {
+    test('drops the tags and keeps the words', () {
+      expect(plainTextFromHtml('<b>Hello</b> <i>there</i>'), 'Hello there');
+    });
+
+    test('paragraphs, breaks and rows become lines', () {
+      expect(
+        plainTextFromHtml('<p>One</p><p>Two<br/>Three</p><div>Four</div>'),
+        'One\nTwo\nThree\nFour\n',
+      );
+    });
+
+    test('list items become dashes', () {
+      expect(
+        plainTextFromHtml('<ul><li>a</li><li>b</li></ul>').trim(),
+        '- a\n- b',
+      );
+    });
+
+    test('drops the head, styles, scripts and comments', () {
+      expect(
+        plainTextFromHtml(
+          '<head><title>T</title></head><style>x{}</style><!-- c -->'
+          '<script>alert(1)</script>Body',
+        ),
+        'Body',
+      );
+    });
+
+    test('reads named and numeric entities', () {
+      expect(
+        plainTextFromHtml('a&nbsp;b &amp; c &lt;d&gt; &#8211; &#x41; &aring;'),
+        'a b & c <d> \u2013 A \u00E5',
+      );
+    });
+
+    test('leaves an entity it does not know, and a bad number, alone', () {
+      expect(plainTextFromHtml('&bogus; &#99999999;'), '&bogus; &#99999999;');
+    });
+
+    test('runs of spaces are one', () {
+      expect(plainTextFromHtml('a   \t  b'), 'a b');
+    });
+
+    test('table cells are kept apart', () {
+      expect(plainTextFromHtml('<tr><td>a</td><td>b</td></tr>').trim(), 'a b');
+    });
+  });
 }

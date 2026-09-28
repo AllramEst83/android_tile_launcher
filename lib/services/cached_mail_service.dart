@@ -77,4 +77,21 @@ class CachedMailService implements MailService {
     _drop();
     return inner.moveToTrash(uid, validity: validity);
   }
+
+  @override
+  Future<MailReadResult> read(int uid, {int? validity}) async {
+    // Opening a message changes its unread state, so the counts are stale.
+    _drop();
+    return inner.read(uid, validity: validity);
+  }
+
+  @override
+  Future<MailMarkResult> mark(
+    int uid, {
+    required bool read,
+    int? validity,
+  }) async {
+    _drop();
+    return inner.mark(uid, read: read, validity: validity);
+  }
 }

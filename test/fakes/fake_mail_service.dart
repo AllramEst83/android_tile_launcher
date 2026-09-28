@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 
@@ -64,5 +66,36 @@ class FakeMailService implements MailService {
     counts.add(count);
     if (fresh) freshCalls++;
     return result;
+  }
+
+  /// What `read` answers, and every `(uid, validity)` it was given.
+  MailReadResult readResult = const MailReadGone();
+
+  /// When set, `read` waits for it: a message that is still opening.
+  Completer<void>? readGate;
+
+  /// Answers for particular uids, before falling back to [readResult].
+  final Map<int, MailReadResult> readResults = <int, MailReadResult>{};
+  final List<(int, int?)> reads = <(int, int?)>[];
+
+  /// What `mark` answers, and every `(uid, read, validity)` it was given.
+  MailMarkResult? markResult;
+  final List<(int, bool, int?)> marks = <(int, bool, int?)>[];
+
+  @override
+  Future<MailReadResult> read(int uid, {int? validity}) async {
+    reads.add((uid, validity));
+    await readGate?.future;
+    return readResults[uid] ?? readResult;
+  }
+
+  @override
+  Future<MailMarkResult> mark(
+    int uid, {
+    required bool read,
+    int? validity,
+  }) async {
+    marks.add((uid, read, validity));
+    return markResult ?? MailMarked(read: read);
   }
 }

@@ -29,4 +29,17 @@ abstract interface class MailService {
   /// read, so nothing is touched. Never throws, and changes nothing unless it
   /// returns [MailMoved].
   Future<MailMoveResult> moveToTrash(int uid, {int? validity});
+
+  /// Opens the inbox message with [uid] in full and marks it read on the
+  /// server (the way opening a mail does anywhere), fetching it without
+  /// touching its flags first so a failure to open never changes it. A message
+  /// over a size limit is not fetched, and a message with no readable text is
+  /// still opened. If [validity] is given and the server's differs, the ids have
+  /// been renumbered and nothing is touched. Never throws.
+  Future<MailReadResult> read(int uid, {int? validity});
+
+  /// Marks the inbox message with [uid] read (or, with `read: false`, unread)
+  /// on the server. Same [validity] rule as [read]. Never throws, and changes
+  /// nothing unless it returns [MailMarked].
+  Future<MailMarkResult> mark(int uid, {required bool read, int? validity});
 }

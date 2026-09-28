@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:android_tile_launcher/services/imap_mail_service.dart';
 import 'package:android_tile_launcher/services/local_store_exception.dart';
 import 'package:android_tile_launcher/services/mail_account.dart';
@@ -434,6 +435,335 @@ void main() {
       await mail.moveToTrash(102);
 
       expect(server.received, contains('LOGOUT'));
+    });
+  });
+  group('read', () {
+    tearDown(() => server.stop());
+
+    const lunch = FakeImapMessage(
+      uid: 101,
+      subject: '"Lunch tomorrow?"',
+      date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+      address: 'anna@example.com',
+      name: 'Anna Berg',
+      text: 'Hi!\r\n\r\nShall we meet at noon?\r\n\r\n/Anna',
+    );
+
+    test('without an account is not set up, and never connects', () async {
+      await boot(const [lunch]);
+
+      expect(await mail.read(101), isA<MailReadNotSetUp>());
+      expect(server.connections, 0);
+    });
+
+    test('shows the message in full', () async {
+      await boot(const [lunch]);
+      await setUp();
+
+      final opened = await mail.read(101) as MailOpened;
+
+      expect(opened.body.uid, 101);
+      expect(opened.body.from, 'Anna Berg');
+      expect(opened.body.subject, 'Lunch tomorrow?');
+      expect(opened.body.date, DateTime.utc(2026, 9, 25, 10).toLocal());
+      expect(opened.body.text, 'Hi!\n\nShall we meet at noon?\n\n/Anna');
+      expect(opened.body.truncated, isFalse);
+      expect(opened.body.attachments, 0);
+    });
+
+    test('marks it read, on the server, and says so', () async {
+      await boot(const [lunch]);
+      await setUp();
+      expect(server.seen, isEmpty);
+
+      final opened = await mail.read(101) as MailOpened;
+
+      expect(server.seen, {101});
+      expect(opened.body.markedRead, isTrue);
+      expect(server.received.where((c) => c.contains('STORE')), hasLength(1));
+    });
+
+    test('fetches without setting the flag itself (PEEK)', () async {
+      await boot(const [lunch]);
+      await setUp();
+
+      await mail.read(101);
+
+      expect(server.received.any((c) => c.contains('BODY.PEEK[]')), isTrue);
+      expect(server.received.any((c) => c.contains(' BODY[]')), isFalse);
+    });
+
+    test('a message that is already read stays read', () async {
+      await boot(const [
+        FakeImapMessage(
+          uid: 5,
+          subject: '"Hej"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          seen: true,
+          text: 'Hej',
+        ),
+      ]);
+      await setUp();
+
+      await mail.read(5);
+
+      expect(server.seen, {5});
+    });
+
+    test('an HTML-only message is shown as its readable text', () async {
+      await boot(const [
+        FakeImapMessage(
+          uid: 7,
+          subject: '"News"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'news@example.com',
+          html:
+              '<html><head><style>p{color:red}</style></head><body>'
+              '<h1>Big &amp; small</h1><p>First<br>second</p>'
+              '<ul><li>one</li><li>two</li></ul></body></html>',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(7) as MailOpened;
+
+      expect(opened.body.text, contains('Big & small'));
+      expect(opened.body.text, contains('First\nsecond'));
+      expect(opened.body.text, contains('- one'));
+      expect(opened.body.text, isNot(contains('<')));
+      expect(opened.body.text, isNot(contains('color:red')));
+    });
+
+    test('takes the plain text when both are there', () async {
+      await boot(const [
+        FakeImapMessage(
+          uid: 8,
+          subject: '"Both"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          text: 'plain version',
+          html: '<p>html version</p>',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(8) as MailOpened;
+
+      expect(opened.body.text, 'plain version');
+    });
+
+    test('counts attachments without showing them', () async {
+      await boot([
+        FakeImapMessage(
+          uid: 9,
+          subject: '"Photos"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          raw:
+              'From: a@example.com\r\nTo: kay@example.com\r\nSubject: Photos\r\n'
+              'Date: Fri, 25 Sep 2026 10:00:00 +0000\r\nMIME-Version: 1.0\r\n'
+              'Content-Type: multipart/mixed; boundary="m1"\r\n\r\n'
+              '--m1\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nSee attached.\r\n'
+              '--m1\r\nContent-Type: image/png; name="a.png"\r\n'
+              'Content-Disposition: attachment; filename="a.png"\r\n'
+              'Content-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n'
+              '--m1\r\nContent-Type: application/pdf; name="b.pdf"\r\n'
+              'Content-Disposition: attachment; filename="b.pdf"\r\n'
+              'Content-Transfer-Encoding: base64\r\n\r\nJVBERi0=\r\n'
+              '--m1--\r\n',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(9) as MailOpened;
+
+      expect(opened.body.text, 'See attached.');
+      expect(opened.body.attachments, 2);
+    });
+
+    test('cuts a very long message', () async {
+      await boot([
+        FakeImapMessage(
+          uid: 10,
+          subject: '"Long"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          text: List.filled(6000, 'word').join(' '),
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(10) as MailOpened;
+
+      expect(opened.body.truncated, isTrue);
+      expect(opened.body.text.length, lessThanOrEqualTo(mailTextLimit));
+      expect(opened.body.text.length, greaterThan(mailTextLimit - 300));
+    });
+
+    test('will not fetch a huge message, and changes nothing', () async {
+      await boot(const [
+        FakeImapMessage(
+          uid: 11,
+          subject: '"Huge"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          text: 'x',
+          size: 30 * 1024 * 1024,
+        ),
+      ]);
+      await setUp();
+
+      final result = await mail.read(11);
+
+      expect(result, isA<MailReadFailed>());
+      expect((result as MailReadFailed).reason, contains('30.0 MB'));
+      expect(server.seen, isEmpty);
+      expect(server.received.any((c) => c.contains('BODY.PEEK[]')), isFalse);
+    });
+
+    test('a message that is not there is gone', () async {
+      await boot(const [lunch]);
+      await setUp();
+
+      expect(await mail.read(999), isA<MailReadGone>());
+      expect(server.seen, isEmpty);
+    });
+
+    test('a renumbered inbox is refused, and nothing changes', () async {
+      await boot(const [lunch]);
+      await setUp();
+      server.uidValidity = 2;
+
+      final result = await mail.read(101, validity: 1);
+
+      expect(result, isA<MailReadFailed>());
+      expect((result as MailReadFailed).reason, contains('renumbered'));
+      expect(server.seen, isEmpty);
+    });
+
+    test('still shows the message when only the marking fails', () async {
+      await boot(const [lunch]);
+      await setUp();
+      server.failStoreSeen = true;
+
+      final opened = await mail.read(101) as MailOpened;
+
+      expect(opened.body.text, contains('noon'));
+      expect(opened.body.markedRead, isFalse);
+      expect(server.seen, isEmpty);
+    });
+
+    test('a server that is unreachable is a failure with a reason', () async {
+      await boot(const [lunch]);
+      await setUp();
+      await server.stop();
+
+      final result = await mail.read(101);
+
+      expect(result, isA<MailReadFailed>());
+      expect((result as MailReadFailed).reason, isNot(contains(_password)));
+    });
+  });
+
+  group('mark', () {
+    tearDown(() => server.stop());
+
+    const unread = FakeImapMessage(
+      uid: 21,
+      subject: '"Hi"',
+      date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+      address: 'a@example.com',
+    );
+    const read = FakeImapMessage(
+      uid: 22,
+      subject: '"Hello"',
+      date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+      address: 'a@example.com',
+      seen: true,
+    );
+
+    test('without an account is not set up', () async {
+      await boot(const [unread]);
+
+      expect(await mail.mark(21, read: true), isA<MailMarkNotSetUp>());
+      expect(server.connections, 0);
+    });
+
+    test('marks a message read', () async {
+      await boot(const [unread, read]);
+      await setUp();
+
+      final result = await mail.mark(21, read: true);
+
+      expect((result as MailMarked).read, isTrue);
+      expect(server.seen, {21, 22});
+    });
+
+    test('marks a message unread', () async {
+      await boot(const [unread, read]);
+      await setUp();
+
+      final result = await mail.mark(22, read: false);
+
+      expect((result as MailMarked).read, isFalse);
+      expect(server.seen, isEmpty);
+    });
+
+    test('touches only that message', () async {
+      await boot(const [unread, read]);
+      await setUp();
+
+      await mail.mark(21, read: true);
+      await mail.mark(22, read: false);
+
+      expect(server.seen, {21});
+      expect(server.inbox, hasLength(2));
+      expect(server.trash, isEmpty);
+    });
+
+    test('a message that is not there is gone', () async {
+      await boot(const [unread]);
+      await setUp();
+
+      expect(await mail.mark(999, read: true), isA<MailMarkGone>());
+    });
+
+    test('a renumbered inbox is refused, and nothing changes', () async {
+      await boot(const [unread]);
+      await setUp();
+      server.uidValidity = 2;
+
+      final result = await mail.mark(21, read: true, validity: 1);
+
+      expect(result, isA<MailMarkFailed>());
+      expect(server.seen, isEmpty);
+    });
+
+    test(
+      'a server error is a failure with a reason, nothing changed',
+      () async {
+        await boot(const [unread]);
+        await setUp();
+        server.failStoreSeen = true;
+
+        final result = await mail.mark(21, read: true);
+
+        expect(result, isA<MailMarkFailed>());
+        expect(server.seen, isEmpty);
+      },
+    );
+
+    test('the unread count follows', () async {
+      await boot(const [unread, read]);
+      await setUp();
+      expect((await mail.latest() as MailMessages).unread, 1);
+
+      await mail.mark(21, read: true);
+      expect((await mail.latest() as MailMessages).unread, 0);
+
+      await mail.mark(22, read: false);
+      expect((await mail.latest() as MailMessages).unread, 1);
     });
   });
 }

@@ -28,8 +28,9 @@ last answer. It is a personal project and is not on the Play Store.
     Open-Meteo outside Sweden; coarse location is asked for only when the tile
     is tapped).
   - **Agenda** (read-only calendar: day and week), **Contact** (call, SMS,
-    WhatsApp; every action is its own tap), **Mail** (IMAP inbox, trash with
-    confirmation, app password kept encrypted in the Android Keystore).
+    WhatsApp; every action is its own tap), **Mail** (IMAP inbox: open a
+    message in full, which marks it read, mark it unread or read again, trash
+    with confirmation; app password kept encrypted in the Android Keystore).
   - **Text TV** (a full-screen viewer for texttv.nu), **Calc** (a calculator and
     a unit and currency converter), **Alarm** (timers and alarms handed to the
     phone's clock app), **Sound** and **Flashlight** toggles.
