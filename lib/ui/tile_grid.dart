@@ -1,6 +1,6 @@
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_layout.dart';
-import 'package:android_tile_launcher/services/system_control_service.dart';
+import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_view.dart';
 import 'package:flutter/material.dart';
@@ -69,14 +69,14 @@ class TileGrid extends StatelessWidget {
     super.key,
     required this.placed,
     required this.labelFor,
-    required this.systemControl,
+    required this.services,
     required this.onLaunch,
     this.onLongPress,
   });
 
   final List<PlacedTile> placed;
   final String Function(Tile tile) labelFor;
-  final SystemControlService systemControl;
+  final TileServices services;
   final ValueChanged<String> onLaunch;
   final ValueChanged<String>? onLongPress;
 
@@ -104,7 +104,7 @@ class TileGrid extends StatelessWidget {
                     content: tileContent(
                       r.tile,
                       labelFor: labelFor,
-                      systemControl: systemControl,
+                      services: services,
                     ),
                     onTap: switch (launchTargetOf(r.tile)) {
                       final String target => () => onLaunch(target),

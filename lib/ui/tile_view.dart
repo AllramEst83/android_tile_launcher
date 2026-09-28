@@ -5,10 +5,13 @@ import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_content.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
+import 'package:android_tile_launcher/services/device_tile_source.dart';
 import 'package:android_tile_launcher/services/sound_mode_tile_source.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
+import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/services/toggle_tile_source.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
+import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
@@ -83,15 +86,16 @@ class TileView extends StatelessWidget {
 /// What goes inside [TileView] for [tile], dispatched by kind — the one
 /// place a new tile kind's view gets wired in (see "Adding a tile kind" in
 /// .agents/architecture.md). [labelFor] only matters for [TileKind.app].
-/// [systemControl] backs every toggle kind's read and tap; [interactive]
+/// [services] backs every live kind that reads from the platform; [interactive]
 /// turns tap-to-toggle off in the grid editor, where a tap selects the tile
 /// instead.
 Widget tileContent(
   Tile tile, {
   required String Function(Tile tile) labelFor,
-  required SystemControlService systemControl,
+  required TileServices services,
   bool interactive = true,
 }) {
+  final SystemControlService systemControl = services.systemControl;
   switch (tile.kind) {
     case TileKind.app:
       return AppTileContent(label: labelFor(tile), ink: tile.colour.ink);
@@ -101,6 +105,15 @@ Widget tileContent(
         interval: const Duration(seconds: 30),
         builder: (context, content, refreshNow) => ClockTileContentView(
           content: content as ClockContent,
+          ink: tile.colour.ink,
+        ),
+      );
+    case TileKind.device:
+      return TilePoller(
+        source: DeviceTileSource(repository: services.device),
+        interval: const Duration(seconds: 60),
+        builder: (context, content, refreshNow) => DeviceTileContentView(
+          status: (content as DeviceContent).status,
           ink: tile.colour.ink,
         ),
       );

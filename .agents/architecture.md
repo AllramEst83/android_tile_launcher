@@ -13,13 +13,15 @@ lib/
   messages.dart              # user-facing strings
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
-    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed
+    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed
     tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4
     tile_layout.dart         # packTiles: ordered tiles -> PlacedTile (column, row); skyline algorithm
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     list_reorder.dart        # moveItem<T>: pure ReorderableListView-style index move, for drag-to-reorder
+    device_status.dart       # DeviceStatus: battery %, charging, storage free/total (each nullable); free/battery fractions for the bars
+    device_format.dart       # formatBattery/formatStorageFree: DeviceStatus -> the tile's strings
     sound_mode.dart          # SoundMode (normal/vibrate/silent): the ringer, with its tap cycle and label
-    tile_content.dart        # what a live tile shows now (sealed: ClockContent, SoundContent, ToggleContent)
+    tile_content.dart        # what a live tile shows now (sealed: ClockContent, DeviceContent, SoundContent, ToggleContent)
     clock_format.dart        # formatClockTime/formatClockDate: DateTime -> the tile's display strings
     alpha_grouping.dart      # groupByInitial<T>: any labelled list -> initial-letter buckets (Swedish order); shared by the app drawer and the contacts tile (Phase 11)
     app_matcher.dart         # rankApps: best-match-first search ranking, for the drawer's search field
@@ -36,6 +38,10 @@ lib/
     clock_tile_source.dart   # ClockTileSource: pure, DateTime.now() by default, injectable for tests
     system_control_service.dart      # abstract: soundMode/setSoundMode (ringer), isOn/setOn(TileKind) (torch)
     android_system_control_service.dart  # MethodChannel implementation
+    tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device), bundled
+    device_repository.dart   # abstract: Future<DeviceStatus> status(); never throws
+    android_device_repository.dart  # MethodChannel implementation
+    device_tile_source.dart  # DeviceTileSource: the repository's status as DeviceContent
     toggle_tile_source.dart  # ToggleTileSource: one TileSource for the two-state kind (flashlight)
     sound_mode_tile_source.dart  # SoundModeTileSource: the ringer's current mode
   ui/
@@ -46,6 +52,7 @@ lib/
     tile_view.dart           # chrome shell (fill, bevel/selection, delete badge) + tileContent(tile) dispatcher + AppTileContent
     tile_poller.dart         # TilePoller: rebuilds from a TileSource on an interval, paused while backgrounded; builder gets a refreshNow to re-read early
     clock_tile_view.dart     # ClockTileContentView: the clock's content -- time large, date small
+    device_tile_view.dart    # DeviceTileContentView: battery and free storage, each a label + value + flat bar
     state_tile_view.dart     # StateTileContentView: label + a state string ([ON], [VIBRATE]...), nullable onTap
     editable_tile_grid.dart  # the grid editor's canvas: Draggable/DragTarget per tile, tap to select, delete badge
     tile_inspector.dart      # the editor's panel: label + Apply always, size/colour pickers while a tile is selected
@@ -55,6 +62,7 @@ lib/
 android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   MainActivity.kt            # wires channel handlers into the Flutter engine
   AppsChannelHandler.kt      # list/launch/uninstall/openAppDetails; listing runs off the main thread
+  DeviceChannelHandler.kt    # battery (sticky broadcast) and storage (StatFs); no permissions
   SystemControlChannelHandler.kt  # ringer mode, torch
 test/  # mirrors lib/; fakes/ holds FakeAppRepository
 ```
@@ -132,3 +140,6 @@ Record decisions that future agents can't derive from code (append, newest last)
 - Entering or leaving silent needs Android's notification-policy access (`NotificationManager.isNotificationPolicyAccessGranted()`) — a special permission granted only through a Settings screen, never a runtime dialog, and not the same as declaring `ACCESS_NOTIFICATION_POLICY` in the manifest (which only lets the app ask). `SystemControlChannelHandler.withPolicyAccess` checks it (only for transitions that need it) and, if not granted, opens `ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS` instead of throwing — the same best-effort, no-error-surface contract every other platform action in this app follows. Previously pinned `silentMode`/`vibrationMode`/`doNotDisturb` tiles no longer parse (`PinnedTile.fromJson` drops unknown kinds) and vanish from the saved grid.
 - The flashlight tile uses `CameraManager.setTorchMode`, not `Camera.open()`/a `CAMERA` permission: torch-only control was explicitly carved out to not need it, so the tile never triggers a runtime permission prompt. A registered `CameraManager.TorchCallback` keeps the Kotlin side's cached `torchOn` correct if the torch is toggled from outside the app (quick settings), since `setTorchMode` itself has no getter.
 - `tileContent()` grew two new required-ish parameters — `systemControl: SystemControlService` and `interactive: bool = true` — the one deliberate exception to "no changes to `TileGrid`/`EditableTileGrid` needed" for a new kind: a toggle kind is the first kind whose view needs a genuinely new collaborator (not just `labelFor`), so threading it through `TileGrid`/`AppTileGrid`/`EditableTileGrid`'s constructors was unavoidable. `interactive: false` in `EditableTileGrid` stops a toggle tile's own tap zone from fighting the outer `TileView`'s tap-to-select — outside the editor (`TileGrid`, home), it defaults to `true` and the tile itself handles the tap since `launchTargetOf` is `null` for every system kind anyway.
+- `TileServices` (`services/tile_services.dart`) replaces the single `systemControl` parameter that `tileContent`, `TileGrid`, `AppTileGrid`, `EditableTileGrid`, `HomeShell` and `TileLauncherApp` each carried. The device tile was the second live kind needing a platform collaborator and every later phase (weather, calendar, contacts, mail) adds another, so bundling them means a new kind's service is one field in one class plus its wiring in `main()`, not a new parameter through six widget layers. `interactive` stays a separate `tileContent` parameter: it is about the call site (editor vs home), not a service.
+- `DeviceRepository.status()` never throws: a failed or missing platform query returns a `DeviceStatus` whose fields are `null`, and the view shows dashes, rather than the tile poller having an error path (`TilePoller` has none; an exception from `read()` would be an unhandled async error). Storage is the internal data partition (`StatFs` on `Environment.getDataDirectory()`) in decimal units, like Android's own storage screen. Battery comes from the sticky `ACTION_BATTERY_CHANGED` broadcast read with a null receiver, so it needs no permission and no registered receiver. The tile polls every 60 seconds (plus on resume): both change slowly.
+- The device tile's two bars both fill toward "more is left" — battery by charge, storage by *free* share — because the storage label says FREE and a bar filling the other way read as "plenty" on a nearly-full disk (seen on the emulator: 648 MB free with a 90%-full bar). The bars are an outlined box filled with the tile's ink, no gradient or alpha, per the palette rule.

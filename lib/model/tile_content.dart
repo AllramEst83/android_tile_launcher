@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 
 /// What a live tile currently shows, from its `TileSource`. An app tile has
@@ -57,4 +58,21 @@ class ToggleContent extends TileContent {
 
   @override
   String toString() => 'ToggleContent($on)';
+}
+
+/// The device tile's content: battery and storage.
+class DeviceContent extends TileContent {
+  const DeviceContent({required this.status});
+
+  final DeviceStatus status;
+
+  @override
+  bool operator ==(Object other) =>
+      other is DeviceContent && other.status == status;
+
+  @override
+  int get hashCode => status.hashCode;
+
+  @override
+  String toString() => 'DeviceContent($status)';
 }

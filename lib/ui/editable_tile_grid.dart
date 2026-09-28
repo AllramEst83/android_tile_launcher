@@ -1,7 +1,7 @@
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_layout.dart';
-import 'package:android_tile_launcher/services/system_control_service.dart';
+import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/tile_grid.dart';
 import 'package:android_tile_launcher/ui/tile_view.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +14,7 @@ class EditableTileGrid extends StatelessWidget {
     super.key,
     required this.tiles,
     required this.labelFor,
-    required this.systemControl,
+    required this.services,
     required this.selected,
     required this.onSelect,
     required this.onDelete,
@@ -23,7 +23,7 @@ class EditableTileGrid extends StatelessWidget {
 
   final List<PinnedTile> tiles;
   final String Function(String id) labelFor;
-  final SystemControlService systemControl;
+  final TileServices services;
   final String? selected;
   final ValueChanged<String> onSelect;
   final ValueChanged<String> onDelete;
@@ -59,7 +59,7 @@ class EditableTileGrid extends StatelessWidget {
       content: tileContent(
         tile,
         labelFor: (t) => labelFor(t.id),
-        systemControl: systemControl,
+        services: services,
         interactive: false,
       ),
       selected: id == selected,

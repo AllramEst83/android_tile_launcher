@@ -1,13 +1,16 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
+import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
+import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
@@ -16,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_app_repository.dart';
+import '../fakes/fake_device_repository.dart';
 import '../fakes/fake_system_control_service.dart';
 import '../fakes/in_memory_local_store.dart';
 
@@ -35,13 +39,17 @@ Future<void> pumpShell(
   FakeAppRepository repository, {
   GridState? gridState,
   FakeSystemControlService? systemControlService,
+  FakeDeviceRepository? deviceRepository,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
     home: HomeShell(
       appRepository: repository,
       gridState: gridState ?? _gridState(),
-      systemControlService: systemControlService ?? FakeSystemControlService(),
+      services: TileServices(
+        systemControl: systemControlService ?? FakeSystemControlService(),
+        device: deviceRepository ?? FakeDeviceRepository(),
+      ),
     ),
   ),
 );
@@ -308,6 +316,30 @@ void main() {
 
       expect(gridState.isPinned('clock'), isTrue);
       expect(_onHome(find.byType(ClockTileContentView)), findsOneWidget);
+    });
+
+    testWidgets('a device tile shows what the repository reports', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        deviceRepository: FakeDeviceRepository(
+          const DeviceStatus(batteryPercent: 64),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DEVICE'));
+      await tester.pumpAndSettle();
+
+      expect(gridState.isPinned('device'), isTrue);
+      expect(_onHome(find.byType(DeviceTileContentView)), findsOneWidget);
+      expect(_onHome(find.text('BATTERY  64%')), findsOneWidget);
     });
 
     testWidgets('tapping the sound tile cycles normal, vibrate, silent', (

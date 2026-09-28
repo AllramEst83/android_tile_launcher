@@ -2,11 +2,11 @@ import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 
 /// What a tile is. `app` launches [Tile.id] as a package name; a system kind
-/// (`clock`, `soundMode`, ...) has no launch target — [Tile.id] is just a
-/// fixed identity (`"clock"`) instead. More arrive one phase at a time (a
-/// device tile in Phase 8, weather in Phase 9, ...) — see "Adding a tile
+/// (`clock`, `device`, ...) has no launch target — [Tile.id] is just a
+/// fixed identity (`"clock"`) instead. More arrive one phase at a time
+/// (weather in Phase 9, ...) — see "Adding a tile
 /// kind" in .agents/architecture.md.
-enum TileKind { app, clock, soundMode, flashlight }
+enum TileKind { app, clock, device, soundMode, flashlight }
 
 /// The app package [tile] launches when tapped, or `null` for a tile with no
 /// launch target (every kind but [TileKind.app]).
@@ -20,6 +20,7 @@ String? launchTargetOf(Tile tile) => tile.kind == TileKind.app ? tile.id : null;
 String displayNameOf(TileKind kind) => switch (kind) {
   TileKind.app => '',
   TileKind.clock => 'CLOCK',
+  TileKind.device => 'DEVICE',
   TileKind.soundMode => 'SOUND',
   TileKind.flashlight => 'FLASHLIGHT',
 };

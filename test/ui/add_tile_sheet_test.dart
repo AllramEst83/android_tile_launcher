@@ -37,6 +37,7 @@ void main() {
     await _open(tester, gridState);
 
     expect(find.text('CLOCK'), findsOneWidget);
+    expect(find.text('DEVICE'), findsOneWidget);
     expect(find.text('SOUND'), findsOneWidget);
     expect(find.text('FLASHLIGHT'), findsOneWidget);
   });
