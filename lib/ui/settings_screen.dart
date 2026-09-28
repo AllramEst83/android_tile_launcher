@@ -216,6 +216,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       children: <Widget>[
                         _themeSection(),
                         _gridSection(),
+                        _textSizeSection(),
                         _gestureSection(),
                         _feelSection(),
                         _wallpaperSection(),
@@ -279,6 +280,35 @@ class _SettingsScreenState extends State<SettingsScreen>
           labelOf: (GridGap g) => g.label,
           keyOf: (GridGap g) => settingsKey('gap-${g.name}'),
           onSelect: (GridGap g) => _change(_current.copyWith(gap: g)),
+        ),
+      ],
+    );
+  }
+
+  Widget _textSizeSection() {
+    return _Section(
+      title: Messages.settingsTextSize,
+      children: <Widget>[
+        _Choices<FontScale>(
+          values: FontScale.values,
+          selected: _current.fontScale,
+          labelOf: (FontScale f) => f.label,
+          keyOf: (FontScale f) => settingsKey('font-scale-${f.name}'),
+          onSelect: (FontScale f) => _change(_current.copyWith(fontScale: f)),
+        ),
+        const _Note(text: Messages.settingsTextSizeNote),
+        const SizedBox(height: TileMetrics.gutter),
+        Center(
+          child: Text(
+            Messages.settingsTextSizePreview,
+            key: settingsKey('font-scale-preview'),
+            textScaler: TextScaler.linear(_current.fontScale.factor),
+            style: TextStyle(
+              fontFamily: kPixelFontFamily,
+              fontSize: 14,
+              color: TileColors.textBright,
+            ),
+          ),
         ),
       ],
     );

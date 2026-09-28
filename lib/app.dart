@@ -84,6 +84,18 @@ class _TileLauncherAppState extends State<TileLauncherApp> {
         title: Messages.appTitle,
         debugShowCheckedModeBanner: false,
         theme: tileLauncherTheme(),
+        // A multiplier on whatever the phone's own accessibility text size
+        // already asks for, not a replacement of it: the FONT SIZE setting
+        // never takes away a scale the user already relies on.
+        builder: (BuildContext context, Widget? child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: _scaledBy(
+              MediaQuery.textScalerOf(context),
+              widget.settingsState.settings.fontScale.factor,
+            ),
+          ),
+          child: child!,
+        ),
         home: HomeShell(
           appRepository: widget.appRepository,
           gridState: widget.gridState,
@@ -94,6 +106,36 @@ class _TileLauncherAppState extends State<TileLauncherApp> {
       ),
     );
   }
+}
+
+/// [ambient] scaled again by [factor]: every text style in the app reads its
+/// size through Flutter's ambient text scaler somewhere along the way (`Text`
+/// by default, or a manual `TextPainter` that was written to ask for it, as
+/// `TvRow` and a few tile content views do for a Text TV page's fixed grid),
+/// so overriding it once here is enough to reach all of them.
+TextScaler _scaledBy(TextScaler ambient, double factor) =>
+    _ScaledTextScaler(ambient, factor);
+
+class _ScaledTextScaler extends TextScaler {
+  const _ScaledTextScaler(this._ambient, this._factor);
+
+  final TextScaler _ambient;
+  final double _factor;
+
+  @override
+  double scale(double fontSize) => _ambient.scale(fontSize) * _factor;
+
+  @override
+  double get textScaleFactor => scale(1);
+
+  @override
+  bool operator ==(Object other) =>
+      other is _ScaledTextScaler &&
+      other._ambient == _ambient &&
+      other._factor == _factor;
+
+  @override
+  int get hashCode => Object.hash(_ambient, _factor);
 }
 
 /// Rebuilds every widget below [context], keeping their state.
