@@ -12,6 +12,7 @@ void main() {
       // The behaviour the launcher had before there were settings.
       expect(defaults.swipeDown, GestureAction.refreshApps);
       expect(defaults.swipeUp, GestureAction.none);
+      expect(defaults.haptics, isTrue);
     });
 
     test('the gaps are 4, 8 and 14 pixels', () {
@@ -29,6 +30,7 @@ void main() {
         gap: GridGap.tight,
         swipeDown: GestureAction.notifications,
         swipeUp: GestureAction.searchApps,
+        haptics: false,
       );
 
       expect(LauncherSettings.fromJson(settings.toJson()), settings);
@@ -71,6 +73,17 @@ void main() {
 
       expect(settings, const LauncherSettings());
     });
+  });
+
+  test('haptics that are not a true or false are on', () {
+    expect(
+      LauncherSettings.fromJson(<String, Object?>{'haptics': 'no'}).haptics,
+      isTrue,
+    );
+    expect(
+      LauncherSettings.fromJson(<String, Object?>{'haptics': false}).haptics,
+      isFalse,
+    );
   });
 
   group('the choices offered', () {

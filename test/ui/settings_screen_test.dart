@@ -185,6 +185,22 @@ void main() {
     });
   });
 
+  group('haptics', () {
+    testWidgets('are on to begin with, and can be switched off and on', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+      expect(rig.settings.settings.haptics, isTrue);
+
+      await _tap(tester, settingsKey('haptics-off'));
+      expect(rig.settings.settings.haptics, isFalse);
+
+      await _tap(tester, settingsKey('haptics-on'));
+      expect(rig.settings.settings.haptics, isTrue);
+    });
+  });
+
   group('the Home app', () {
     testWidgets('says when this launcher is it', (WidgetTester tester) async {
       await _Rig(homeRole: FakeHomeRoleService(true)).open(tester);

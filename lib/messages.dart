@@ -138,6 +138,12 @@ abstract final class Messages {
   static const String settingsSwipeUp = 'SWIPE UP';
   static const String settingsSwipeUpNote =
       'PUSH UP WHEN HOME IS AT THE BOTTOM.';
+  static const String settingsFeel = 'FEEL';
+  static const String settingsHaptics = 'HAPTICS';
+  static const String settingsHapticsNote =
+      'A SHORT BUZZ WHEN YOU PRESS A TILE OR A KEY.';
+  static const String settingsOn = 'ON';
+  static const String settingsOff = 'OFF';
   static const String settingsSystem = 'SYSTEM';
   static const String settingsHomeApp = 'DEFAULT HOME APP';
   static const String settingsHomeActive = 'ACTIVE: THIS IS YOUR HOME APP.';

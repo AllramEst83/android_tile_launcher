@@ -199,6 +199,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         _themeSection(),
                         _gridSection(),
                         _gestureSection(),
+                        _feelSection(),
                         _systemSection(),
                         _layoutSection(),
                         const SizedBox(height: 24),
@@ -288,6 +289,23 @@ class _SettingsScreenState extends State<SettingsScreen>
           onSelect: (GestureAction a) => _change(_current.copyWith(swipeUp: a)),
         ),
         const _Note(text: Messages.settingsSwipeUpNote),
+      ],
+    );
+  }
+
+  Widget _feelSection() {
+    return _Section(
+      title: Messages.settingsFeel,
+      children: <Widget>[
+        _Label(text: Messages.settingsHaptics),
+        _Choices<bool>(
+          values: const <bool>[true, false],
+          selected: _current.haptics,
+          labelOf: (bool on) => on ? Messages.settingsOn : Messages.settingsOff,
+          keyOf: (bool on) => settingsKey('haptics-${on ? 'on' : 'off'}'),
+          onSelect: (bool on) => _change(_current.copyWith(haptics: on)),
+        ),
+        const _Note(text: Messages.settingsHapticsNote),
       ],
     );
   }

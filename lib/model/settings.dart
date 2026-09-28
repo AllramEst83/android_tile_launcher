@@ -59,6 +59,7 @@ class LauncherSettings {
     this.gap = GridGap.normal,
     this.swipeDown = GestureAction.refreshApps,
     this.swipeUp = GestureAction.none,
+    this.haptics = true,
   });
 
   final ThemeVariant theme;
@@ -71,6 +72,9 @@ class LauncherSettings {
   /// bottom of it does.
   final GestureAction swipeDown;
   final GestureAction swipeUp;
+
+  /// A short buzz on a tile or key press and on long-press.
+  final bool haptics;
 
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
@@ -94,12 +98,14 @@ class LauncherSettings {
     GridGap? gap,
     GestureAction? swipeDown,
     GestureAction? swipeUp,
+    bool? haptics,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
     gap: gap ?? this.gap,
     swipeDown: swipeDown ?? this.swipeDown,
     swipeUp: swipeUp ?? this.swipeUp,
+    haptics: haptics ?? this.haptics,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -108,6 +114,7 @@ class LauncherSettings {
     'gap': gap.name,
     'swipeDown': swipeDown.name,
     'swipeUp': swipeUp.name,
+    'haptics': haptics,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -142,6 +149,9 @@ class LauncherSettings {
       gap: pick(GridGap.values, json['gap'], defaults.gap),
       swipeDown: swipeDownChoices.contains(down) ? down : defaults.swipeDown,
       swipeUp: swipeUpChoices.contains(up) ? up : defaults.swipeUp,
+      haptics: json['haptics'] is bool
+          ? json['haptics']! as bool
+          : defaults.haptics,
     );
   }
 
@@ -152,12 +162,14 @@ class LauncherSettings {
       other.columns == columns &&
       other.gap == gap &&
       other.swipeDown == swipeDown &&
-      other.swipeUp == swipeUp;
+      other.swipeUp == swipeUp &&
+      other.haptics == haptics;
 
   @override
-  int get hashCode => Object.hash(theme, columns, gap, swipeDown, swipeUp);
+  int get hashCode =>
+      Object.hash(theme, columns, gap, swipeDown, swipeUp, haptics);
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, down: $swipeDown, up: $swipeUp)';
+      'LauncherSettings($theme, $columns columns, $gap, down: $swipeDown, up: $swipeUp, haptics: $haptics)';
 }

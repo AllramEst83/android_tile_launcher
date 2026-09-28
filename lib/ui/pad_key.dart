@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/ui/haptics.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
@@ -37,8 +38,14 @@ class PadKey extends StatelessWidget {
         : accent
         ? TileColors.accent
         : TileColors.textBright;
+    final VoidCallback? tap = onTap;
     return InkWell(
-      onTap: onTap,
+      onTap: tap == null
+          ? null
+          : () {
+              haptic(context, Haptic.tap);
+              tap();
+            },
       child: Container(
         constraints: BoxConstraints(minHeight: height),
         alignment: Alignment.center,
