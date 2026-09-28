@@ -90,10 +90,12 @@ class _AppDrawerState extends State<AppDrawer> {
             style: Theme.of(context).textTheme.bodyMedium,
             cursorColor: TileColors.textBright,
             decoration: InputDecoration(
-              isDense: true,
+              // Roomy, not dense, and the same as the contact picker's: a thin
+              // field is hard to hit and to read.
+              contentPadding: const EdgeInsets.symmetric(vertical: 16),
               hintText: Messages.searchApps,
               hintStyle: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: TileColors.textDim),
+                  ?.copyWith(color: C64.lightGrey),
               enabledBorder: const UnderlineInputBorder(
                 borderSide: BorderSide(color: TileColors.bezel),
               ),

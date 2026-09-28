@@ -111,6 +111,12 @@ void main() {
     expect(find.text('M'), findsNothing);
   });
 
+  testWidgets('the search field is tall enough to hit', (tester) async {
+    await _pump(tester);
+
+    expect(tester.getSize(find.byType(TextField)).height, greaterThan(48));
+  });
+
   testWidgets('a query that matches nothing says so', (tester) async {
     await _pump(tester);
 
