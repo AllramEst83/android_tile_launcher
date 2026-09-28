@@ -98,6 +98,7 @@ void main() {
       for (final String title in <String>[
         Messages.settingsTheme,
         Messages.settingsGrid,
+        Messages.settingsTextSize,
         Messages.settingsGestures,
         Messages.settingsSystem,
         Messages.settingsLayout,
@@ -155,6 +156,48 @@ void main() {
 
       await _tap(tester, settingsKey('gap-relaxed'));
       expect(rig.settings.settings.gap, GridGap.relaxed);
+    });
+  });
+
+  group('text size', () {
+    testWidgets('a key for each, the current one is NORMAL', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+
+      for (final FontScale scale in FontScale.values) {
+        expect(
+          find.byKey(settingsKey('font-scale-${scale.name}')),
+          findsOneWidget,
+        );
+      }
+      expect(rig.settings.settings.fontScale, FontScale.normal);
+    });
+
+    testWidgets('tapping one chooses it', (WidgetTester tester) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+
+      await _tap(tester, settingsKey('font-scale-extraLarge'));
+      expect(rig.settings.settings.fontScale, FontScale.extraLarge);
+
+      await _tap(tester, settingsKey('font-scale-small'));
+      expect(rig.settings.settings.fontScale, FontScale.small);
+    });
+
+    testWidgets('the preview grows and shrinks with the choice', (
+      WidgetTester tester,
+    ) async {
+      await _Rig().open(tester);
+      final Finder preview = find.byKey(settingsKey('font-scale-preview'));
+      final double normal = tester.getSize(preview).width;
+
+      await _tap(tester, settingsKey('font-scale-extraLarge'));
+      expect(tester.getSize(preview).width, greaterThan(normal));
+
+      await _tap(tester, settingsKey('font-scale-small'));
+      expect(tester.getSize(preview).width, lessThan(normal));
     });
   });
 

@@ -9,6 +9,7 @@ void main() {
       expect(defaults.theme, ThemeVariant.c64);
       expect(defaults.columns, 4);
       expect(defaults.gap, GridGap.normal);
+      expect(defaults.fontScale, FontScale.normal);
       // The behaviour the launcher had before there were settings.
       expect(defaults.swipeDown, GestureAction.refreshApps);
       expect(defaults.swipeUp, GestureAction.none);
@@ -22,6 +23,13 @@ void main() {
       expect(GridGap.normal.pixels, 8);
       expect(GridGap.relaxed.pixels, 14);
     });
+
+    test('the font scales are 0.9, 1, 1.15 and 1.3', () {
+      expect(FontScale.small.factor, 0.9);
+      expect(FontScale.normal.factor, 1.0);
+      expect(FontScale.large.factor, 1.15);
+      expect(FontScale.extraLarge.factor, 1.3);
+    });
   });
 
   group('JSON', () {
@@ -30,6 +38,7 @@ void main() {
         theme: ThemeVariant.beige,
         columns: 6,
         gap: GridGap.tight,
+        fontScale: FontScale.large,
         swipeDown: GestureAction.notifications,
         swipeUp: GestureAction.searchApps,
         haptics: false,
@@ -61,6 +70,7 @@ void main() {
           'theme': 'neon',
           'columns': 5,
           'gap': 'huge',
+          'fontScale': 'huge',
           // Real actions, but not ones this gesture may be set to.
           'swipeDown': 'searchApps',
           'swipeUp': 'notifications',
@@ -146,5 +156,17 @@ void main() {
     expect(changed.columns, 6);
     expect(changed.theme, settings.theme);
     expect(changed.gap, settings.gap);
+    expect(changed.fontScale, settings.fontScale);
+  });
+
+  test('copyWith changes the font scale alone', () {
+    const LauncherSettings settings = LauncherSettings();
+
+    final LauncherSettings changed = settings.copyWith(
+      fontScale: FontScale.extraLarge,
+    );
+
+    expect(changed.fontScale, FontScale.extraLarge);
+    expect(changed.columns, settings.columns);
   });
 }
