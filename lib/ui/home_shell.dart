@@ -17,6 +17,7 @@ import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/add_tile_sheet.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
+import 'package:android_tile_launcher/ui/bevel_key.dart';
 import 'package:android_tile_launcher/ui/boot_screen.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
@@ -24,6 +25,10 @@ import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_inspector.dart';
 import 'package:flutter/material.dart';
+
+/// Keys for the two buttons along the top of home, so a test can find them.
+const Key settingsButtonKey = ValueKey<String>('home-settings');
+const Key addTileButtonKey = ValueKey<String>('home-add-tile');
 
 /// What Android shows when Home is pressed.
 ///
@@ -377,28 +382,30 @@ class _HomePageState extends State<_HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        // The bar of keys along the top: the same width each, the same bevel
+        // as a tile, close above the grid.
         Padding(
           padding: const EdgeInsets.fromLTRB(
             TileMetrics.margin,
             TileMetrics.gutter,
             TileMetrics.margin,
-            TileMetrics.gutter,
+            0,
           ),
           child: Row(
             children: <Widget>[
-              InkWell(
-                onTap: _openSettings,
-                child: Text(
-                  Messages.settingsButton,
-                  style: Theme.of(context).textTheme.labelSmall,
+              Expanded(
+                child: BevelKey(
+                  key: settingsButtonKey,
+                  label: Messages.settingsButton,
+                  onTap: _openSettings,
                 ),
               ),
-              const Spacer(),
-              InkWell(
-                onTap: _addTile,
-                child: Text(
-                  Messages.addTile,
-                  style: Theme.of(context).textTheme.labelSmall,
+              const SizedBox(width: TileMetrics.gutter),
+              Expanded(
+                child: BevelKey(
+                  key: addTileButtonKey,
+                  label: Messages.addTile,
+                  onTap: _addTile,
                 ),
               ),
             ],

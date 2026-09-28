@@ -65,7 +65,13 @@ class AppTileGrid extends StatelessWidget {
     } else {
       content = SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(TileMetrics.margin),
+        // Close under the bar of keys, the usual margin elsewhere.
+        padding: const EdgeInsets.fromLTRB(
+          TileMetrics.margin,
+          TileMetrics.gutter,
+          TileMetrics.margin,
+          TileMetrics.margin,
+        ),
         child: TileGrid(
           placed: packTiles(tiles, columns: settings.columns),
           labelFor: labelFor,

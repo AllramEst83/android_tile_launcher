@@ -45,6 +45,7 @@ import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/text_tv_screen.dart';
 import 'package:android_tile_launcher/ui/text_tv_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/tile_view.dart';
 import 'package:android_tile_launcher/ui/timer_pad.dart';
 import 'package:android_tile_launcher/ui/weather_tile_view.dart';
 import 'package:flutter/material.dart';
@@ -1383,6 +1384,80 @@ void main() {
         containsAll(<String>['pkg.clock', 'pkg.maps']),
       );
       expect(_inDrawer(find.byType(AppIcon)), findsNWidgets(2));
+    });
+  });
+  group('the bar of keys along the top', () {
+    testWidgets(
+      'has SETTINGS and + ADD TILE, side by side and as wide as each other',
+      (WidgetTester tester) async {
+        await pumpShell(tester, FakeAppRepository());
+        await tester.pump();
+
+        final Rect settings = tester.getRect(find.byKey(settingsButtonKey));
+        final Rect add = tester.getRect(find.byKey(addTileButtonKey));
+
+        expect(find.text(Messages.settingsButton), findsOneWidget);
+        expect(find.text(Messages.addTile), findsOneWidget);
+        expect(settings.width, closeTo(add.width, 0.01));
+        expect(settings.top, add.top);
+        expect(settings.right, lessThan(add.left));
+      },
+    );
+
+    testWidgets('the keys are big enough to hit, and span the width', (
+      WidgetTester tester,
+    ) async {
+      await pumpShell(tester, FakeAppRepository());
+      await tester.pump();
+
+      final Rect settings = tester.getRect(find.byKey(settingsButtonKey));
+      final Rect add = tester.getRect(find.byKey(addTileButtonKey));
+
+      expect(settings.height, greaterThanOrEqualTo(40));
+      expect(settings.left, TileMetrics.margin);
+      expect(add.right, 800 - TileMetrics.margin);
+    });
+
+    testWidgets('the grid starts close beneath them', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await gridState.pin('pkg.clock');
+      await pumpShell(
+        tester,
+        FakeAppRepository(
+          apps: const <AppInfo>[
+            AppInfo(label: 'Clock', packageName: 'pkg.clock'),
+          ],
+        ),
+        gridState: gridState,
+      );
+      await tester.pump();
+
+      final double keysBottom = tester
+          .getRect(find.byKey(settingsButtonKey))
+          .bottom;
+      final double firstTile = tester
+          .getTopLeft(_onHome(find.byType(TileView)).first)
+          .dy;
+
+      expect(firstTile - keysBottom, lessThanOrEqualTo(TileMetrics.gutter + 1));
+      expect(firstTile - keysBottom, greaterThanOrEqualTo(0));
+    });
+
+    testWidgets('each opens what it says', (WidgetTester tester) async {
+      await pumpShell(tester, FakeAppRepository());
+      await tester.pump();
+
+      await tester.tap(find.byKey(addTileButtonKey));
+      await tester.pumpAndSettle();
+      expect(find.text(displayNameOf(TileKind.clock)), findsWidgets);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(settingsButtonKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(settingsCloseKey), findsOneWidget);
     });
   });
 }

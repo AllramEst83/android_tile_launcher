@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:android_tile_launcher/model/alpha_grouping.dart';
 import 'package:android_tile_launcher/ui/haptics.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 /// [items] filed under their initial the way a Swedish phone book does (A to Z,
@@ -112,15 +113,28 @@ class SectionHeader extends StatelessWidget {
 /// with a light tick, a thin bar tracking the touch, and a wave: the letters
 /// near the finger bulge out to the left and grow, and settle back when it lifts.
 ///
-/// The letters are spread over the whole height the strip is given, so a tall
-/// screen gets a tall strip, up to [maxRowHeight] a letter (a list with only a
-/// few initials sits in the middle rather than being stretched silly); a short
-/// strip (a sheet with the keyboard up) squeezes them so every letter fits.
+/// The letters fill the middle [usedFraction] of the height the strip is given
+/// (15% empty above and below), up to [maxRowHeight] a letter, so they sit
+/// clear of the corners of the screen. A short strip (a sheet with the keyboard
+/// up) would make them tiny, so it uses more of its height, down to
+/// [minRowHeight] a letter, and if even that does not fit, all of it.
+///
+/// While a finger is down the whole strip slides [pushOut] to the left, out from
+/// under the finger, and back when it lifts.
 class JumpIndex extends StatefulWidget {
   const JumpIndex({super.key, required this.initials, required this.onTap});
 
   /// The tallest a letter's row is, however much room there is.
   static const double maxRowHeight = 44;
+
+  /// How much of the height the letters take, centred: 15% clear at each end.
+  static const double usedFraction = 0.7;
+
+  /// The least a row is made before the strip stops sparing its ends.
+  static const double minRowHeight = 14;
+
+  /// How far the strip slides out from under the finger while it is touched.
+  static const double pushOut = 30;
 
   /// How wide the strip is (the wave swings out past it, to the left).
   static const double width = 24;
@@ -128,7 +142,7 @@ class JumpIndex extends StatefulWidget {
   /// How many letters either side of the finger take part in the wave, how far
   /// the nearest one swings out, and how much bigger it grows.
   static const int waveReach = 4;
-  static const double waveSwing = 16;
+  static const double waveSwing = 12;
   static const double waveGrowth = 0.7;
 
   final List<String> initials;
@@ -141,6 +155,11 @@ class JumpIndex extends StatefulWidget {
 class _JumpIndexState extends State<JumpIndex>
     with SingleTickerProviderStateMixin {
   int? _active;
+
+  // The letter last jumped to and ticked for, kept until the finger really
+  // lifts: a tap that turns into a drag is "cancelled" and the drag starts on
+  // the same letter, which must not jump and tick a second time.
+  int? _reached;
 
   // Where along the letters the finger is, as a fractional index, so the wave
   // slides smoothly between letters rather than stepping.
@@ -166,8 +185,9 @@ class _JumpIndexState extends State<JumpIndex>
     final int index = row.floor().clamp(0, count - 1);
     setState(() => _position = (row - 0.5).clamp(0.0, count - 1.0));
     _wave.forward();
-    if (index == _active) return;
     setState(() => _active = index);
+    if (index == _reached) return;
+    _reached = index;
     haptic(context, Haptic.tick);
     widget.onTap(index);
   }
@@ -175,6 +195,11 @@ class _JumpIndexState extends State<JumpIndex>
   void _release() {
     _wave.reverse();
     setState(() => _active = null);
+  }
+
+  void _lift() {
+    _reached = null;
+    _release();
   }
 
   /// How much of the wave the letter at [index] takes: 1 under the finger,
@@ -193,58 +218,76 @@ class _JumpIndexState extends State<JumpIndex>
         final int count = widget.initials.length;
         final double rowHeight = count == 0
             ? JumpIndex.maxRowHeight
-            : (constraints.maxHeight / count).clamp(
-                0.0,
+            : (constraints.maxHeight * JumpIndex.usedFraction / count).clamp(
+                math.min(constraints.maxHeight / count, JumpIndex.minRowHeight),
                 JumpIndex.maxRowHeight,
               );
         // Centred in what is left over.
         final double top = ((constraints.maxHeight - rowHeight * count) / 2)
             .clamp(0.0, double.infinity);
         final double fontSize = (rowHeight * 0.55).clamp(8.0, 12.0);
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (d) => _handleAt(d.localPosition.dy, top, rowHeight),
-          onTapUp: (_) => _release(),
-          onTapCancel: _release,
-          onVerticalDragStart: (d) =>
-              _handleAt(d.localPosition.dy, top, rowHeight),
-          onVerticalDragUpdate: (d) =>
-              _handleAt(d.localPosition.dy, top, rowHeight),
-          onVerticalDragEnd: (_) => _release(),
-          child: SizedBox(
-            width: JumpIndex.width,
-            child: AnimatedBuilder(
-              animation: _wave,
-              builder: (BuildContext context, Widget? _) => Stack(
-                clipBehavior: Clip.none,
-                children: <Widget>[
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: top,
-                    child: Column(
-                      children: <Widget>[
-                        for (final (int i, String initial)
-                            in widget.initials.indexed)
-                          SizedBox(
-                            height: rowHeight,
-                            child: _Letter(
-                              initial: initial,
-                              fontSize: fontSize,
-                              wave: _weight(i) * _wave.value,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (_active != null)
+        return Listener(
+          // Every new touch starts afresh, whatever became of the last.
+          onPointerDown: (_) => _reached = null,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            // A scrub starts on the letter the finger landed on, not the one it
+            // had reached by the time it had moved far enough to count as a drag.
+            dragStartBehavior: DragStartBehavior.down,
+            onTapDown: (d) => _handleAt(d.localPosition.dy, top, rowHeight),
+            onTapUp: (_) => _lift(),
+            onTapCancel: _release,
+            onVerticalDragStart: (d) =>
+                _handleAt(d.localPosition.dy, top, rowHeight),
+            onVerticalDragUpdate: (d) =>
+                _handleAt(d.localPosition.dy, top, rowHeight),
+            onVerticalDragEnd: (_) => _lift(),
+            child: SizedBox(
+              width: JumpIndex.width,
+              child: AnimatedBuilder(
+                animation: _wave,
+                builder: (BuildContext context, Widget? _) => Stack(
+                  clipBehavior: Clip.none,
+                  children: <Widget>[
                     Positioned(
-                      left: 0,
-                      right: 0,
-                      top: top + _active! * rowHeight + rowHeight - 2,
-                      child: Container(height: 2, color: TileColors.textBright),
+                      left:
+                          -JumpIndex.pushOut *
+                          Curves.easeOut.transform(_wave.value),
+                      right:
+                          JumpIndex.pushOut *
+                          Curves.easeOut.transform(_wave.value),
+                      top: top,
+                      child: Column(
+                        children: <Widget>[
+                          for (final (int i, String initial)
+                              in widget.initials.indexed)
+                            SizedBox(
+                              height: rowHeight,
+                              child: _Letter(
+                                initial: initial,
+                                fontSize: fontSize,
+                                wave: _weight(i) * _wave.value,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                ],
+                    if (_active != null)
+                      Positioned(
+                        left:
+                            -JumpIndex.pushOut *
+                            Curves.easeOut.transform(_wave.value),
+                        right:
+                            JumpIndex.pushOut *
+                            Curves.easeOut.transform(_wave.value),
+                        top: top + _active! * rowHeight + rowHeight - 2,
+                        child: Container(
+                          height: 2,
+                          color: TileColors.textBright,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

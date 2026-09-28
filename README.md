@@ -7,7 +7,7 @@ what it knows (the time, the weather, your next event, how many messages are
 waiting) and opens the thing behind it when you tap it. The layout is
 Windows-Phone-ish; the *look* is not: light blue on C64 blue, VIC-II colours,
 the *Press Start 2P* pixel font, hard edges and bevels instead of shadows and
-blur. Tiles are chunky bevelled keys with a faint scanline, a shine and a dithered shade, and they sink when you press them.
+blur. Tiles are chunky bevelled keys with a faint scanline, a shine and a dithered shade, and they sink when you press them (not when you only scroll past).
 
 <p align="center"><img src="design/icon/preview_circle.png" alt="The app icon: four bevelled tiles under a rainbow stripe" width="160"></p>
 

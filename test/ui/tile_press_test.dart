@@ -1,6 +1,7 @@
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
+import 'package:android_tile_launcher/ui/press_listener.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_view.dart';
@@ -93,6 +94,8 @@ Color _bottomRight(WidgetTester tester) =>
 
 /// The bevel animates: one frame to start it, then time for it to finish.
 Future<void> _flip(WidgetTester tester) async {
+  // The finger rests until the look comes on, then the bevel animates.
+  await tester.pump(PressListener.showAfter + const Duration(milliseconds: 10));
   await tester.pump();
   await tester.pump(TileView.pressDuration * 2);
 }
@@ -258,6 +261,117 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(_buzzes, isEmpty);
+    });
+  });
+
+  group('a finger that is only scrolling', () {
+    testWidgets('never sinks the tile, however long it takes to go', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, onTap: () {});
+
+      final TestGesture finger = await tester.startGesture(
+        tester.getCenter(find.byKey(_tile)),
+      );
+      // Off before the look would have come on.
+      await tester.pump(const Duration(milliseconds: 30));
+      await finger.moveBy(const Offset(0, 14));
+      await tester.pump(PressListener.showAfter * 3);
+      await tester.pump(TileView.pressDuration * 2);
+
+      expect(_topLeft(tester), light);
+      await finger.up();
+      await tester.pumpAndSettle();
+      expect(_topLeft(tester), light);
+    });
+
+    testWidgets('does not tick, either', (WidgetTester tester) async {
+      _record(tester);
+      await _pump(tester, onTap: () {});
+
+      final TestGesture finger = await tester.startGesture(
+        tester.getCenter(find.byKey(_tile)),
+      );
+      await finger.moveBy(const Offset(0, 60));
+      await finger.up();
+      await tester.pumpAndSettle();
+
+      expect(_buzzes, isEmpty);
+    });
+
+    testWidgets('a finger that rests, then slides away, lets go at once', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, onTap: () {});
+
+      final TestGesture finger = await tester.startGesture(
+        tester.getCenter(find.byKey(_tile)),
+      );
+      await _flip(tester);
+      expect(_topLeft(tester), dark);
+
+      await finger.moveBy(const Offset(0, PressListener.visualSlop + 4));
+      await tester.pump();
+      await tester.pump(TileView.pressDuration * 2);
+
+      expect(_topLeft(tester), light);
+      await finger.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a wobble under the slop still counts as a press', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, onTap: () {});
+
+      final TestGesture finger = await tester.startGesture(
+        tester.getCenter(find.byKey(_tile)),
+      );
+      await finger.moveBy(const Offset(0, PressListener.visualSlop - 3));
+      await _flip(tester);
+
+      expect(_topLeft(tester), dark);
+      await finger.up();
+      await tester.pumpAndSettle();
+    });
+  });
+
+  group('a quick tap', () {
+    testWidgets('sinks for a moment once it lets go, so it is seen', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, onTap: () {});
+
+      await tester.tap(find.byKey(_tile));
+      await tester.pump();
+      expect(_topLeft(tester), dark);
+
+      await tester.pump(PressListener.flashFor);
+      await tester.pump(TileView.pressDuration * 2);
+      expect(_topLeft(tester), light);
+    });
+
+    testWidgets('still ticks', (WidgetTester tester) async {
+      _record(tester);
+      await _pump(tester, onTap: () {});
+
+      await tester.tap(find.byKey(_tile));
+      await tester.pumpAndSettle();
+
+      expect(_buzzes, <String>['HapticFeedbackType.lightImpact']);
+    });
+
+    testWidgets('a tile that does nothing when tapped does not flash', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+
+      await tester.tap(find.byKey(_tile));
+      await tester.pump();
+      await tester.pump(TileView.pressDuration * 2);
+
+      expect(_topLeft(tester), light);
+      await tester.pumpAndSettle();
     });
   });
 }

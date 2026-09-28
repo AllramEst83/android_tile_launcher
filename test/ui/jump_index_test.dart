@@ -37,10 +37,19 @@ void _recordHaptics(WidgetTester tester) {
   );
 }
 
+/// The 26 letters in a 780 px strip: 70% of the height, so 546 px, 21 a letter,
+/// with 117 px (15%) clear above and below.
+const double _height = 780;
+const double _row = 21;
+const double _top = 117;
+
+/// Where, down the strip, the middle of letter [k] is.
+double _at(int k) => _top + _row * k + _row / 2;
+
 Future<List<int>> _pump(
   WidgetTester tester, {
   List<String>? initials,
-  double height = 780,
+  double height = _height,
   bool haptics = true,
 }) async {
   tester.view
@@ -77,7 +86,7 @@ Future<List<int>> _pump(
 /// then the wave takes a moment to grow.
 Future<void> _settleWave(WidgetTester tester) async {
   await tester.pump(kPressTimeout + const Duration(milliseconds: 10));
-  await tester.pump(const Duration(milliseconds: 200));
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 double _y(WidgetTester tester, String letter) =>
@@ -88,7 +97,7 @@ double _x(WidgetTester tester, String letter) =>
 
 /// How much bigger than at rest the letter is drawn (layout size does not
 /// change with a scale, so read the scale itself).
-double _width(WidgetTester tester, String letter) => tester
+double _scale(WidgetTester tester, String letter) => tester
     .widgetList<Transform>(
       find.ancestor(of: find.text(letter), matching: find.byType(Transform)),
     )
@@ -97,15 +106,23 @@ double _width(WidgetTester tester, String letter) => tester
 
 void main() {
   group('spread', () {
-    testWidgets('the letters share the whole height, evenly', (
+    testWidgets('the letters fill the middle 70%, evenly', (
       WidgetTester tester,
     ) async {
-      await _pump(tester, height: 780);
+      await _pump(tester);
 
-      // 26 letters in 780: 30 a letter.
-      expect(_y(tester, 'B') - _y(tester, 'A'), closeTo(30, 0.5));
-      expect(_y(tester, 'Z') - _y(tester, 'A'), closeTo(30 * 25, 1));
-      expect(_y(tester, 'A'), closeTo(15, 1));
+      expect(_y(tester, 'B') - _y(tester, 'A'), closeTo(_row, 0.5));
+      expect(_y(tester, 'Z') - _y(tester, 'A'), closeTo(_row * 25, 1));
+      expect(_y(tester, 'A'), closeTo(_at(0), 1));
+    });
+
+    testWidgets('15% is clear above the first letter and below the last', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+
+      expect(_y(tester, 'A'), greaterThan(_height * 0.15));
+      expect(_y(tester, 'Z'), lessThan(_height * 0.85));
     });
 
     testWidgets('never more than the largest row, and then centred', (
@@ -117,49 +134,72 @@ void main() {
         _y(tester, 'B') - _y(tester, 'A'),
         closeTo(JumpIndex.maxRowHeight, 0.5),
       );
-      // Three rows in the middle of 800: the middle one on the middle line.
       expect(_y(tester, 'B'), closeTo(400, 1));
     });
 
-    testWidgets('a short strip squeezes them so every letter fits', (
+    testWidgets('a short strip uses all its height, so every letter fits', (
       WidgetTester tester,
     ) async {
       await _pump(tester, height: 260);
 
+      // 70% would be 7 a letter; it takes 10 (all 260) instead.
       expect(_y(tester, 'B') - _y(tester, 'A'), closeTo(10, 0.5));
       expect(_y(tester, 'Z'), lessThan(260));
+    });
+
+    testWidgets('a medium strip stops sparing its ends at the smallest row', (
+      WidgetTester tester,
+    ) async {
+      // 26 letters in 500: 70% is 13.4 a letter, under the 14 minimum; there is
+      // room for 19, so the minimum is used.
+      await _pump(tester, height: 500);
+
+      expect(
+        _y(tester, 'B') - _y(tester, 'A'),
+        closeTo(JumpIndex.minRowHeight, 0.5),
+      );
     });
 
     testWidgets('a tap lands on the letter drawn there', (
       WidgetTester tester,
     ) async {
-      final List<int> jumps = await _pump(tester, height: 780);
+      final List<int> jumps = await _pump(tester);
 
       final Offset top = tester.getTopLeft(find.byKey(_strip));
       for (final int letter in <int>[0, 7, 13, 25]) {
-        await tester.tapAt(Offset(top.dx + 12, top.dy + 30 * letter + 15));
+        await tester.tapAt(Offset(top.dx + 12, top.dy + _at(letter)));
         await tester.pump();
       }
 
       expect(jumps, <int>[0, 7, 13, 25]);
     });
 
-    testWidgets('a tap above or below the letters takes the nearest one', (
+    testWidgets('a fresh touch on the same letter jumps again', (
       WidgetTester tester,
     ) async {
-      final List<int> jumps = await _pump(
-        tester,
-        initials: <String>['A', 'B', 'C'],
-        height: 800,
-      );
+      final List<int> jumps = await _pump(tester);
 
       final Offset top = tester.getTopLeft(find.byKey(_strip));
-      await tester.tapAt(Offset(top.dx + 12, top.dy + 2));
+      for (int i = 0; i < 3; i++) {
+        await tester.tapAt(Offset(top.dx + 12, top.dy + _at(4)));
+        await tester.pump();
+      }
+
+      expect(jumps, <int>[4, 4, 4]);
+    });
+
+    testWidgets('a tap in the clear space takes the nearest letter', (
+      WidgetTester tester,
+    ) async {
+      final List<int> jumps = await _pump(tester);
+
+      final Offset top = tester.getTopLeft(find.byKey(_strip));
+      await tester.tapAt(Offset(top.dx + 12, top.dy + 20));
       await tester.pump();
-      await tester.tapAt(Offset(top.dx + 12, top.dy + 798));
+      await tester.tapAt(Offset(top.dx + 12, top.dy + _height - 20));
       await tester.pump();
 
-      expect(jumps, <int>[0, 2]);
+      expect(jumps, <int>[0, 25]);
     });
   });
 
@@ -167,13 +207,13 @@ void main() {
     testWidgets('each letter passed over jumps once, in order', (
       WidgetTester tester,
     ) async {
-      final List<int> jumps = await _pump(tester, height: 780);
+      final List<int> jumps = await _pump(tester);
       final Offset top = tester.getTopLeft(find.byKey(_strip));
 
       final TestGesture finger = await tester.startGesture(
-        Offset(top.dx + 12, top.dy + 5),
+        Offset(top.dx + 12, top.dy + _at(0)),
       );
-      for (double y = 10; y < 130; y += 6) {
+      for (double y = _at(0); y < _at(4) + 5; y += 5) {
         await finger.moveTo(Offset(top.dx + 12, top.dy + y));
         await tester.pump();
       }
@@ -187,17 +227,17 @@ void main() {
       WidgetTester tester,
     ) async {
       _recordHaptics(tester);
-      await _pump(tester, height: 780);
+      await _pump(tester);
       final Offset top = tester.getTopLeft(find.byKey(_strip));
 
       final TestGesture finger = await tester.startGesture(
-        Offset(top.dx + 12, top.dy + 5),
+        Offset(top.dx + 12, top.dy + _at(0)),
       );
       // Held long enough to count as a touch on the first letter.
       await tester.pump(kPressTimeout + const Duration(milliseconds: 10));
-      await finger.moveTo(Offset(top.dx + 12, top.dy + 10));
-      await finger.moveTo(Offset(top.dx + 12, top.dy + 40));
-      await finger.moveTo(Offset(top.dx + 12, top.dy + 44));
+      await finger.moveTo(Offset(top.dx + 12, top.dy + _at(0) + 3));
+      await finger.moveTo(Offset(top.dx + 12, top.dy + _at(1)));
+      await finger.moveTo(Offset(top.dx + 12, top.dy + _at(1) + 3));
       await finger.up();
       await tester.pumpAndSettle();
 
@@ -211,13 +251,13 @@ void main() {
       WidgetTester tester,
     ) async {
       _recordHaptics(tester);
-      await _pump(tester, height: 780, haptics: false);
+      await _pump(tester, haptics: false);
       final Offset top = tester.getTopLeft(find.byKey(_strip));
 
       final TestGesture finger = await tester.startGesture(
-        Offset(top.dx + 12, top.dy + 5),
+        Offset(top.dx + 12, top.dy + _at(0)),
       );
-      await finger.moveTo(Offset(top.dx + 12, top.dy + 100));
+      await finger.moveTo(Offset(top.dx + 12, top.dy + _at(6)));
       await finger.up();
       await tester.pumpAndSettle();
 
@@ -225,89 +265,125 @@ void main() {
     });
   });
 
+  group('pushed out while touched', () {
+    testWidgets('the whole strip slides out from under the finger', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+      final double restA = _x(tester, 'A');
+      final double restZ = _x(tester, 'Z');
+      final Offset top = tester.getTopLeft(find.byKey(_strip));
+
+      final TestGesture finger = await tester.startGesture(
+        Offset(top.dx + 12, top.dy + _at(12)),
+      );
+      await _settleWave(tester);
+
+      // Far from the finger, so no wave: only the slide.
+      expect(restA - _x(tester, 'A'), closeTo(JumpIndex.pushOut, 0.5));
+      expect(restZ - _x(tester, 'Z'), closeTo(JumpIndex.pushOut, 0.5));
+      await finger.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('and back to rest when it lifts', (WidgetTester tester) async {
+      await _pump(tester);
+      final double restA = _x(tester, 'A');
+      final double restM = _x(tester, 'M');
+      final Offset top = tester.getTopLeft(find.byKey(_strip));
+
+      final TestGesture finger = await tester.startGesture(
+        Offset(top.dx + 12, top.dy + _at(12)),
+      );
+      await _settleWave(tester);
+      await finger.up();
+      await tester.pumpAndSettle();
+
+      expect(_x(tester, 'A'), closeTo(restA, 0.01));
+      expect(_x(tester, 'M'), closeTo(restM, 0.01));
+    });
+
+    testWidgets('a touch in the clear space pushes it out too', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+      final double restA = _x(tester, 'A');
+      final Offset top = tester.getTopLeft(find.byKey(_strip));
+
+      final TestGesture finger = await tester.startGesture(
+        Offset(top.dx + 12, top.dy + 10),
+      );
+      await _settleWave(tester);
+
+      expect(restA - _x(tester, 'A'), greaterThan(JumpIndex.pushOut - 1));
+      await finger.up();
+      await tester.pumpAndSettle();
+    });
+  });
+
   group('the wave', () {
-    testWidgets('the letter under the finger swings out and grows', (
+    testWidgets('the letter under the finger swings out further and grows', (
       WidgetTester tester,
     ) async {
-      await _pump(tester, height: 780);
-      final double restX = _x(tester, 'M');
-      final double restWidth = _width(tester, 'M');
+      await _pump(tester);
+      final double restM = _x(tester, 'M');
+      final double restA = _x(tester, 'A');
       final Offset top = tester.getTopLeft(find.byKey(_strip));
 
       final TestGesture finger = await tester.startGesture(
-        Offset(top.dx + 12, top.dy + 30 * 12 + 15),
+        Offset(top.dx + 12, top.dy + _at(12)),
       );
       await _settleWave(tester);
 
-      expect(_x(tester, 'M'), lessThan(restX - JumpIndex.waveSwing * 0.9));
-      expect(_width(tester, 'M'), greaterThan(restWidth * 1.5));
+      final double slide = restA - _x(tester, 'A');
+      expect(restM - _x(tester, 'M'), closeTo(slide + JumpIndex.waveSwing, 1));
+      expect(_scale(tester, 'M'), greaterThan(1 + JumpIndex.waveGrowth * 0.9));
+      expect(_scale(tester, 'A'), 1);
       await finger.up();
       await tester.pumpAndSettle();
     });
 
-    testWidgets('it fades with distance, and far letters stay put', (
-      WidgetTester tester,
-    ) async {
-      await _pump(tester, height: 780);
-      final double restNear = _x(tester, 'O');
-      final double restFar = _x(tester, 'A');
+    testWidgets('it fades with distance', (WidgetTester tester) async {
+      await _pump(tester);
+      final double restM = _x(tester, 'M');
+      final double restO = _x(tester, 'O');
+      final double restA = _x(tester, 'A');
       final Offset top = tester.getTopLeft(find.byKey(_strip));
 
       final TestGesture finger = await tester.startGesture(
-        Offset(top.dx + 12, top.dy + 30 * 12 + 15),
+        Offset(top.dx + 12, top.dy + _at(12)),
       );
       await _settleWave(tester);
 
-      // Two letters away swings, but less than the one under the finger.
-      final double near = restNear - _x(tester, 'O');
-      final double under = _x(tester, 'N') - _x(tester, 'N');
-      expect(near, greaterThan(0));
-      expect(near, lessThan(JumpIndex.waveSwing));
-      expect(under, 0);
-      // A dozen letters away does not move at all.
-      expect(_x(tester, 'A'), restFar);
+      final double slide = restA - _x(tester, 'A');
+      final double under = restM - _x(tester, 'M') - slide;
+      final double two = restO - _x(tester, 'O') - slide;
+      expect(two, greaterThan(0));
+      expect(two, lessThan(under));
       await finger.up();
       await tester.pumpAndSettle();
     });
 
-    testWidgets('it settles back when the finger lifts', (
+    testWidgets('it follows the finger along the strip', (
       WidgetTester tester,
     ) async {
-      await _pump(tester, height: 780);
-      final double restX = _x(tester, 'M');
-      final double restWidth = _width(tester, 'M');
-      final Offset top = tester.getTopLeft(find.byKey(_strip));
-
-      final TestGesture finger = await tester.startGesture(
-        Offset(top.dx + 12, top.dy + 30 * 12 + 15),
-      );
-      await _settleWave(tester);
-      await finger.up();
-      await tester.pumpAndSettle();
-
-      expect(_x(tester, 'M'), closeTo(restX, 0.01));
-      expect(_width(tester, 'M'), closeTo(restWidth, 0.01));
-    });
-
-    testWidgets('the wave follows the finger along the strip', (
-      WidgetTester tester,
-    ) async {
-      await _pump(tester, height: 780);
+      await _pump(tester);
       final double restD = _x(tester, 'D');
       final double restT = _x(tester, 'T');
       final Offset top = tester.getTopLeft(find.byKey(_strip));
 
       final TestGesture finger = await tester.startGesture(
-        Offset(top.dx + 12, top.dy + 30 * 3 + 15),
+        Offset(top.dx + 12, top.dy + _at(3)),
       );
       await _settleWave(tester);
-      expect(_x(tester, 'D'), lessThan(restD - 10));
-      expect(_x(tester, 'T'), restT);
+      expect(restD - _x(tester, 'D'), greaterThan(JumpIndex.pushOut + 5));
+      expect(restT - _x(tester, 'T'), closeTo(JumpIndex.pushOut, 1));
 
-      await finger.moveTo(Offset(top.dx + 12, top.dy + 30 * 19 + 15));
-      await _settleWave(tester);
-      expect(_x(tester, 'D'), restD);
-      expect(_x(tester, 'T'), lessThan(restT - 10));
+      await finger.moveTo(Offset(top.dx + 12, top.dy + _at(19)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(restD - _x(tester, 'D'), closeTo(JumpIndex.pushOut, 1));
+      expect(restT - _x(tester, 'T'), greaterThan(JumpIndex.pushOut + 5));
       await finger.up();
       await tester.pumpAndSettle();
     });

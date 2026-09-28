@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
+import 'package:android_tile_launcher/ui/press_listener.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_gloss.dart';
@@ -100,6 +101,9 @@ void main() {
 
       final TestGesture finger = await tester.startGesture(
         tester.getCenter(find.byKey(_tile)),
+      );
+      await tester.pump(
+        PressListener.showAfter + const Duration(milliseconds: 10),
       );
       await tester.pump();
 
