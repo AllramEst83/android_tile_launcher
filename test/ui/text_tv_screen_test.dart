@@ -204,6 +204,39 @@ void main() {
     });
   });
 
+  testWidgets('a colour bar is centred by its edges, the text by its words', (
+    WidgetTester tester,
+  ) async {
+    final FakeTextTvRepository repository = _repository();
+    // Text that leans right (blank cells left of it, none right of it), and a
+    // bar across the whole width.
+    final List<List<StyledRun>> rows = <List<StyledRun>>[
+      <StyledRun>[StyledRun('100 SVT Text'.padRight(40))],
+      <StyledRun>[StyledRun('  A headline that reaches the far edge!!')],
+      <StyledRun>[
+        StyledRun('    Inrikes 101 Utrikes 104 Innehåll 70', bg: TvColor.blue),
+        const StyledRun('0', bg: TvColor.blue),
+      ],
+    ];
+    repository.pages[100] = _page(
+      100,
+      parts: <List<String>>[
+        <String>['100', 'x', 'y'],
+      ],
+      styled: <List<List<StyledRun>>>[rows],
+    );
+    await _open(tester, repository);
+
+    final List<TvRow> drawn = tester
+        .widgetList<TvRow>(find.byType(TvRow))
+        .toList();
+
+    // The text leans right, so it is drawn with less gutter on its left...
+    expect(drawn[1].gutterLeft, 0);
+    // ...and the bar with the same gutter on both sides.
+    expect(drawn[2].gutterLeft, tvGutterCells ~/ 2);
+  });
+
   group('going to another page', () {
     testWidgets('the arrows follow the pages the site names', (
       WidgetTester tester,

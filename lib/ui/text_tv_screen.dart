@@ -492,7 +492,11 @@ class _Grid extends StatelessWidget {
             runs: row,
             columns: 40,
             style: style,
-            gutterLeft: gutters.left,
+            // The text is centred by what it says; a bar, which runs the width
+            // of the page, by its edges, so it has the same margin both sides.
+            gutterLeft: tvIsBar(row, columns: 40)
+                ? tvGutterCells ~/ 2
+                : gutters.left,
             rowHeight: rowHeight,
             onRun: onLink,
           ),

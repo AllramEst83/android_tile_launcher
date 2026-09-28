@@ -24,7 +24,62 @@ List<List<StyledRun>> _fixture(String name) {
 }
 
 void main() {
+  group('tvIsBar', () {
+    test('a coloured background under the whole width is a bar', () {
+      final List<StyledRun> bar = <StyledRun>[
+        StyledRun(
+          'Inrikes 101'.padRight(40),
+          fg: TvColor.yellow,
+          bg: TvColor.blue,
+        ),
+      ];
+
+      expect(tvIsBar(bar, columns: 40), isTrue);
+    });
+
+    test('so is one made of several coloured runs', () {
+      final List<StyledRun> bar = <StyledRun>[
+        StyledRun(' ' * 4, bg: TvColor.blue),
+        StyledRun(
+          'Innehåll 700'.padRight(36),
+          fg: TvColor.yellow,
+          bg: TvColor.blue,
+        ),
+      ];
+
+      expect(tvIsBar(bar, columns: 40), isTrue);
+    });
+
+    test('plain text on black is not, nor is a short coloured patch', () {
+      expect(tvIsBar(_row('  Rubrik'), columns: 40), isFalse);
+      expect(
+        tvIsBar(<StyledRun>[
+          StyledRun(' ' * 10, bg: TvColor.red),
+          StyledRun(' ' * 30),
+        ], columns: 40),
+        isFalse,
+      );
+    });
+  });
+
   group('tvTextMargins', () {
+    test('a colour bar does not count as text', () {
+      final List<List<StyledRun>> rows = <List<StyledRun>>[
+        _row('title'),
+        _row('  A headline that reaches the far edge!!'),
+        <StyledRun>[
+          StyledRun(
+            '    Inrikes 101 Utrikes 104 Innehåll 700',
+            bg: TvColor.blue,
+          ),
+        ],
+      ];
+
+      // The bar starts at cell 4 and ends at the last cell; the headline sets
+      // the margins.
+      expect(tvTextMargins(rows, columns: 40), (left: 2, right: 0));
+    });
+
     test('the room the longest-reaching rows leave on each side', () {
       final List<List<StyledRun>> rows = _page(<String>[
         '100 SVT Text', // the title strip is not counted
