@@ -44,6 +44,14 @@ Future<void> _pump(
   ),
 );
 
+/// The headline the tile drew at [index].
+Text _headline(WidgetTester tester, int index) => tester.widget<Text>(
+  find.descendant(
+    of: find.byKey(textTvHeadlineKey(index)),
+    matching: find.byType(Text),
+  ),
+);
+
 void main() {
   group('with a page', () {
     testWidgets('small: the name and the page number', (
@@ -77,6 +85,49 @@ void main() {
 
       expect(find.byKey(textTvHeadlineKey(0)), findsOneWidget);
       expect(find.byKey(textTvHeadlineKey(2)), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the headlines are big enough to read', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, TextTvShown(_page));
+
+      expect(_headline(tester, 0).style?.fontSize, greaterThanOrEqualTo(11));
+    });
+
+    testWidgets('a headline too long for one line wraps to as many as it '
+        'needs, the lead story more than the rest', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, TextTvShown(_page));
+
+      // The lead story: too long for one line even at its extra allowance.
+      expect(_headline(tester, 0).maxLines, 2);
+      // Short enough not to need the second line the tile would allow it.
+      expect(_headline(tester, 1).maxLines, 1);
+    });
+
+    testWidgets('a short headline is not stretched to lines it does not '
+        'need, so the tile fits more stories', (WidgetTester tester) async {
+      final TextTvPage short = TextTvPage(
+        number: 100,
+        parts: <List<String>>[
+          <String>['100', '', '  Short one', '  Also short', '  And this'],
+        ],
+      );
+      await _pump(tester, TextTvShown(short));
+
+      expect(_headline(tester, 0).maxLines, 1);
+      expect(_headline(tester, 1).maxLines, 1);
+      expect(_headline(tester, 2).maxLines, 1);
+    });
+
+    testWidgets('narrower still, a headline needs more lines to read in '
+        'full', (WidgetTester tester) async {
+      await _pump(tester, TextTvShown(_page), size: const Size(185, 185));
+
+      expect(_headline(tester, 0).maxLines, 3);
       expect(tester.takeException(), isNull);
     });
   });

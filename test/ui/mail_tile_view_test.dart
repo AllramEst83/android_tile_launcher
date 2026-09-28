@@ -85,6 +85,29 @@ void main() {
       expect(find.text('*'), findsNWidgets(2));
     });
 
+    testWidgets('wide: who it is from over what it is about', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, _inbox, size: const Size(380, 185));
+
+      final Offset from = tester.getTopLeft(find.text('ANNA ANDERSSON'));
+      final Offset about = tester.getTopLeft(find.text('LUNCH ON FRIDAY?'));
+      // Two lines, one under the other, not one line holding both.
+      expect(about.dy, greaterThan(from.dy));
+      expect(about.dx, from.dx);
+    });
+
+    testWidgets('wide: the messages are big enough to read', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, _inbox, size: const Size(380, 185));
+
+      final Text from = tester.widget<Text>(find.text('ANNA ANDERSSON'));
+      final Text about = tester.widget<Text>(find.text('LUNCH ON FRIDAY?'));
+      expect(from.style?.fontSize, greaterThanOrEqualTo(11));
+      expect(about.style?.fontSize, greaterThanOrEqualTo(10));
+    });
+
     testWidgets('wide: only as many lines as the height holds', (
       WidgetTester tester,
     ) async {

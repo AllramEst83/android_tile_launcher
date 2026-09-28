@@ -9,10 +9,10 @@ Key mailRowKey(int index) => ValueKey<String>('mail-row-$index');
 
 /// The mail tile's content, fitted to whatever size the tile was given: the
 /// unread count as a big number on a small one; plus the newest message on a
-/// medium one; plus as many of the newest messages as fit, one line each, on a
-/// wide (or larger) one. Without an inbox to show it says why, and a tap
-/// ([onTap]) is how the user sets mail up, retries, or opens the inbox. `null`
-/// in the grid editor, where a tap selects the tile.
+/// medium one; plus as many of the newest messages as fit, sender and subject
+/// on a line each, on a wide (or larger) one. Without an inbox to show it says
+/// why, and a tap ([onTap]) is how the user sets mail up, retries, or opens the
+/// inbox. `null` in the grid editor, where a tap selects the tile.
 class MailTileContentView extends StatelessWidget {
   const MailTileContentView({
     super.key,
@@ -62,8 +62,17 @@ List<String> _messageFor(MailResult result) => switch (result) {
   MailMessages() => const <String>[],
 };
 
-TextStyle _text(Color ink, double size) =>
-    TextStyle(fontFamily: kPixelFontFamily, fontSize: size, color: ink);
+/// The box one line of tile text sits in, as a multiple of its type size. Set
+/// here rather than left to the font, so a row's height is known from its type
+/// size alone and a wrapped line sits exactly one row below the one above it.
+const double _leading = 1.45;
+
+TextStyle _text(Color ink, double size) => TextStyle(
+  fontFamily: kPixelFontFamily,
+  fontSize: size,
+  height: _leading,
+  color: ink,
+);
 
 String _subjectOf(MailMessage m) =>
     m.subject.isEmpty ? Messages.mailNoSubject : m.subject.toUpperCase();
@@ -83,7 +92,7 @@ class _MessageView extends StatelessWidget {
         Text(Messages.mailTitle, style: _text(ink, 10)),
         const SizedBox(height: 6),
         for (final String line in lines)
-          Text(line, style: _text(ink, 8), softWrap: true),
+          Text(line, style: _text(ink, 9), softWrap: true),
       ],
     );
   }
@@ -104,29 +113,45 @@ class _InboxView extends StatelessWidget {
 
   static const double _compact = 120;
   static const double _wide = 260;
-  static const double _rowHeight = 16;
-  static const double _headerHeight = 22;
+
+  /// A message on a wide tile: who it is from over what it is about, each on a
+  /// line of its own, at a size that can be read at arm's length. One cramped
+  /// line holding both said less than this says in two.
+  static const double _sender = 11;
+  static const double _subject = 10;
+  static const double _senderLine = _sender * _leading;
+  static const double _subjectLine = _subject * _leading;
+  static const double _rowHeight = _senderLine + _subjectLine;
+
+  /// Air between two messages, so the list reads as messages, not as lines.
+  static const double _gap = 5;
+
+  /// The width the unread marker and the subject's indent under it take, so a
+  /// subject lines up with its sender's name.
+  static const double _marker = 14;
+
+  /// The count on a wide tile's header line, and the room that line needs for
+  /// it: it is the tallest thing on the line.
+  static const double _headerCount = 18;
+  static const double _headerHeight = _headerCount * _leading + 2;
+
+  Widget _count(double size, Alignment alignment) => FittedBox(
+    key: mailCountKey,
+    fit: BoxFit.scaleDown,
+    alignment: alignment,
+    child: Text('${inbox.unread}', style: _text(ink, size)),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final Widget count = FittedBox(
-      key: mailCountKey,
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.centerLeft,
-      child: Text(
-        '${inbox.unread}',
-        style: _text(ink, width < _compact ? 28 : 32),
-      ),
-    );
-
     if (width < _compact) {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          count,
+          _count(28, Alignment.centerLeft),
           const SizedBox(height: 4),
-          Text(Messages.mailUnread, style: _text(ink, 8)),
+          Text(Messages.mailUnread, style: _text(ink, 9)),
         ],
       );
     }
@@ -137,103 +162,107 @@ class _InboxView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          Text(Messages.mailTitle, style: _text(ink, 8)),
+          Text(Messages.mailTitle, style: _text(ink, 9)),
           const SizedBox(height: 4),
-          count,
-          Text(Messages.mailUnread, style: _text(ink, 8)),
+          _count(30, Alignment.centerLeft),
+          Text(Messages.mailUnread, style: _text(ink, 9)),
           if (newest != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(
               newest.from.toUpperCase(),
-              style: _text(ink, 8),
+              style: _text(ink, _sender),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Flexible(
               child: Text(
                 _subjectOf(newest),
-                style: _text(ink, 8),
+                style: _text(ink, _subject),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
           ] else ...<Widget>[
             const SizedBox(height: 8),
-            Text(Messages.mailInboxEmpty, style: _text(ink, 8)),
+            Text(Messages.mailInboxEmpty, style: _text(ink, _subject)),
           ],
         ],
       );
     }
 
-    // Wide: the count down the left, the newest messages down the right.
-    final int fit = ((height - _headerHeight) / _rowHeight).floor().clamp(
+    // Wide: the count on one header line, so the messages below have the whole
+    // width of the tile to say who wrote and what about.
+    final double room = height - _headerHeight;
+    final int fit = (room / (_rowHeight + _gap)).floor().clamp(
       1,
       inbox.messages.isEmpty ? 1 : inbox.messages.length,
     );
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         SizedBox(
-          width: 84,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+          height: _headerHeight,
+          child: Row(
             children: <Widget>[
-              Text(Messages.mailTitle, style: _text(ink, 8)),
-              const SizedBox(height: 4),
-              count,
-              Text(Messages.mailUnread, style: _text(ink, 8)),
+              Text(Messages.mailTitle, style: _text(ink, 10)),
+              Expanded(child: _count(_headerCount, Alignment.centerRight)),
+              const SizedBox(width: 6),
+              Text(Messages.mailUnread, style: _text(ink, 9)),
             ],
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: inbox.messages.isEmpty
-              ? Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(Messages.mailInboxEmpty, style: _text(ink, 8)),
-                )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        if (inbox.messages.isEmpty)
+          Text(Messages.mailInboxEmpty, style: _text(ink, _subject))
+        else
+          for (final (int i, MailMessage m) in inbox.messages.take(fit).indexed)
+            Padding(
+              key: mailRowKey(i),
+              padding: EdgeInsets.only(top: i == 0 ? 0 : _gap),
+              child: SizedBox(
+                height: _rowHeight,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    for (final (int i, MailMessage m)
-                        in inbox.messages.take(fit).indexed)
-                      SizedBox(
-                        key: mailRowKey(i),
-                        height: _rowHeight,
-                        child: Row(
-                          children: <Widget>[
-                            // An unread message is marked and bright; a read
-                            // one is not, so the eye finds the new ones.
-                            SizedBox(
-                              width: 14,
-                              child: Text(
-                                m.unread ? '*' : '',
-                                style: _text(ink, 8),
-                              ),
+                    SizedBox(
+                      height: _senderLine,
+                      child: Row(
+                        children: <Widget>[
+                          // An unread message is marked, so the eye finds the
+                          // new ones without having to read them.
+                          SizedBox(
+                            width: _marker,
+                            child: Text(
+                              m.unread ? '*' : '',
+                              style: _text(ink, _sender),
                             ),
-                            SizedBox(
-                              width: 88,
-                              child: Text(
-                                m.from.toUpperCase(),
-                                style: _text(ink, 8),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              m.from.toUpperCase(),
+                              style: _text(ink, _sender),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            Expanded(
-                              child: Text(
-                                _subjectOf(m),
-                                style: _text(ink, 8),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: _subjectLine,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: _marker),
+                        child: Text(
+                          _subjectOf(m),
+                          style: _text(ink, _subject),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                    ),
                   ],
                 ),
-        ),
+              ),
+            ),
       ],
     );
   }
