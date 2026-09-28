@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:android_tile_launcher/model/styled_text.dart';
 import 'package:flutter/material.dart';
 
@@ -15,6 +17,16 @@ const tvUpscaleLimit = 1.75;
 /// leans. The page's own colour bars run to the page's edges, so the gutters
 /// are black either side of them.
 const tvGutterCells = 2;
+
+/// The width of one cell when a grid of [columns] (and the gutters) is fitted
+/// into [width]: what `TvRow` will pick, so a caller can work out how tall to
+/// make the rows before drawing them. Press Start 2P is one em wide per
+/// character, so a cell is as wide as the font is big.
+double tvCellWidth(double width, {int columns = 40, double baseFontSize = 8}) =>
+    (width * 0.995 / (columns + tvGutterCells)).clamp(
+      0.0,
+      baseFontSize * tvUpscaleLimit,
+    );
 
 /// The teletext colours as drawn: a fixed palette, not the theme's, because a
 /// teletext page is its own black screen in every theme. Bright but not
@@ -71,6 +83,7 @@ class TvRow extends StatelessWidget {
     required this.columns,
     required this.style,
     this.gutterLeft = tvGutterCells ~/ 2,
+    this.rowHeight,
     this.onRun,
   });
 
@@ -81,6 +94,13 @@ class TvRow extends StatelessWidget {
   /// Black cells to the left of the page; the rest of `tvGutterCells` go to
   /// the right.
   final int gutterLeft;
+
+  /// How tall one row is; by default as tall as the font makes it. A page that
+  /// is to fill a screen taller than that asks for more: backgrounds and block
+  /// graphics grow with the row, and the letters are stretched upright with
+  /// it (real teletext characters are twice as tall as they are wide), by as
+  /// much as the row allows, up to twice.
+  final double? rowHeight;
 
   /// Runs the command of a tapped link. Links are not tappable without it.
   final ValueChanged<String>? onRun;
@@ -105,8 +125,14 @@ class TvRow extends StatelessWidget {
           textDirection: TextDirection.ltr,
         )..layout();
         final cellWidth = cell.width;
-        final rowHeight = cell.height;
+        final naturalHeight = cell.height;
         cell.dispose();
+        final rowHeight = math.max(this.rowHeight ?? 0, naturalHeight);
+        // The letters fill about four fifths of a row that is taller than the
+        // font's own.
+        final stretch = this.rowHeight == null
+            ? 1.0
+            : (rowHeight / (cellWidth * 1.25)).clamp(1.0, 2.0);
         // A headline row is two rows tall and its glyphs are stretched to fit.
         final tall = runs.any((run) => run.tall);
 
@@ -139,6 +165,7 @@ class TvRow extends StatelessWidget {
                     cellWidth: cellWidth,
                     tall: tall,
                     gutterLeft: gutterLeft,
+                    stretch: stretch,
                   ),
                 ),
               ),
@@ -185,6 +212,7 @@ class _TvRowPainter extends CustomPainter {
     required this.cellWidth,
     required this.tall,
     required this.gutterLeft,
+    required this.stretch,
   });
 
   final List<StyledRun> runs;
@@ -193,6 +221,10 @@ class _TvRowPainter extends CustomPainter {
   final double cellWidth;
   final bool tall;
   final int gutterLeft;
+
+  /// How much taller than wide the letters are drawn (1 is as the font has
+  /// them).
+  final double stretch;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -317,13 +349,12 @@ class _TvRowPainter extends CustomPainter {
       textScaler: scaler,
       textDirection: TextDirection.ltr,
     )..layout();
-    painter.paint(
-      canvas,
-      Offset(
-        left + (cellWidth - painter.width) / 2,
-        (size.height - painter.height) / 2,
-      ),
-    );
+    // Stretched about the middle of the cell, so the letter stays centred.
+    canvas.save();
+    canvas.translate(left + cellWidth / 2, size.height / 2);
+    canvas.scale(1, stretch);
+    painter.paint(canvas, Offset(-painter.width / 2, -painter.height / 2));
+    canvas.restore();
     painter.dispose();
   }
 
@@ -334,5 +365,6 @@ class _TvRowPainter extends CustomPainter {
       old.cellWidth != cellWidth ||
       old.tall != tall ||
       old.gutterLeft != gutterLeft ||
+      old.stretch != stretch ||
       old.scaler != scaler;
 }

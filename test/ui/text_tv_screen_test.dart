@@ -105,6 +105,105 @@ void main() {
     });
   });
 
+  group('filling the screen', () {
+    // A page of 24 plain rows, like a real one.
+    FakeTextTvRepository fullPage() {
+      final FakeTextTvRepository repository = _repository();
+      repository.pages[100] = _page(
+        100,
+        parts: <List<String>>[
+          <String>[
+            '100 SVT Text',
+            for (int i = 1; i < 24; i++) '  Rad $i i sidan',
+          ],
+        ],
+      );
+      return repository;
+    }
+
+    double pageHeight(WidgetTester tester) =>
+        tester.widgetList<TvRow>(find.byType(TvRow)).length.toDouble() *
+        tester.getSize(find.byType(TvRow).first).height;
+
+    testWidgets('on a tall screen the rows grow to use the height', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(400, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await _open(tester, fullPage());
+
+      final double area = tester
+          .getSize(find.byType(SingleChildScrollView).first)
+          .height;
+      final double cell = 400 * 0.995 / (40 + tvGutterCells);
+      final double natural = cell * 1.6;
+
+      expect(
+        tester.getSize(find.byType(TvRow).first).height,
+        greaterThan(natural * 1.2),
+      );
+      // Fills the room, or stops at its tallest row on a very tall screen.
+      expect(pageHeight(tester), lessThanOrEqualTo(area + 0.5));
+      expect(pageHeight(tester), greaterThan(area * 0.9));
+    });
+
+    testWidgets(
+      'on a short screen the rows stay natural and the page scrolls',
+      (WidgetTester tester) async {
+        tester.view
+          ..physicalSize = const Size(400, 420)
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await _open(tester, fullPage());
+
+        final double cell = 400 * 0.995 / (40 + tvGutterCells);
+        expect(
+          tester.getSize(find.byType(TvRow).first).height,
+          closeTo(cell * 1.6, 1),
+        );
+        final ScrollableState scroll = tester.state<ScrollableState>(
+          find.descendant(
+            of: find.byType(SingleChildScrollView).first,
+            matching: find.byType(Scrollable),
+          ),
+        );
+        expect(scroll.position.maxScrollExtent, greaterThan(0));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('a headline row counts for two rows of height', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(400, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final FakeTextTvRepository repository = _repository();
+      repository.pages[100] = _page(
+        100,
+        parts: <List<String>>[
+          <String>['100', 'HEAD', 'x'],
+        ],
+        styled: <List<List<StyledRun>>>[
+          <List<StyledRun>>[
+            <StyledRun>[StyledRun('title'.padRight(40))],
+            <StyledRun>[StyledRun('headline'.padRight(40), tall: true)],
+            <StyledRun>[StyledRun('  text row'.padRight(40))],
+          ],
+        ],
+      );
+      await _open(tester, repository);
+
+      final double plain = tester.getSize(find.byType(TvRow).at(0)).height;
+      final double tall = tester.getSize(find.byType(TvRow).at(1)).height;
+
+      expect(tall, closeTo(plain * 2, 0.5));
+    });
+  });
+
   group('going to another page', () {
     testWidgets('the arrows follow the pages the site names', (
       WidgetTester tester,

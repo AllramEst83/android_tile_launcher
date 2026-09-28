@@ -361,33 +361,37 @@ class _PageArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextTvResult? shown = result;
-    final Widget content;
-    if (loading || shown == null) {
-      content = _Message(lines: const <String>[Messages.textTvLoading]);
-    } else {
-      content = switch (shown) {
-        TextTvShown(:final TextTvPage page) => _Grid(
-          page: page,
-          part: part,
-          onLink: onLink,
-        ),
-        TextTvNotBroadcast(:final int number) => _Message(
-          lines: <String>[Messages.textTvPageNotBroadcast(number)],
-        ),
-        TextTvFailed(:final String reason) => _Message(
-          lines: <String>[reason.toUpperCase()],
-          retry: onRetry,
-        ),
-      };
-    }
     return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-          child: Center(child: content),
-        ),
-      ),
+      builder: (context, constraints) {
+        final TextTvResult? shown = result;
+        final Widget content;
+        if (loading || shown == null) {
+          content = _Message(lines: const <String>[Messages.textTvLoading]);
+        } else {
+          content = switch (shown) {
+            TextTvShown(:final TextTvPage page) => _Grid(
+              page: page,
+              part: part,
+              onLink: onLink,
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+            ),
+            TextTvNotBroadcast(:final int number) => _Message(
+              lines: <String>[Messages.textTvPageNotBroadcast(number)],
+            ),
+            TextTvFailed(:final String reason) => _Message(
+              lines: <String>[reason.toUpperCase()],
+              retry: onRetry,
+            ),
+          };
+        }
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(child: content),
+          ),
+        );
+      },
     );
   }
 }
@@ -428,11 +432,25 @@ class _Message extends StatelessWidget {
 /// The 40-column grid of one part of a page, drawn edge to edge with the text
 /// centred between equal margins.
 class _Grid extends StatelessWidget {
-  const _Grid({required this.page, required this.part, required this.onLink});
+  const _Grid({
+    required this.page,
+    required this.part,
+    required this.onLink,
+    required this.width,
+    required this.height,
+  });
 
   final TextTvPage page;
   final int part;
   final ValueChanged<String> onLink;
+
+  /// The room the page has, so its rows can be made tall enough to fill it.
+  final double width;
+  final double height;
+
+  /// No row is drawn taller than this many cells: on a very tall screen the
+  /// page stops growing and is centred instead.
+  static const double _tallestRow = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -447,12 +465,25 @@ class _Grid extends StatelessWidget {
         ];
     final ({int left, int right}) gutters = tvGutters(rows, columns: 40);
     // Press Start 2P is a monospaced pixel face: every cell one square em. The
-    // line height gives the rows their teletext proportions.
-    final TextStyle style = const TextStyle(
+    // line height gives the rows their natural teletext proportions.
+    const TextStyle style = TextStyle(
       fontFamily: kPixelFontFamily,
       fontSize: 8,
       height: 1.6,
     );
+
+    // Spread the rows over the height there is: a headline row counts for two.
+    // A screen too short for the natural row height scrolls instead.
+    final double cell = tvCellWidth(width);
+    final int units = rows.fold(
+      0,
+      (int sum, List<StyledRun> row) =>
+          sum + (row.any((StyledRun r) => r.tall) ? 2 : 1),
+    );
+    final double rowHeight = units == 0
+        ? cell * 1.6
+        : (height / units).clamp(cell * 1.6, cell * _tallestRow);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
@@ -462,6 +493,7 @@ class _Grid extends StatelessWidget {
             columns: 40,
             style: style,
             gutterLeft: gutters.left,
+            rowHeight: rowHeight,
             onRun: onLink,
           ),
       ],
