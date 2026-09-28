@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 /// Keys so tests can find the parts.
 const Key mailCountKey = ValueKey<String>('mail-count');
+const Key mailHeaderKey = ValueKey<String>('mail-header');
 Key mailRowKey(int index) => ValueKey<String>('mail-row-$index');
 
 /// The mail tile's content, fitted to whatever size the tile was given: the
@@ -119,9 +120,6 @@ class _InboxView extends StatelessWidget {
   /// line holding both said less than this says in two.
   static const double _sender = 11;
   static const double _subject = 10;
-  static const double _senderLine = _sender * _leading;
-  static const double _subjectLine = _subject * _leading;
-  static const double _rowHeight = _senderLine + _subjectLine;
 
   /// Air between two messages, so the list reads as messages, not as lines.
   static const double _gap = 5;
@@ -133,7 +131,6 @@ class _InboxView extends StatelessWidget {
   /// The count on a wide tile's header line, and the room that line needs for
   /// it: it is the tallest thing on the line.
   static const double _headerCount = 18;
-  static const double _headerHeight = _headerCount * _leading + 2;
 
   Widget _count(double size, Alignment alignment) => FittedBox(
     key: mailCountKey,
@@ -144,6 +141,16 @@ class _InboxView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Every fixed-height row below is sized off the FONT SIZE setting's
+    // scaler, not the bare type size: a `SizedBox` built from the unscaled
+    // size would still hold the same physical height while the `Text`
+    // inside it rendered taller, overflowing it.
+    final TextScaler scaler = MediaQuery.textScalerOf(context);
+    final double senderLine = scaler.scale(_sender) * _leading;
+    final double subjectLine = scaler.scale(_subject) * _leading;
+    final double rowHeight = senderLine + subjectLine;
+    final double headerHeight = scaler.scale(_headerCount) * _leading + 2;
+
     if (width < _compact) {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -192,8 +199,8 @@ class _InboxView extends StatelessWidget {
 
     // Wide: the count on one header line, so the messages below have the whole
     // width of the tile to say who wrote and what about.
-    final double room = height - _headerHeight;
-    final int fit = (room / (_rowHeight + _gap)).floor().clamp(
+    final double room = height - headerHeight;
+    final int fit = (room / (rowHeight + _gap)).floor().clamp(
       1,
       inbox.messages.isEmpty ? 1 : inbox.messages.length,
     );
@@ -201,7 +208,8 @@ class _InboxView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         SizedBox(
-          height: _headerHeight,
+          key: mailHeaderKey,
+          height: headerHeight,
           child: Row(
             children: <Widget>[
               Text(Messages.mailTitle, style: _text(ink, 10)),
@@ -219,12 +227,12 @@ class _InboxView extends StatelessWidget {
               key: mailRowKey(i),
               padding: EdgeInsets.only(top: i == 0 ? 0 : _gap),
               child: SizedBox(
-                height: _rowHeight,
+                height: rowHeight,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     SizedBox(
-                      height: _senderLine,
+                      height: senderLine,
                       child: Row(
                         children: <Widget>[
                           // An unread message is marked, so the eye finds the
@@ -248,7 +256,7 @@ class _InboxView extends StatelessWidget {
                       ),
                     ),
                     SizedBox(
-                      height: _subjectLine,
+                      height: subjectLine,
                       child: Padding(
                         padding: const EdgeInsets.only(left: _marker),
                         child: Text(

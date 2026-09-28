@@ -27,9 +27,14 @@ Future<void> _pump(
   MailResult result, {
   Size size = const Size(185, 185),
   VoidCallback? onTap,
+  TextScaler textScaler = TextScaler.noScaling,
 }) => tester.pumpWidget(
   MaterialApp(
     theme: tileLauncherTheme(),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+      child: child!,
+    ),
     home: Scaffold(
       body: Center(
         child: SizedBox(
@@ -146,6 +151,95 @@ void main() {
       );
 
       expect(find.text(Messages.mailNoSubject), findsOneWidget);
+    });
+  });
+
+  group('at a larger text scale (the FONT SIZE setting)', () {
+    // Regression: the wide inbox list's rows were fixed-height SizedBoxes
+    // sized off the bare, unscaled type size, so a message's sender and
+    // subject painted taller than their box at a larger scale and bled into
+    // the row below — a visual overlap a `RenderFlex` never flags (only a
+    // *main*-axis overflow throws; these rows overflow their *cross* axis),
+    // so `tester.takeException()` alone cannot catch it. The regression test
+    // is geometric: the row's own allocated height must grow with the
+    // scaler, not stay fixed while the text inside it grows.
+    const TextScaler extraLarge = TextScaler.linear(1.3);
+
+    testWidgets('small: the count still fits', (WidgetTester tester) async {
+      await _pump(
+        tester,
+        _inbox,
+        size: const Size(90, 90),
+        textScaler: extraLarge,
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('medium: the newest message still fits', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, _inbox, textScaler: extraLarge);
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('without an inbox: the message still fits', (
+      WidgetTester tester,
+    ) async {
+      await _pump(
+        tester,
+        const MailUnavailable('imap.gmail.com did not answer'),
+        textScaler: extraLarge,
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'wide: a message row grows with the scale, so its text is never '
+      'taller than the row',
+      (WidgetTester tester) async {
+        await _pump(tester, _inbox, size: const Size(380, 400));
+        final double normalHeight = tester
+            .getRect(find.byKey(mailRowKey(0)))
+            .height;
+
+        await _pump(
+          tester,
+          _inbox,
+          size: const Size(380, 400),
+          textScaler: extraLarge,
+        );
+        final double scaledHeight = tester
+            .getRect(find.byKey(mailRowKey(0)))
+            .height;
+
+        expect(scaledHeight, closeTo(normalHeight * 1.3, 0.5));
+      },
+    );
+
+    testWidgets('wide: the header row grows with the scale too', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, _inbox, size: const Size(380, 400));
+      final double normalHeight = tester
+          .getRect(find.byKey(mailHeaderKey))
+          .height;
+
+      await _pump(
+        tester,
+        _inbox,
+        size: const Size(380, 400),
+        textScaler: extraLarge,
+      );
+      final double scaledHeight = tester
+          .getRect(find.byKey(mailHeaderKey))
+          .height;
+
+      // Grows with the scale, not by exactly the same factor: 2px of it is
+      // fixed padding, not type size.
+      expect(scaledHeight, greaterThan(normalHeight * 1.2));
     });
   });
 
