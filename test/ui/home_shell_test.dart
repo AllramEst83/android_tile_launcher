@@ -17,6 +17,9 @@ import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
+import 'package:android_tile_launcher/ui/calc_pad.dart';
+import 'package:android_tile_launcher/ui/calc_sheet.dart';
+import 'package:android_tile_launcher/ui/calc_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/contact_picker.dart';
 import 'package:android_tile_launcher/ui/contact_sheet.dart';
@@ -808,6 +811,30 @@ void main() {
         expect(_onHome(find.byType(TextTvTileContentView)), findsOneWidget);
       },
     );
+
+    testWidgets('the calc tile opens the calculator, which works', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await pumpShell(tester, FakeAppRepository(), gridState: gridState);
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.calc);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.byType(CalcTileContentView)));
+      await tester.pumpAndSettle();
+      for (final String key in <String>['6', '*', '7', '=']) {
+        await tester.tap(find.byKey(calcKey(key)));
+        await tester.pump();
+      }
+
+      expect(tester.widget<Text>(find.byKey(calcExpressionKey)).data, '42');
+
+      await tester.tap(find.byKey(calcCloseKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(calcCloseKey), findsNothing);
+    });
 
     testWidgets('tapping the sound tile cycles normal, vibrate, silent', (
       WidgetTester tester,

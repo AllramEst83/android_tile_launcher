@@ -3,6 +3,7 @@ import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
+import 'package:android_tile_launcher/services/rates_repository.dart';
 import 'package:android_tile_launcher/services/sms_service.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/text_tv_repository.dart';
@@ -14,6 +15,7 @@ import 'fake_agenda_repository.dart';
 import 'fake_contacts.dart';
 import 'fake_device_repository.dart';
 import 'fake_mail_service.dart';
+import 'fake_rates_repository.dart';
 import 'fake_system_control_service.dart';
 import 'fake_text_tv_repository.dart';
 import 'fake_weather_repository.dart';
@@ -31,6 +33,7 @@ TileServices fakeTileServices({
   WhatsAppService? whatsApp,
   MailService? mail,
   TextTvRepository? textTv,
+  RatesRepository? rates,
 }) => TileServices(
   systemControl: systemControl ?? FakeSystemControlService(),
   device: device ?? FakeDeviceRepository(),
@@ -42,4 +45,5 @@ TileServices fakeTileServices({
   whatsApp: whatsApp ?? FakeWhatsAppService(),
   mail: mail ?? FakeMailService(),
   textTv: textTv ?? FakeTextTvRepository(),
+  rates: rates ?? FakeRatesRepository(),
 );

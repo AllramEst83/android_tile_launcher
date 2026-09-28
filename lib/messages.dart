@@ -91,6 +91,21 @@ abstract final class Messages {
   static const String mailForgetAsk = 'FORGET THIS ACCOUNT AND ITS PASSWORD?';
   static const String mailRefresh = 'REFRESH';
 
+  static const String calcTitle = 'CALC';
+  static const String calcTabCalc = 'CALC';
+  static const String calcTabConvert = 'CONVERT';
+  static const String calcFrom = 'FROM';
+  static const String calcTo = 'TO';
+  static const String calcSwap = 'SWAP';
+  static const String calcClear = 'C';
+  static const String calcDelete = 'DEL';
+  static const String calcEquals = '=';
+  static const String calcRatesLoading = 'LOADING RATES...';
+  static const String calcTryAgain = 'TRY AGAIN';
+  static String calcRateNote(String day, {required bool stale}) =>
+      stale ? 'SAVED RATES FROM $day (OFFLINE)' : 'RATES FROM $day (ECB)';
+  static const String calcMoney = 'MONEY';
+
   static const String textTvTitle = 'TEXT TV';
   static const String textTvTapToOpen = 'TAP TO OPEN';
   static const String textTvNotBroadcast = 'NOT IN BROADCAST.';
@@ -100,4 +115,17 @@ abstract final class Messages {
   static const String textTvPart = 'PART';
   static String textTvPageNotBroadcast(int number) =>
       'PAGE $number IS NOT IN BROADCAST.';
+
+  // Why an expression could not be worked out: lower case, as they are said;
+  // the pad shows them in capitals.
+  static String exprUnexpected(String found) => "unexpected '$found'";
+  static const String exprUnexpectedEnd = 'expression ended unexpectedly';
+  static const String exprMissingParen = "missing ')'";
+  static const String exprDivideByZero = 'division by zero';
+  static const String exprNotReal = 'result is not a real number';
+  static const String exprTooLarge = 'result is too large';
+  static const String exprTooDeep = 'expression is nested too deeply';
+  static String exprBadNumber(String text) => "bad number '$text'";
+  static String exprUnknownName(String name) =>
+      "unknown function or constant '$name'";
 }

@@ -23,6 +23,8 @@ import 'package:android_tile_launcher/services/weather_repository.dart';
 import 'package:android_tile_launcher/services/weather_tile_source.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
+import 'package:android_tile_launcher/ui/calc_sheet.dart';
+import 'package:android_tile_launcher/ui/calc_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/contact_sheet.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
@@ -236,6 +238,17 @@ Widget tileContent(
                     repository: textTv,
                   ).then((_) => refreshNow()),
                 )
+              : null,
+        ),
+      );
+    case TileKind.calc:
+      // Nothing to read from outside, so no poller: it opens the calculator
+      // and converter, and that is all it does.
+      return Builder(
+        builder: (context) => CalcTileContentView(
+          ink: tile.colour.ink,
+          onTap: interactive
+              ? () => unawaited(showCalcSheet(context, rates: services.rates))
               : null,
         ),
       );

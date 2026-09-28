@@ -15,12 +15,14 @@ import 'services/android_sms_service.dart';
 import 'services/android_system_control_service.dart';
 import 'services/android_whatsapp_service.dart';
 import 'services/cached_mail_service.dart';
+import 'services/currency_rates.dart';
 import 'services/flutter_secret_store.dart';
 import 'services/grid_state.dart';
 import 'services/imap_mail_service.dart';
 import 'services/io_http_fetcher.dart';
 import 'services/live_agenda_repository.dart';
 import 'services/live_contacts_repository.dart';
+import 'services/live_rates_repository.dart';
 import 'services/live_text_tv_repository.dart';
 import 'services/live_weather_repository.dart';
 import 'services/mail_account.dart';
@@ -67,6 +69,9 @@ Future<void> main() async {
         sms: const AndroidSmsService(permissions: AndroidPermissionService()),
         whatsApp: const AndroidWhatsAppService(),
         textTv: LiveTextTvRepository(textTv: TextTv(fetcher: fetcher)),
+        rates: LiveRatesRepository(
+          currencyRates: CurrencyRates(fetcher: fetcher, store: store),
+        ),
         mail: CachedMailService(
           inner: ImapMailService(
             accounts: MailAccountStore(FlutterSecretStore()),
