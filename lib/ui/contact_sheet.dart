@@ -30,6 +30,8 @@ Future<void> showContactSheet(
     context: context,
     backgroundColor: TileColors.canvas,
     isScrollControlled: true,
+    // Laid out below the status bar, so the keyboard cannot push it under it.
+    useSafeArea: true,
     builder: (BuildContext sheetContext) => Padding(
       // Keep the message field above the keyboard.
       padding: EdgeInsets.only(
@@ -182,106 +184,110 @@ class _ContactSheetState extends State<_ContactSheet> {
     final TextTheme text = Theme.of(context).textTheme;
     final Contact? contact = _contact;
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(TileMetrics.margin),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              (contact?.name ?? widget.name).toUpperCase(),
-              style: text.bodyMedium?.copyWith(color: TileColors.textBright),
-            ),
-            const SizedBox(height: 4),
-            Container(height: 2, color: TileColors.bezel),
-            const SizedBox(height: TileMetrics.gutter),
-            if (_loading)
-              Text(Messages.contactsLoading, style: text.bodySmall)
-            else if (contact == null)
-              Text(_problem ?? '', style: text.bodyMedium)
-            else ...<Widget>[
-              for (final (int i, PhoneNumber n) in contact.numbers.indexed)
-                _NumberRow(
-                  key: contactNumberKey(i),
-                  number: n,
-                  selected: i == _selected,
-                  // With one number there is nothing to choose between.
-                  onTap: contact.numbers.length > 1
-                      ? () => setState(() => _selected = i)
-                      : null,
+      top: false,
+      // Scrolls when the keyboard leaves too little room for it all.
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(TileMetrics.margin),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                (contact?.name ?? widget.name).toUpperCase(),
+                style: text.bodyMedium?.copyWith(color: TileColors.textBright),
+              ),
+              const SizedBox(height: 4),
+              Container(height: 2, color: TileColors.bezel),
+              const SizedBox(height: TileMetrics.gutter),
+              if (_loading)
+                Text(Messages.contactsLoading, style: text.bodySmall)
+              else if (contact == null)
+                Text(_problem ?? '', style: text.bodyMedium)
+              else ...<Widget>[
+                for (final (int i, PhoneNumber n) in contact.numbers.indexed)
+                  _NumberRow(
+                    key: contactNumberKey(i),
+                    number: n,
+                    selected: i == _selected,
+                    // With one number there is nothing to choose between.
+                    onTap: contact.numbers.length > 1
+                        ? () => setState(() => _selected = i)
+                        : null,
+                  ),
+                const SizedBox(height: TileMetrics.margin),
+                Row(
+                  children: <Widget>[
+                    _ActionButton(
+                      key: contactCallKey,
+                      label: Messages.contactCall,
+                      onTap: _busy ? null : _call,
+                    ),
+                    const SizedBox(width: TileMetrics.gutter),
+                    _ActionButton(
+                      key: contactSmsKey,
+                      label: Messages.contactSms,
+                      selected: _composing,
+                      onTap: _busy
+                          ? null
+                          : () => setState(() => _composing = !_composing),
+                    ),
+                    const SizedBox(width: TileMetrics.gutter),
+                    _ActionButton(
+                      key: contactWhatsAppKey,
+                      label: Messages.contactWhatsApp,
+                      onTap: _busy ? null : _whatsApp,
+                    ),
+                  ],
                 ),
-              const SizedBox(height: TileMetrics.margin),
-              Row(
-                children: <Widget>[
-                  _ActionButton(
-                    key: contactCallKey,
-                    label: Messages.contactCall,
-                    onTap: _busy ? null : _call,
+                if (_composing) ...<Widget>[
+                  const SizedBox(height: TileMetrics.margin),
+                  TextField(
+                    key: contactMessageKey,
+                    controller: _message,
+                    autofocus: true,
+                    minLines: 2,
+                    maxLines: 5,
+                    style: text.bodySmall?.copyWith(
+                      fontSize: 12,
+                      color: TileColors.textBright,
+                    ),
+                    cursorColor: TileColors.textBright,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: Messages.contactMessageHint,
+                      hintStyle: text.bodySmall?.copyWith(
+                        fontSize: 12,
+                        color: C64.lightGrey,
+                      ),
+                      enabledBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(color: TileColors.bezel),
+                      ),
+                      focusedBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(color: TileColors.textBright),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: TileMetrics.gutter),
+                  const SizedBox(height: TileMetrics.gutter),
                   _ActionButton(
-                    key: contactSmsKey,
-                    label: Messages.contactSms,
-                    selected: _composing,
-                    onTap: _busy
-                        ? null
-                        : () => setState(() => _composing = !_composing),
-                  ),
-                  const SizedBox(width: TileMetrics.gutter),
-                  _ActionButton(
-                    key: contactWhatsAppKey,
-                    label: Messages.contactWhatsApp,
-                    onTap: _busy ? null : _whatsApp,
+                    key: contactSendKey,
+                    label: Messages.contactSend,
+                    onTap: _busy ? null : _send,
                   ),
                 ],
-              ),
-              if (_composing) ...<Widget>[
-                const SizedBox(height: TileMetrics.margin),
-                TextField(
-                  key: contactMessageKey,
-                  controller: _message,
-                  autofocus: true,
-                  minLines: 2,
-                  maxLines: 5,
-                  style: text.bodySmall?.copyWith(
-                    fontSize: 12,
-                    color: TileColors.textBright,
-                  ),
-                  cursorColor: TileColors.textBright,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: Messages.contactMessageHint,
-                    hintStyle: text.bodySmall?.copyWith(
-                      fontSize: 12,
-                      color: C64.lightGrey,
-                    ),
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: TileColors.bezel),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: TileColors.textBright),
+                if (_status != null) ...<Widget>[
+                  const SizedBox(height: TileMetrics.margin),
+                  Text(
+                    _status!,
+                    style: text.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: C64.cyan,
                     ),
                   ),
-                ),
-                const SizedBox(height: TileMetrics.gutter),
-                _ActionButton(
-                  key: contactSendKey,
-                  label: Messages.contactSend,
-                  onTap: _busy ? null : _send,
-                ),
-              ],
-              if (_status != null) ...<Widget>[
-                const SizedBox(height: TileMetrics.margin),
-                Text(
-                  _status!,
-                  style: text.bodySmall?.copyWith(
-                    fontSize: 10,
-                    color: C64.cyan,
-                  ),
-                ),
+                ],
               ],
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -55,6 +55,43 @@ void main() {
     expect(find.text('ÅSA EK'), findsOneWidget);
   });
 
+  testWidgets('the search field is tall enough to hit', (
+    WidgetTester tester,
+  ) async {
+    await _open(tester, FakeContactsRepository(book));
+
+    expect(
+      tester.getSize(find.byKey(contactSearchKey)).height,
+      greaterThan(48),
+    );
+  });
+
+  testWidgets('with the keyboard up, stays below the status bar', (
+    WidgetTester tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(400, 800)
+      ..devicePixelRatio = 1
+      ..padding = const FakeViewPadding(top: 24)
+      ..viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.reset);
+
+    await _open(
+      tester,
+      FakeContactsRepository(<Contact>[
+        for (int i = 0; i < 40; i++) _person('k$i', 'Person $i'),
+      ]),
+    );
+
+    // Screen 800, keyboard 300, status bar 24: the sheet may start at 24 at
+    // the very highest, and the search field sits inside it.
+    expect(tester.getTopLeft(find.byKey(contactSearchKey)).dy, greaterThan(24));
+    expect(
+      tester.getBottomLeft(find.byKey(contactSearchKey)).dy,
+      lessThan(500),
+    );
+  });
+
   testWidgets('files Å, Ä, Ö after Z, as the app drawer does', (
     WidgetTester tester,
   ) async {

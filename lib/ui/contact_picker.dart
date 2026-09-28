@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/alpha_grouping.dart';
@@ -26,18 +27,30 @@ Future<void> showContactPicker(
     context: context,
     backgroundColor: TileColors.canvas,
     isScrollControlled: true,
-    builder: (BuildContext sheetContext) => Padding(
-      // Keep the list and the search field above the keyboard.
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-      ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
+    // Without this the sheet is laid out from the very top of the screen, and
+    // its context is told there is no status bar.
+    useSafeArea: true,
+    builder: (BuildContext sheetContext) {
+      final MediaQueryData media = MediaQuery.of(sheetContext);
+      // Never taller than the room between the status bar and the keyboard: a
+      // sheet a fixed share of the screen tall, pushed up by the keyboard,
+      // ran up under the status bar with the search field on top of the clock.
+      final double room =
+          media.size.height -
+          media.viewInsets.bottom -
+          media.padding.top -
+          TileMetrics.margin;
+      return Padding(
+        // Keep the list and the search field above the keyboard.
+        padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: math.min(media.size.height * 0.8, room),
+          ),
+          child: _ContactPicker(contacts: contacts, gridState: gridState),
         ),
-        child: _ContactPicker(contacts: contacts, gridState: gridState),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -77,6 +90,7 @@ class _ContactPickerState extends State<_ContactPicker> {
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
     return SafeArea(
+      top: false,
       child: Padding(
         padding: const EdgeInsets.all(TileMetrics.margin),
         child: Column(
@@ -89,7 +103,8 @@ class _ContactPickerState extends State<_ContactPicker> {
               style: text.bodyMedium,
               cursorColor: TileColors.textBright,
               decoration: InputDecoration(
-                isDense: true,
+                // Roomy, not dense: a thin field is hard to hit and to read.
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 hintText: Messages.contactSearch,
                 hintStyle: text.bodyMedium?.copyWith(color: C64.lightGrey),
                 enabledBorder: const UnderlineInputBorder(
