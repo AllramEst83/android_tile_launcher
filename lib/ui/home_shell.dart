@@ -9,12 +9,14 @@ import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/first_run.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/add_tile_sheet.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
+import 'package:android_tile_launcher/ui/boot_screen.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/settings_screen.dart';
@@ -34,11 +36,16 @@ class HomeShell extends StatefulWidget {
     required this.appRepository,
     required this.gridState,
     required this.services,
+    this.firstRun,
   });
 
   final AppRepository appRepository;
   final GridState gridState;
   final TileServices services;
+
+  /// When it says this is the first run, the boot screen plays its whole
+  /// animation (and is remembered as seen). Without one, it never does.
+  final FirstRun? firstRun;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -48,6 +55,7 @@ class _HomeShellState extends State<HomeShell> {
   late Future<List<AppInfo>> _apps;
   final PageController _pageController = PageController();
   final FocusNode _searchFocus = FocusNode();
+  late bool _bootDone = !(widget.firstRun?.isFirstRun ?? false);
 
   @override
   void initState() {
@@ -72,6 +80,12 @@ class _HomeShellState extends State<HomeShell> {
     // Swallowed here: the FutureBuilder below is already watching `next` and
     // renders the error state itself once it completes.
     await next.then((_) {}, onError: (_) {});
+  }
+
+  void _onBootDone() {
+    if (_bootDone) return;
+    setState(() => _bootDone = true);
+    unawaited(widget.firstRun?.markSeen());
   }
 
   /// What a swipe down or up on Home was set to do (see settings).
@@ -117,10 +131,15 @@ class _HomeShellState extends State<HomeShell> {
                   future: _apps,
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return const _BootScreen(error: true);
+                      return const BootScreen(error: true);
                     }
                     final List<AppInfo>? apps = snapshot.data;
-                    if (apps == null) return const _BootScreen();
+                    if (apps == null || !_bootDone) {
+                      return BootScreen(
+                        animate: !_bootDone,
+                        onDone: _onBootDone,
+                      );
+                    }
                     final Map<String, String> labelByPackage = <String, String>{
                       for (final AppInfo app in apps)
                         app.packageName: app.label,
@@ -399,34 +418,6 @@ class _EditorBar extends StatelessWidget {
           InkWell(
             onTap: onCancel,
             child: Text(Messages.cancel, style: style),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BootScreen extends StatelessWidget {
-  const _BootScreen({this.error = false});
-
-  final bool error;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme text = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.all(TileMetrics.margin),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text(Messages.bootBanner, style: text.bodyMedium),
-          const SizedBox(height: TileMetrics.gutter),
-          Text(Messages.bootMemory, style: text.bodyMedium),
-          const SizedBox(height: TileMetrics.gutter * 2),
-          Text(
-            error ? Messages.appListError : Messages.bootReady,
-            style: text.bodyMedium,
           ),
         ],
       ),

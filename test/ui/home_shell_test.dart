@@ -13,6 +13,7 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/model/weather.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
+import 'package:android_tile_launcher/services/first_run.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
@@ -21,6 +22,7 @@ import 'package:android_tile_launcher/ui/alarm_sheet.dart';
 import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
+import 'package:android_tile_launcher/ui/boot_screen.dart';
 import 'package:android_tile_launcher/ui/calc_pad.dart';
 import 'package:android_tile_launcher/ui/calc_sheet.dart';
 import 'package:android_tile_launcher/ui/calc_tile_view.dart';
@@ -86,12 +88,14 @@ Future<void> pumpShell(
   FakeAlarmService? alarmService,
   SettingsState? settingsState,
   FakeShadeService? shadeService,
+  FirstRun? firstRun,
 }) => tester.pumpWidget(
   SettingsScope(
     state: settingsState ?? SettingsState(store: InMemoryLocalStore()),
     child: MaterialApp(
       theme: tileLauncherTheme(),
       home: HomeShell(
+        firstRun: firstRun,
         appRepository: repository,
         gridState: gridState ?? _gridState(),
         services: fakeTileServices(
@@ -1098,6 +1102,84 @@ void main() {
       await swipe(tester, 40);
 
       expect(shade.notificationCalls, 0);
+    });
+  });
+  group('the first-run boot animation', () {
+    Future<(FirstRun, InMemoryLocalStore)> pumpFirstRun(
+      WidgetTester tester, {
+      required bool first,
+    }) async {
+      final InMemoryLocalStore store = InMemoryLocalStore();
+      if (!first) await store.write(FirstRun.storeKey, true);
+      final FirstRun firstRun = FirstRun(store: store);
+      await firstRun.load();
+      await pumpShell(tester, FakeAppRepository(), firstRun: firstRun);
+      return (firstRun, store);
+    }
+
+    testWidgets('plays on the first run, even after the apps are loaded', (
+      WidgetTester tester,
+    ) async {
+      await pumpFirstRun(tester, first: true);
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // The apps are long since listed; the show is still on.
+      expect(find.byType(BootScreen), findsOneWidget);
+      expect(find.byType(AppTileGrid), findsNothing);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('gives way to home when it is over, and is remembered', (
+      WidgetTester tester,
+    ) async {
+      final (FirstRun firstRun, InMemoryLocalStore store) = await pumpFirstRun(
+        tester,
+        first: true,
+      );
+
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+
+      expect(find.byType(BootScreen), findsNothing);
+      expect(find.byType(AppTileGrid), findsOneWidget);
+      expect(firstRun.isFirstRun, isFalse);
+      expect(await store.read(FirstRun.storeKey), isTrue);
+    });
+
+    testWidgets('a tap skips it', (WidgetTester tester) async {
+      await pumpFirstRun(tester, first: true);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.byType(BootScreen));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppTileGrid), findsOneWidget);
+    });
+
+    testWidgets('is not played again once it has been seen', (
+      WidgetTester tester,
+    ) async {
+      await pumpFirstRun(tester, first: false);
+      await tester.pump();
+
+      expect(find.byType(BootScreen), findsNothing);
+      expect(find.byType(AppTileGrid), findsOneWidget);
+    });
+
+    testWidgets('a failing app list is shown at once, not after the show', (
+      WidgetTester tester,
+    ) async {
+      final InMemoryLocalStore store = InMemoryLocalStore();
+      final FirstRun firstRun = FirstRun(store: store);
+      await firstRun.load();
+      await pumpShell(
+        tester,
+        FakeAppRepository()..listError = Exception('boom'),
+        firstRun: firstRun,
+      );
+      await tester.pump();
+
+      expect(find.text(Messages.appListError), findsOneWidget);
+      await tester.pumpAndSettle();
     });
   });
 }

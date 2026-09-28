@@ -19,6 +19,7 @@ import 'services/android_system_control_service.dart';
 import 'services/android_whatsapp_service.dart';
 import 'services/cached_mail_service.dart';
 import 'services/currency_rates.dart';
+import 'services/first_run.dart';
 import 'services/flutter_secret_store.dart';
 import 'services/grid_state.dart';
 import 'services/imap_mail_service.dart';
@@ -48,6 +49,8 @@ Future<void> main() async {
   await gridState.load();
   final SettingsState settingsState = SettingsState(store: store);
   await settingsState.load();
+  final FirstRun firstRun = FirstRun(store: store);
+  await firstRun.load();
   final IoHttpFetcher fetcher = IoHttpFetcher();
 
   runApp(
@@ -55,6 +58,7 @@ Future<void> main() async {
       appRepository: AndroidAppRepository(ownPackage: _ownPackage),
       gridState: gridState,
       settingsState: settingsState,
+      firstRun: firstRun,
       services: TileServices(
         systemControl: const AndroidSystemControlService(),
         device: const AndroidDeviceRepository(),
