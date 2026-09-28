@@ -14,7 +14,7 @@ lib/
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
     tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, contact, mail, textTv, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed, contactTileId/contactKeyOf; Tile.label
-    tile_size.dart           # small 1x1, medium 2x2, wide 4x2, large 4x4; spanIn(columns) gives the width on a 4- or 6-column grid
+    tile_size.dart           # small 1x1, flat 2x1, tall 1x2, medium 2x2, broad 3x2, wide 4x2, tower 2x4, large 4x4; spanIn(columns) gives the width on a 4- or 6-column grid (fullWidth sizes span it entirely; others clamp to it)
     tile_layout.dart         # packTiles(tiles, columns:): ordered tiles -> PlacedTile (column, row, span); skyline algorithm
     settings.dart            # LauncherSettings (theme, columns, gap, swipe down, swipe up) + ThemeVariant, GridGap, GestureAction; tolerant fromJson
     layout_export.dart       # exportLayout / parseLayout: the tiles + settings as one line of JSON (format tag + version), sealed LayoutImported / LayoutRejected

@@ -35,8 +35,22 @@ void main() {
       expect(TileSize.large.spanIn(6), 6);
     });
 
+    test('flat, tall, broad and tower keep their own width, whatever the '
+        'mosaic', () {
+      expect(TileSize.flat.spanIn(4), 2);
+      expect(TileSize.flat.spanIn(6), 2);
+      expect(TileSize.tall.spanIn(4), 1);
+      expect(TileSize.tall.spanIn(6), 1);
+      expect(TileSize.broad.spanIn(4), 3);
+      expect(TileSize.broad.spanIn(6), 3);
+      expect(TileSize.tower.spanIn(4), 2);
+      expect(TileSize.tower.spanIn(6), 2);
+    });
+
     test('nothing is wider than the mosaic', () {
       expect(TileSize.medium.spanIn(1), 1);
+      expect(TileSize.broad.spanIn(2), 2);
+      expect(TileSize.wide.spanIn(3), 3);
     });
   });
 

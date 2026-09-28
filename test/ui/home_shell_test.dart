@@ -335,6 +335,25 @@ void main() {
       expect(clock.size, TileSize.medium);
     });
 
+    testWidgets('every size option is reachable without overflowing', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = await pinTwo(tester);
+
+      await tester.longPress(_onHome(find.text('CLOCK')));
+      await tester.pumpAndSettle();
+      // The panel is narrow on a phone; eight size buttons must wrap, not
+      // overflow the row (a RenderFlex overflow would fail the test).
+      await tester.tap(find.text('3x2'));
+      await tester.pump();
+      await tester.tap(find.text(Messages.apply));
+      await tester.pumpAndSettle();
+
+      final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
+      expect(clock.size, TileSize.broad);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('apply commits a recolour', (WidgetTester tester) async {
       final GridState gridState = await pinTwo(tester);
 

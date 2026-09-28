@@ -55,6 +55,38 @@ void main() {
       expect(totalRows(placed), 3); // 1 (small's row) + 2 (wide's height)
     });
 
+    test('a broad tile leaves a one-column gap a small tile fills', () {
+      final tiles = [
+        _tile('broad', TileSize.broad),
+        _tile('a', TileSize.small),
+        _tile('b', TileSize.small),
+      ];
+
+      final placed = packTiles(tiles);
+
+      expect(placed.map((p) => (p.column, p.row)), [
+        (0, 0), // broad, 3x2
+        (3, 0), // a: the only free column
+        (3, 1), // b: column 3 is still the shortest
+      ]);
+      expect(totalRows(placed), 2);
+    });
+
+    test('a tower tile stands two columns tall across four rows', () {
+      final tiles = [
+        _tile('tower', TileSize.tower),
+        for (var i = 0; i < 8; i++) _tile('$i', TileSize.small),
+      ];
+
+      final placed = packTiles(tiles);
+
+      expect((placed[0].column, placed[0].row), (0, 0)); // tower, 2x4
+      // The eight small tiles fill columns 2 and 3, four rows deep, since
+      // the tower leaves them as the shortest columns throughout.
+      expect(placed.skip(1).every((p) => p.column == 2 || p.column == 3), true);
+      expect(totalRows(placed), 4);
+    });
+
     test('an empty list packs to zero rows', () {
       expect(totalRows(packTiles(const [])), 0);
     });

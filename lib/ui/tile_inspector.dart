@@ -56,16 +56,15 @@ class TileInspector extends StatelessWidget {
               const SizedBox(height: TileMetrics.gutter * 2),
               Text(Messages.tileSize, style: text.labelSmall),
               const SizedBox(height: TileMetrics.gutter),
-              Row(
+              Wrap(
+                spacing: TileMetrics.gutter,
+                runSpacing: TileMetrics.gutter,
                 children: <Widget>[
                   for (final TileSize size in TileSize.values)
-                    Padding(
-                      padding: const EdgeInsets.only(right: TileMetrics.gutter),
-                      child: _SizeButton(
-                        size: size,
-                        selected: size == selected.size,
-                        onTap: () => onSizeSelected(size),
-                      ),
+                    _SizeButton(
+                      size: size,
+                      selected: size == selected.size,
+                      onTap: () => onSizeSelected(size),
                     ),
                 ],
               ),
