@@ -73,8 +73,17 @@ List<String> _messageFor(AgendaSnapshot snapshot) => switch (snapshot) {
   ],
 };
 
-TextStyle _text(Color ink, double size) =>
-    TextStyle(fontFamily: kPixelFontFamily, fontSize: size, color: ink);
+/// The box one line of tile text sits in, as a multiple of its type size —
+/// same convention as the mail and Text TV tiles, so a row's height is known
+/// from its type size alone rather than left to the font.
+const double _leading = 1.45;
+
+TextStyle _text(Color ink, double size) => TextStyle(
+  fontFamily: kPixelFontFamily,
+  fontSize: size,
+  height: _leading,
+  color: ink,
+);
 
 String _titleOf(CalendarEvent event) =>
     event.title.isEmpty ? Messages.agendaUntitled : event.title.toUpperCase();
@@ -117,12 +126,11 @@ class _EventsView extends StatelessWidget {
 
   static const double _compact = 120;
   static const double _wide = 260;
-  static const double _rowHeight = 16;
-  static const double _headerHeight = 22;
 
   @override
   Widget build(BuildContext context) {
-    if (width >= _wide) return _list();
+    final TextScaler scaler = MediaQuery.textScalerOf(context);
+    if (width >= _wide) return _list(scaler);
     final CalendarEvent next = nextEvent(events)!;
     final int more = events.length - 1;
     final Widget when = FittedBox(
@@ -149,6 +157,26 @@ class _EventsView extends StatelessWidget {
         ],
       );
     }
+
+    // The title/when header is shown whatever the height; measured with the
+    // real scaler (not assumed) so the room left for the location and the
+    // "+n more" line below the (already `Flexible`, so never forced to
+    // overflow) event title is never a guess — the same budget the mail and
+    // weather tiles keep before deciding what else fits under their own
+    // headers. A one-line reservation for the title itself means location
+    // and "+more" only get added once the title is guaranteed at least that
+    // much, not just whatever happens to be left after it takes its fill.
+    final double titleLine = scaler.scale(8) * _leading;
+    final double whenLine = scaler.scale(20) * _leading;
+    final double eventTitleMin = scaler.scale(10) * _leading;
+    final double locationLine = scaler.scale(8) * _leading;
+    final double moreLine = scaler.scale(8) * _leading;
+
+    final double room = height - titleLine - 6 - whenLine - 6 - eventTitleMin;
+    final bool showLocation = next.location != null && room >= locationLine;
+    final double afterLocation = room - (showLocation ? locationLine : 0);
+    final bool showMore = more > 0 && afterLocation >= 6 + moreLine;
+
     return Column(
       key: agendaNextKey,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,10 +184,13 @@ class _EventsView extends StatelessWidget {
       children: <Widget>[
         Text(Messages.agendaTitle, style: _text(ink, 8)),
         const SizedBox(height: 6),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(formatWhen(next, now), style: _text(ink, 20)),
+        SizedBox(
+          height: whenLine,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(formatWhen(next, now), style: _text(ink, 20)),
+          ),
         ),
         const SizedBox(height: 6),
         Flexible(
@@ -170,14 +201,14 @@ class _EventsView extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (next.location != null)
+        if (showLocation)
           Text(
             next.location!.toUpperCase(),
             style: _text(ink, 8),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-        if (more > 0) ...<Widget>[
+        if (showMore) ...<Widget>[
           const SizedBox(height: 6),
           Text('+$more MORE', style: _text(ink, 8)),
         ],
@@ -186,8 +217,14 @@ class _EventsView extends StatelessWidget {
   }
 
   /// As many upcoming events as the height allows, one line each, time first.
-  Widget _list() {
-    final int fit = ((height - _headerHeight) / _rowHeight).floor().clamp(
+  Widget _list(TextScaler scaler) {
+    // Every fixed-height row below is sized off the FONT SIZE setting's
+    // scaler, not the bare type size, the same as the mail tile's own list —
+    // a `SizedBox` built from the unscaled size would still hold the same
+    // physical height while the `Text` inside it rendered taller.
+    final double rowHeight = scaler.scale(8) * _leading;
+    final double headerHeight = scaler.scale(10) * _leading + 2;
+    final int fit = ((height - headerHeight) / rowHeight).floor().clamp(
       1,
       events.length,
     );
@@ -196,7 +233,7 @@ class _EventsView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         SizedBox(
-          height: _headerHeight,
+          height: headerHeight,
           child: Row(
             children: <Widget>[
               Text(Messages.agendaTitle, style: _text(ink, 10)),
@@ -208,7 +245,7 @@ class _EventsView extends StatelessWidget {
         for (final (int i, CalendarEvent event) in events.take(fit).indexed)
           SizedBox(
             key: agendaRowKey(i),
-            height: _rowHeight,
+            height: rowHeight,
             child: Row(
               children: <Widget>[
                 SizedBox(

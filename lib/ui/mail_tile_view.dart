@@ -132,6 +132,16 @@ class _InboxView extends StatelessWidget {
   /// it: it is the tallest thing on the line.
   static const double _headerCount = 18;
 
+  /// The count on a medium tile's own line, above the sender/subject block.
+  /// Bigger than the wide header's, since here it has no `MAIL`/`UNREAD` to
+  /// share a line with.
+  static const double _mediumCount = 30;
+
+  /// Air between the title and the count, and between the count block and
+  /// the newest message below it, on a medium tile.
+  static const double _mediumGap = 4;
+  static const double _mediumNewestGap = 8;
+
   Widget _count(double size, Alignment alignment) => FittedBox(
     key: mailCountKey,
     fit: BoxFit.scaleDown,
@@ -165,35 +175,65 @@ class _InboxView extends StatelessWidget {
 
     if (width < _wide) {
       final MailMessage? newest = inbox.messages.firstOrNull;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Text(Messages.mailTitle, style: _text(ink, 9)),
-          const SizedBox(height: 4),
-          _count(30, Alignment.centerLeft),
-          Text(Messages.mailUnread, style: _text(ink, 9)),
-          if (newest != null) ...<Widget>[
-            const SizedBox(height: 8),
+      // The title/count/unread block is shown whatever the height: measured
+      // with the real scaler, not assumed, so the room left over for the
+      // newest message below it is never a guess. A tile too short even for
+      // that much already overflows before Phase 35 (small/flat tiles) fixes
+      // it; this is only about what to add underneath it.
+      final double titleLine = scaler.scale(9) * _leading;
+      final double countLine = scaler.scale(_mediumCount) * _leading;
+      final double unreadLine = scaler.scale(9) * _leading;
+      final double headerBlock =
+          titleLine + _mediumGap + countLine + unreadLine;
+      final double room = height - headerBlock - _mediumNewestGap;
+
+      final List<Widget> children = <Widget>[
+        Text(Messages.mailTitle, style: _text(ink, 9)),
+        const SizedBox(height: _mediumGap),
+        _count(_mediumCount, Alignment.centerLeft),
+        Text(Messages.mailUnread, style: _text(ink, 9)),
+      ];
+
+      if (newest != null) {
+        if (room >= senderLine) {
+          children.add(const SizedBox(height: _mediumNewestGap));
+          children.add(
             Text(
               newest.from.toUpperCase(),
               style: _text(ink, _sender),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            Flexible(
-              child: Text(
-                _subjectOf(newest),
-                style: _text(ink, _subject),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+          );
+          // Only as many subject lines as are left, same idea as the wide
+          // list below deciding how many rows fit: a squeezed line ellipsised
+          // to nothing says less than one it can actually show.
+          final int subjectLines = ((room - senderLine) / subjectLine)
+              .floor()
+              .clamp(0, 2);
+          if (subjectLines > 0) {
+            children.add(
+              Flexible(
+                child: Text(
+                  _subjectOf(newest),
+                  style: _text(ink, _subject),
+                  maxLines: subjectLines,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ] else ...<Widget>[
-            const SizedBox(height: 8),
-            Text(Messages.mailInboxEmpty, style: _text(ink, _subject)),
-          ],
-        ],
+            );
+          }
+        }
+      } else if (room >= subjectLine) {
+        children.add(const SizedBox(height: _mediumNewestGap));
+        children.add(
+          Text(Messages.mailInboxEmpty, style: _text(ink, _subject)),
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
       );
     }
 

@@ -100,6 +100,22 @@ void main() {
 
       expect(find.text('SMHI ${Messages.weatherOld}'), findsOneWidget);
     });
+
+    testWidgets(
+      'medium on a short tile: the place and source drop before the tile '
+      'overflows, the description never disappears',
+      (WidgetTester tester) async {
+        // Regression: this block had no height budget at all — the row,
+        // the description, the place and the source were always all
+        // stacked, so a medium tile shorter than that (a real one, on a
+        // phone whose grid gives it less headroom than the square 185x185
+        // this group otherwise tests) overflowed at its bottom edge.
+        await _pump(tester, WeatherReady(_forecast), size: const Size(200, 80));
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('12°'), findsOneWidget);
+      },
+    );
   });
 
   group('without a forecast', () {

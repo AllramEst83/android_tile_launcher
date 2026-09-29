@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/weather.dart';
 import 'package:android_tile_launcher/model/weather_format.dart';
@@ -41,6 +43,7 @@ class WeatherTileContentView extends StatelessWidget {
                 stale: stale,
                 ink: ink,
                 width: constraints.maxWidth,
+                height: constraints.maxHeight,
               ),
             _ => _MessageView(lines: _messageFor(snapshot), ink: ink),
           },
@@ -74,8 +77,17 @@ List<String> _messageFor(WeatherSnapshot snapshot) => switch (snapshot) {
   WeatherReady() => const <String>[],
 };
 
-TextStyle _text(Color ink, double size) =>
-    TextStyle(fontFamily: kPixelFontFamily, fontSize: size, color: ink);
+/// The box one line of tile text sits in, as a multiple of its type size —
+/// same convention as the mail and Text TV tiles, so a row's height is known
+/// from its type size alone rather than left to the font.
+const double _leading = 1.45;
+
+TextStyle _text(Color ink, double size) => TextStyle(
+  fontFamily: kPixelFontFamily,
+  fontSize: size,
+  height: _leading,
+  color: ink,
+);
 
 class _MessageView extends StatelessWidget {
   const _MessageView({required this.lines, required this.ink});
@@ -104,15 +116,21 @@ class _ForecastView extends StatelessWidget {
     required this.stale,
     required this.ink,
     required this.width,
+    required this.height,
   });
 
   final Forecast forecast;
   final bool stale;
   final Color ink;
   final double width;
+  final double height;
 
   static const double _compact = 120;
   static const double _wide = 260;
+
+  /// Air after the icon/temperature row, and again after the description.
+  static const double _gap = 6;
+  static const double _placeGap = 4;
 
   @override
   Widget build(BuildContext context) {
@@ -134,49 +152,76 @@ class _ForecastView extends StatelessWidget {
       );
     }
 
+    // Fixed lines below (the row, the place, the source) are measured with
+    // the real scaler so the room left for them is never a guess, the same
+    // way the mail tile budgets its own header before deciding what else
+    // fits under it. The description alone is `Flexible`: it degrades by
+    // shrinking rather than by being counted in or out wholesale, since — of
+    // the four things this tile shows — it is the one most tolerable to
+    // read clipped rather than not at all.
+    final TextScaler scaler = MediaQuery.textScalerOf(context);
+    final double rowHeight = math.max(36, scaler.scale(24) * _leading);
+    final double placeLine = scaler.scale(8) * _leading;
+    final double sourceLine = scaler.scale(8) * _leading;
+    final double descLine = scaler.scale(8) * _leading;
+
+    final double afterHeader = height - rowHeight - _gap;
+    final bool showPlace = afterHeader - descLine - _placeGap >= placeLine;
+    final bool showSource =
+        showPlace &&
+        afterHeader - descLine - _placeGap - placeLine >= sourceLine;
+
     final Widget current = Column(
       key: weatherNowKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            WeatherIcon(kind: kind, size: 36, color: ink),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  formatDegrees(now.temperature),
-                  style: _text(ink, 24),
+        SizedBox(
+          height: rowHeight,
+          child: Row(
+            children: <Widget>[
+              WeatherIcon(kind: kind, size: 36, color: ink),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    formatDegrees(now.temperature),
+                    style: _text(ink, 24),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          describeWeather(now.code),
-          style: _text(ink, 8),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+        const SizedBox(height: _gap),
+        Flexible(
+          child: Text(
+            describeWeather(now.code),
+            style: _text(ink, 8),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          forecast.place.name.toUpperCase(),
-          style: _text(ink, 8),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        Text(
-          stale
-              ? '${forecast.source.toUpperCase()} ${Messages.weatherOld}'
-              : forecast.source.toUpperCase(),
-          style: _text(ink, 8),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        if (showPlace) ...<Widget>[
+          const SizedBox(height: _placeGap),
+          Text(
+            forecast.place.name.toUpperCase(),
+            style: _text(ink, 8),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+        if (showSource)
+          Text(
+            stale
+                ? '${forecast.source.toUpperCase()} ${Messages.weatherOld}'
+                : forecast.source.toUpperCase(),
+            style: _text(ink, 8),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
       ],
     );
 

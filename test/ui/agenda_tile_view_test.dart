@@ -149,6 +149,94 @@ void main() {
 
       expect(find.text(Messages.agendaUntitled), findsOneWidget);
     });
+
+    testWidgets(
+      'medium on a short tile: the location and "+more" drop before the '
+      'tile overflows, the event title never disappears',
+      (WidgetTester tester) async {
+        // Regression: this block had no height budget at all — the header,
+        // the location and the "+n more" line were always all stacked below
+        // the (already `Flexible`) event title, so a medium tile shorter
+        // than that (a real one, on a phone whose grid gives it less
+        // headroom than the square 185x185 this group otherwise tests)
+        // overflowed at its bottom edge.
+        await _pump(tester, AgendaReady(_events), size: const Size(200, 80));
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('14:30'), findsOneWidget);
+        expect(find.text('DENTIST'), findsOneWidget);
+      },
+    );
+  });
+
+  group('at a larger text scale (the FONT SIZE setting)', () {
+    // Regression: the wide list's rows and header were fixed-height
+    // `SizedBox`es sized off the bare, unscaled type size — the same bug
+    // already found and fixed in the mail tile's own wide list — so a larger
+    // FONT SIZE setting made a row's text paint taller than its box.
+    const TextScaler extraLarge = TextScaler.linear(1.3);
+
+    testWidgets('medium: the event still fits', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: tileLauncherTheme(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: extraLarge),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 185,
+                height: 185,
+                child: AgendaTileContentView(
+                  snapshot: AgendaReady(_events),
+                  now: _now,
+                  ink: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('wide: a row grows with the scale, so its text is never '
+        'taller than the row', (WidgetTester tester) async {
+      Future<double> rowHeight(TextScaler scaler) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: tileLauncherTheme(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: scaler),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 380,
+                  height: 185,
+                  child: AgendaTileContentView(
+                    snapshot: AgendaReady(_events),
+                    now: _now,
+                    ink: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        return tester.getRect(find.byKey(agendaRowKey(0))).height;
+      }
+
+      final double normalHeight = await rowHeight(TextScaler.noScaling);
+      final double scaledHeight = await rowHeight(extraLarge);
+
+      expect(scaledHeight, closeTo(normalHeight * 1.3, 0.5));
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('without events', () {

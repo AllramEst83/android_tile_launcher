@@ -76,6 +76,42 @@ void main() {
       expect(find.text('BO BERG'), findsNothing);
     });
 
+    testWidgets('medium on a narrow, tall tile: content sits at the top, not '
+        'centred with a gap above it', (WidgetTester tester) async {
+      // Regression: this branch centred its Column, unnoticed while the
+      // only medium size tested was square (185x185, content nearly
+      // filling it). TileSize.tall (1 column x 2 rows) is the same width
+      // but twice as high, so the leftover height below the content used
+      // to be split above and below it too, pushing MAIL/the count/UNREAD
+      // visibly down from the tile's top edge.
+      await _pump(tester, _inbox, size: const Size(150, 300));
+
+      final double tileTop = tester
+          .getTopLeft(find.byType(MailTileContentView))
+          .dy;
+      final double titleTop = tester
+          .getTopLeft(find.text(Messages.mailTitle))
+          .dy;
+      // Only the tile's own padding (half a gutter) should separate them.
+      expect(titleTop - tileTop, lessThan(TileMetrics.gutter));
+    });
+
+    testWidgets(
+      'medium on a tile too short for the newest message: no overflow, '
+      'and the sender/subject shrink or drop rather than spill past the '
+      'tile',
+      (WidgetTester tester) async {
+        // Regression: this branch had no height budget at all — it always
+        // added the sender and a two-line subject under the header, so a
+        // medium tile short enough (a real one, on a phone whose grid gives
+        // it less headroom than the square 185x185 this group otherwise
+        // tests) overflowed at its bottom edge.
+        await _pump(tester, _inbox, size: const Size(150, 100));
+
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('wide: a line for each of the newest, unread ones marked', (
       WidgetTester tester,
     ) async {
