@@ -670,7 +670,10 @@ class _WallpaperPreview extends StatelessWidget {
   }
 }
 
-/// A heading with a rule under it, and what belongs to it.
+/// A bordered group, boxed like a tile so its members read as one unit and
+/// the gap to the next group reads as a real gap, not just more text — the
+/// same bevel this app already draws around every tile, reused here instead
+/// of a plain rule under a heading.
 class _Section extends StatelessWidget {
   const _Section({required this.title, required this.children});
 
@@ -680,23 +683,34 @@ class _Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: TileMetrics.margin * 1.5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            title,
-            style: TextStyle(
-              fontFamily: kPixelFontFamily,
-              fontSize: 12,
-              color: TileColors.textBright,
+      padding: const EdgeInsets.only(top: TileMetrics.margin * 2),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: TileColors.bezel, width: TileMetrics.bevel),
+        ),
+        padding: const EdgeInsets.all(TileMetrics.margin),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Container(width: 4, height: 14, color: TileColors.accent),
+                const SizedBox(width: 6),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: kPixelFontFamily,
+                    fontSize: 12,
+                    letterSpacing: 1,
+                    color: TileColors.textBright,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 4),
-          Container(height: 2, color: TileColors.bezel),
-          const SizedBox(height: TileMetrics.gutter),
-          ...children,
-        ],
+            const SizedBox(height: TileMetrics.gutter),
+            ...children,
+          ],
+        ),
       ),
     );
   }
