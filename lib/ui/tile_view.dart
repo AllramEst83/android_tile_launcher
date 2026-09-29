@@ -388,6 +388,7 @@ Widget tileContent(
         },
       );
     case TileKind.flashlight:
+    case TileKind.orientationLock:
       return TilePoller(
         source: ToggleTileSource(kind: tile.kind, control: systemControl),
         interval: const Duration(seconds: 5),
@@ -395,7 +396,7 @@ Widget tileContent(
           final bool on = (content as ToggleContent).on;
           return StateTileContentView(
             label: displayNameOf(tile.kind),
-            state: on ? '[ON]' : '[OFF]',
+            state: _toggleStateOf(tile.kind, on),
             ink: tile.colour.ink,
             onTap: interactive
                 ? () => unawaited(
@@ -433,6 +434,13 @@ Widget tileContent(
       );
   }
 }
+
+/// The flashlight's `[ON]`/`[OFF]`, or the rotation lock's own
+/// `[LOCKED]`/`[AUTO]` — both are `on`/`off`, but "on" reads oddly for a lock.
+String _toggleStateOf(TileKind kind, bool on) => switch (kind) {
+  TileKind.orientationLock => on ? '[LOCKED]' : '[AUTO]',
+  _ => on ? '[ON]' : '[OFF]',
+};
 
 String _bluetoothStateLabel(BluetoothStatus status) => switch (status) {
   BluetoothOn() => Messages.bluetoothOn,

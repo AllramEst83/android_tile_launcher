@@ -1142,6 +1142,37 @@ void main() {
       expect(control.setCalls, [(TileKind.flashlight, true)]);
       expect(_onHome(find.text('[ON]')), findsOneWidget);
     });
+
+    testWidgets('the rotation-lock tile flips between LOCKED and AUTO', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final FakeSystemControlService control = FakeSystemControlService();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        systemControlService: control,
+      );
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+      // The last kind in the list, so it starts below the sheet's own fold.
+      await tester.ensureVisible(find.text('ROTATION'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ROTATION'));
+      await tester.pumpAndSettle();
+
+      expect(_onHome(find.text('[AUTO]')), findsOneWidget);
+
+      await tester.tap(_onHome(find.byType(StateTileContentView)));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(control.setCalls, [(TileKind.orientationLock, true)]);
+      expect(_onHome(find.text('[LOCKED]')), findsOneWidget);
+    });
   });
   group('settings and swipe gestures', () {
     Future<(SettingsState, FakeShadeService)> pumpWith(

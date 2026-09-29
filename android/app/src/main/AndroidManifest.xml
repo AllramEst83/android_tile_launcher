@@ -16,6 +16,13 @@
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <!-- The rotation-lock tile: toggling Android's own auto-rotate setting
+         (the same one the quick-settings tile flips) needs WRITE_SETTINGS, a
+         "special access" permission granted once from its own Settings
+         screen, never a runtime dialog. Reading the setting needs no
+         permission at all. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+
     <!-- The weather tile fetches forecasts (SMHI, Open-Meteo)... -->
     <uses-permission android:name="android.permission.INTERNET" />
 

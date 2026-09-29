@@ -7,18 +7,21 @@ import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
+import android.net.Uri
 import android.provider.Settings
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Reads and changes two device-wide controls for the Dart `AndroidSystemControlService`:
- * the ringer mode (normal/vibrate/silent) and the torch.
+ * Reads and changes three device-wide controls for the Dart
+ * `AndroidSystemControlService`: the ringer mode (normal/vibrate/silent), the
+ * torch, and locking the screen's orientation (the same as the quick-settings
+ * auto-rotate tile, off).
  *
- * Ringer-mode and torch queries are cheap main-thread system calls, unlike
- * [AppsChannelHandler]'s package-manager query, so everything here runs on
- * the calling (platform) thread.
+ * Ringer-mode, torch and orientation queries are cheap main-thread system
+ * calls, unlike [AppsChannelHandler]'s package-manager query, so everything
+ * here runs on the calling (platform) thread.
  */
 class SystemControlChannelHandler(
     private val context: Context,
@@ -71,10 +74,23 @@ class SystemControlChannelHandler(
             else -> "normal"
         }
 
-    private fun isOn(kind: String?): Boolean = kind == "flashlight" && torchOn
+    private fun isOn(kind: String?): Boolean = when (kind) {
+        "flashlight" -> torchOn
+        // 0 is locked (auto-rotate off); default to 1 (unlocked) if the
+        // setting is somehow missing, so a read error never claims a lock.
+        "orientationLock" -> Settings.System.getInt(
+            context.contentResolver,
+            Settings.System.ACCELEROMETER_ROTATION,
+            1,
+        ) == 0
+        else -> false
+    }
 
     private fun setOn(kind: String?, on: Boolean) {
-        if (kind == "flashlight") setTorch(on)
+        when (kind) {
+            "flashlight" -> setTorch(on)
+            "orientationLock" -> setOrientationLock(on)
+        }
     }
 
     // Silent is reached the way the volume rocker reaches it -- lowering the
@@ -132,6 +148,24 @@ class SystemControlChannelHandler(
         } catch (e: SecurityException) {
             // Ignored: the settings screen above is the only recovery path.
         }
+    }
+
+    // Locking or unlocking the orientation writes a system setting, which
+    // needs WRITE_SETTINGS -- a special permission granted only via Settings,
+    // the same shape notification policy access takes for silent mode above.
+    private fun setOrientationLock(locked: Boolean) {
+        if (!Settings.System.canWrite(context)) {
+            val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)
+            intent.data = Uri.parse("package:${context.packageName}")
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            return
+        }
+        Settings.System.putInt(
+            context.contentResolver,
+            Settings.System.ACCELEROMETER_ROTATION,
+            if (locked) 0 else 1,
+        )
     }
 
     private fun setTorch(on: Boolean) {
