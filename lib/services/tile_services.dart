@@ -1,6 +1,7 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/bluetooth_service.dart';
 import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
@@ -40,6 +41,7 @@ class TileServices {
     required this.wallpaper,
     required this.icons,
     required this.files,
+    required this.bluetooth,
   });
 
   final SystemControlService systemControl;
@@ -69,4 +71,5 @@ class TileServices {
   final AppIconLoader icons;
 
   final FilesService files;
+  final BluetoothService bluetooth;
 }

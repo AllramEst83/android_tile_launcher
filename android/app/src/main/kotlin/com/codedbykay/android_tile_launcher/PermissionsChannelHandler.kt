@@ -120,6 +120,11 @@ class PermissionsChannelHandler(
             "contacts" to arrayOf(Manifest.permission.READ_CONTACTS),
             "phone" to arrayOf(Manifest.permission.CALL_PHONE),
             "sms" to arrayOf(Manifest.permission.SEND_SMS),
+            // A normal, install-time permission before Android 12 (API 31);
+            // `checkSelfPermission` on an older phone reports it granted
+            // without a dialog, the same way `MANAGE_EXTERNAL_STORAGE` reads
+            // as meaningless (never checked) on Android older than 11.
+            "bluetooth" to arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
         )
     }
 }

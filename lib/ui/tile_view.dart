@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
+import 'package:android_tile_launcher/model/bluetooth_status.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
@@ -12,6 +14,8 @@ import 'package:android_tile_launcher/services/agenda_tile_source.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/alarm_tile_source.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/bluetooth_service.dart';
+import 'package:android_tile_launcher/services/bluetooth_tile_source.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
@@ -29,6 +33,7 @@ import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/alarm_sheet.dart';
 import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_icon.dart';
+import 'package:android_tile_launcher/ui/bluetooth_sheet.dart';
 import 'package:android_tile_launcher/ui/calc_sheet.dart';
 import 'package:android_tile_launcher/ui/calc_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
@@ -400,8 +405,41 @@ Widget tileContent(
           );
         },
       );
+    case TileKind.bluetooth:
+      final BluetoothService bluetooth = services.bluetooth;
+      return TilePoller(
+        source: BluetoothTileSource(service: bluetooth),
+        interval: const Duration(seconds: 10),
+        builder: (context, content, refreshNow) {
+          final BluetoothStatus status =
+              (content as BluetoothTileContent).status;
+          return StateTileContentView(
+            label: displayNameOf(tile.kind),
+            state: _bluetoothStateLabel(status),
+            ink: tile.colour.ink,
+            // Turning it on/off and managing a device both happen inside the
+            // sheet (or the system screens it opens), never here directly, so
+            // the tile re-reads once it closes rather than waiting on the poll.
+            onTap: interactive
+                ? () => unawaited(
+                    showBluetoothSheet(
+                      context,
+                      bluetooth: bluetooth,
+                    ).then((_) => refreshNow()),
+                  )
+                : null,
+          );
+        },
+      );
   }
 }
+
+String _bluetoothStateLabel(BluetoothStatus status) => switch (status) {
+  BluetoothOn() => Messages.bluetoothOn,
+  BluetoothOff() => Messages.bluetoothOff,
+  BluetoothUnsupported() => Messages.bluetoothUnsupported,
+  BluetoothNeedsPermission() => Messages.bluetoothOff,
+};
 
 /// Runs a state-changing [action], then re-reads the tile so it shows the
 /// result at once instead of at the next poll — and again shortly after,

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'app.dart';
 import 'services/android_alarm_service.dart';
 import 'services/android_app_repository.dart';
+import 'services/android_bluetooth_service.dart';
 import 'services/android_calendar_service.dart';
 import 'services/android_contacts_service.dart';
 import 'services/android_device_repository.dart';
@@ -96,6 +97,9 @@ Future<void> main() async {
         wallpaper: const AndroidWallpaperService(),
         icons: appRepository.icon,
         files: AndroidFilesService(),
+        bluetooth: AndroidBluetoothService(
+          permissions: const AndroidPermissionService(),
+        ),
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

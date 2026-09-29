@@ -2,8 +2,10 @@
 /// (not per manifest string), so a feature never names an Android permission;
 /// `PermissionsChannelHandler.kt` maps each to the real one(s). More arrive
 /// with the phases that need them. `calendar` is read access; `phone` is placing
-/// a call and `sms` sending a text.
-enum AppPermission { location, calendar, contacts, phone, sms }
+/// a call and `sms` sending a text; `bluetooth` is reading the adapter's
+/// paired devices (Android 12+'s `BLUETOOTH_CONNECT` — a normal, install-time
+/// permission on older Android, so this grants at once there).
+enum AppPermission { location, calendar, contacts, phone, sms, bluetooth }
 
 enum PermissionStatus {
   granted,

@@ -48,6 +48,16 @@
          grants Do-Not-Disturb access via Settings) set the ringer mode. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- The Bluetooth tile: reading the adapter's state and its paired
+         devices. `BLUETOOTH` alone covered this before Android 12 (API 31);
+         `BLUETOOTH_CONNECT` is the runtime permission the split introduced,
+         asked for the same way calendar/contacts access is. Turning
+         Bluetooth on/off and connecting a paired device both need Android's
+         own screens instead — see `BluetoothChannelHandler`'s own comment —
+         so neither `BLUETOOTH_ADMIN` nor `BLUETOOTH_SCAN` is requested. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <!-- No auto-backup: the mail account is kept encrypted with a key that
          lives only in this phone's Keystore, so a restored copy of the
          encrypted file could never be read. -->

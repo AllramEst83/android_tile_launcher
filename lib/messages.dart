@@ -243,6 +243,22 @@ abstract final class Messages {
       'DELETE "$name"? THIS CAN\'T BE UNDONE.';
   static const String filesDeleteFailed = 'COULD NOT DELETE THAT.';
 
+  static const String bluetoothTitle = 'BLUETOOTH';
+  static const String bluetoothOn = '[ON]';
+  static const String bluetoothOff = '[OFF]';
+  static const String bluetoothUnsupported = 'N/A';
+  static const String bluetoothTapToAllow = 'TAP TO ALLOW BLUETOOTH ACCESS';
+  static const String bluetoothAllowInSettings =
+      'ALLOW BLUETOOTH ACCESS IN ANDROID SETTINGS.';
+  static const String bluetoothUnsupportedBody =
+      'THIS PHONE HAS NO BLUETOOTH RADIO.';
+  static const String bluetoothOffBody = 'BLUETOOTH IS OFF.';
+  static const String bluetoothToggle = 'TURN ON / OFF';
+  static const String bluetoothManage = 'MANAGE DEVICES';
+  static const String bluetoothNoDevices = 'NO PAIRED DEVICES.';
+  static const String bluetoothConnected = 'CONNECTED';
+  static const String bluetoothNotConnected = 'NOT CONNECTED';
+
   // Why an expression could not be worked out: lower case, as they are said;
   // the pad shows them in capitals.
   static String exprUnexpected(String found) => "unexpected '$found'";
