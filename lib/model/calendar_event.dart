@@ -9,6 +9,7 @@ class CalendarEvent {
     this.allDay = false,
     this.location,
     this.description,
+    this.calendarId,
   });
 
   /// The event's id in Android's calendar provider; shared by all repeats.
@@ -28,6 +29,11 @@ class CalendarEvent {
   /// agenda list, only in the event's own detail view.
   final String? description;
 
+  /// The calendar it is filed under, so editing can default to the calendar
+  /// it is already on instead of guessing. Null if it was never read (a
+  /// freshly-built test value, say).
+  final int? calendarId;
+
   @override
   bool operator ==(Object other) =>
       other is CalendarEvent &&
@@ -37,11 +43,20 @@ class CalendarEvent {
       other.end == end &&
       other.allDay == allDay &&
       other.location == location &&
-      other.description == description;
+      other.description == description &&
+      other.calendarId == calendarId;
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, start, end, allDay, location, description);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    start,
+    end,
+    allDay,
+    location,
+    description,
+    calendarId,
+  );
 
   @override
   String toString() => 'CalendarEvent($id, $title, $start..$end)';

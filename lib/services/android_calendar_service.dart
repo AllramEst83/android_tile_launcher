@@ -200,6 +200,7 @@ class AndroidCalendarService implements CalendarService {
     final Object? title = entry['title'];
     final Object? location = entry['location'];
     final Object? description = entry['description'];
+    final Object? calendarId = entry['calendarId'];
     return CalendarEvent(
       id: id,
       title: title is String ? title.trim() : '',
@@ -212,6 +213,7 @@ class AndroidCalendarService implements CalendarService {
       description: description is String && description.trim().isNotEmpty
           ? description.trim()
           : null,
+      calendarId: calendarId is int ? calendarId : null,
     );
   }
 

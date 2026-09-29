@@ -103,6 +103,7 @@ void main() {
           ),
           'location': ' Cafe ',
           'description': ' Bring the report ',
+          'calendarId': 4,
         },
       ],
     );
@@ -116,6 +117,7 @@ void main() {
     expect(found.single.end, DateTime(2026, 9, 26, 13));
     expect(found.single.allDay, isFalse);
     expect(found.single.location, 'Cafe');
+    expect(found.single.calendarId, 4);
     expect(found.single.description, 'Bring the report');
   });
 
@@ -223,6 +225,7 @@ void main() {
     expect(found.single.title, '');
     expect(found.single.location, isNull);
     expect(found.single.description, isNull);
+    expect(found.single.calendarId, isNull);
   });
 
   test('a broken range (end before start) is made harmless', () async {

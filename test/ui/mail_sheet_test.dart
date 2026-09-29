@@ -898,6 +898,19 @@ void main() {
             ?.text,
         'Re: Lunch on Friday?',
       );
+      final TextEditingController? body = tester
+          .widget<TextField>(find.byKey(composeBodyKey))
+          .controller;
+      expect(
+        body?.text,
+        contains('On MON 28 SEP 09:05, Anna Andersson wrote:'),
+      );
+      expect(
+        body?.text,
+        contains('> Hi Kay,\n> \n> Shall we have lunch on Friday?\n> \n> Anna'),
+      );
+      // The cursor starts above the quote, so typing lands the reply there.
+      expect(body?.selection.baseOffset, 0);
     });
 
     testWidgets('no address on the message: FROM is not tappable', (

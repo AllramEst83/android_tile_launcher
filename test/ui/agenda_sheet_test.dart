@@ -36,6 +36,12 @@ Future<void> _open(
 }) async {
   final Widget app = MaterialApp(
     theme: tileLauncherTheme(),
+    // Forces a plain hour/minute entry in the event form's time picker (no
+    // AM/PM segment), so a test can drive it without locale surprises.
+    builder: (BuildContext context, Widget? child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+      child: child!,
+    ),
     home: Builder(
       builder: (BuildContext context) => TextButton(
         onPressed: () =>
@@ -52,6 +58,19 @@ Future<void> _open(
     settings == null ? app : SettingsScope(state: settings, child: app),
   );
   await tester.tap(find.text('open'));
+  await tester.pumpAndSettle();
+}
+
+/// Switches the time picker to text entry and types `hour:minute` (the test
+/// app forces 24-hour format, so there is no AM/PM segment to contend with).
+Future<void> _pickTime(WidgetTester tester, int hour, int minute) async {
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Icons.keyboard_outlined));
+  await tester.pumpAndSettle();
+  final Finder fields = find.byType(TextFormField);
+  await tester.enterText(fields.at(0), '$hour');
+  await tester.enterText(fields.at(1), '$minute');
+  await tester.tap(find.text('OK'));
   await tester.pumpAndSettle();
 }
 
@@ -232,13 +251,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(eventDetailTitleFieldKey), findsOneWidget);
-    expect(
-      tester
-          .widget<TextField>(find.byKey(eventDetailDateFieldKey))
-          .controller
-          ?.text,
-      '2026-09-28',
-    );
+    expect(find.text('MON 28 SEP'), findsOneWidget);
   });
 
   testWidgets('saving a new event reloads the list underneath', (
@@ -254,8 +267,10 @@ void main() {
     await tester.tap(find.byKey(agendaAddEventKey));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Gym');
-    await tester.enterText(find.byKey(eventDetailStartFieldKey), '18:00');
-    await tester.enterText(find.byKey(eventDetailEndFieldKey), '19:00');
+    await tester.tap(find.byKey(eventDetailStartTimeFieldKey));
+    await _pickTime(tester, 18, 0);
+    await tester.tap(find.byKey(eventDetailEndTimeFieldKey));
+    await _pickTime(tester, 19, 0);
     await tester.tap(find.byKey(eventDetailSaveKey));
     await tester.pumpAndSettle();
 

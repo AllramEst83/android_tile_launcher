@@ -20,8 +20,8 @@ import java.util.concurrent.Executors
  * Android's calendar provider (no library: each is a handful of calls).
  *
  * `events` takes `begin`/`end` in epoch milliseconds and replies a list of
- * `{id, title, begin, end, allDay, location, description}`, one per
- * occurrence (repeating events are already expanded by `Instances`). Times
+ * `{id, title, begin, end, allDay, location, description, calendarId}`, one
+ * per occurrence (repeating events are already expanded by `Instances`). Times
  * are raw: an all-day event's are UTC midnights, and turning them into local
  * dates is the Dart side's job, where it is tested. `calendars` replies every
  * calendar Android will accept an insert for (`CALENDAR_ACCESS_LEVEL` at
@@ -103,6 +103,7 @@ class CalendarChannelHandler(
             CalendarContract.Instances.ALL_DAY,
             CalendarContract.Instances.EVENT_LOCATION,
             CalendarContract.Instances.DESCRIPTION,
+            CalendarContract.Instances.CALENDAR_ID,
         )
         // Only calendars the user has switched on, and not cancelled events.
         val selection = "${CalendarContract.Instances.VISIBLE} = 1 AND " +
@@ -122,6 +123,7 @@ class CalendarChannelHandler(
                             "allDay" to (cursor.getInt(4) != 0),
                             "location" to cursor.getString(5),
                             "description" to cursor.getString(6),
+                            "calendarId" to cursor.getLong(7),
                         ),
                     )
                 }

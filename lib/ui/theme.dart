@@ -272,5 +272,15 @@ ThemeData tileLauncherTheme() {
       bodyMedium: base.copyWith(fontSize: 14),
       labelSmall: base.copyWith(fontSize: 10, color: palette.textDim),
     ),
+    // The event form's date/start/end pickers: same hard edges as everything
+    // else, on the canvas colour rather than Material's own dialog grey.
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: palette.canvas,
+      shape: const RoundedRectangleBorder(),
+    ),
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: palette.canvas,
+      shape: const RoundedRectangleBorder(),
+    ),
   );
 }

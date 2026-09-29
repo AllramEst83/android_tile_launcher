@@ -12,13 +12,15 @@ const Key composeSendKey = ValueKey<String>('compose-send');
 
 /// What COMPOSE on the mail sheet opens (blank), or what tapping the sender's
 /// address in an open message opens (addressed to them, subject prefixed
-/// `RE:`): to, subject and the message text, SEND on the account already set
-/// up. Closes on its own once the server accepts it.
+/// `RE:`, [body] the original text quoted below): to, subject and the message
+/// text, SEND on the account already set up. Closes on its own once the
+/// server accepts it.
 Future<void> showComposeSheet(
   BuildContext context, {
   required MailService mail,
   String? to,
   String? subject,
+  String? body,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -30,17 +32,18 @@ Future<void> showComposeSheet(
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
       ),
-      child: _ComposeSheet(mail: mail, to: to, subject: subject),
+      child: _ComposeSheet(mail: mail, to: to, subject: subject, body: body),
     ),
   );
 }
 
 class _ComposeSheet extends StatefulWidget {
-  const _ComposeSheet({required this.mail, this.to, this.subject});
+  const _ComposeSheet({required this.mail, this.to, this.subject, this.body});
 
   final MailService mail;
   final String? to;
   final String? subject;
+  final String? body;
 
   @override
   State<_ComposeSheet> createState() => _ComposeSheetState();
@@ -53,7 +56,11 @@ class _ComposeSheetState extends State<_ComposeSheet> {
   late final TextEditingController _subject = TextEditingController(
     text: widget.subject ?? '',
   );
-  final TextEditingController _body = TextEditingController();
+  // The cursor starts above a quoted reply, not at its end, so typing goes
+  // where the reply belongs.
+  late final TextEditingController _body = TextEditingController(
+    text: widget.body ?? '',
+  )..selection = const TextSelection.collapsed(offset: 0);
 
   bool _busy = false;
   String? _error;

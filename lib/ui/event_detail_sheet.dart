@@ -2,7 +2,6 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_format.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/model/clock_format.dart';
-import 'package:android_tile_launcher/model/event_form.dart';
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/calendar_service.dart';
 import 'package:android_tile_launcher/ui/pad_key.dart';
@@ -26,19 +25,35 @@ const Key eventDetailLocationFieldKey = ValueKey<String>(
 const Key eventDetailDescriptionFieldKey = ValueKey<String>(
   'event-detail-description',
 );
-const Key eventDetailDateFieldKey = ValueKey<String>('event-detail-date');
-const Key eventDetailStartFieldKey = ValueKey<String>('event-detail-start');
-const Key eventDetailEndFieldKey = ValueKey<String>('event-detail-end');
+const Key eventDetailCalendarFieldKey = ValueKey<String>(
+  'event-detail-calendar',
+);
+const Key eventDetailStartDateFieldKey = ValueKey<String>(
+  'event-detail-start-date',
+);
+const Key eventDetailStartTimeFieldKey = ValueKey<String>(
+  'event-detail-start-time',
+);
+const Key eventDetailEndDateFieldKey = ValueKey<String>(
+  'event-detail-end-date',
+);
+const Key eventDetailEndDateClearKey = ValueKey<String>(
+  'event-detail-end-date-clear',
+);
+const Key eventDetailEndTimeFieldKey = ValueKey<String>(
+  'event-detail-end-time',
+);
 
 /// What a tap on an agenda event opens (everything it holds, one labelled
 /// field per property), or what `+ ADD EVENT` opens directly into edit mode.
 /// EDIT turns the read fields into an edit form (title, location, about,
-/// date, start and end — timed events only: an all-day event can be deleted
-/// here but not edited); SAVE writes it back and DELETE asks first. Adding
-/// files the event under the account's primary calendar (or the first one
-/// Android will accept an insert for); editing never changes which calendar
-/// an event is on. Completes with whether anything actually changed, so the
-/// agenda sheet knows to reload.
+/// calendar, start and end — timed events only: an all-day event can be
+/// deleted here but not edited); SAVE writes it back and DELETE asks first.
+/// The calendar field lists every calendar Android will accept an insert for,
+/// defaulting to the event's own (or the account's primary) — changing it
+/// moves the event. An end date is only shown once set; left alone, the event
+/// ends the same day it starts. Completes with whether anything actually
+/// changed, so the agenda sheet knows to reload.
 Future<bool> showEventDetailSheet(
   BuildContext context, {
   required AgendaRepository repository,
@@ -51,11 +66,18 @@ Future<bool> showEventDetailSheet(
     isScrollControlled: true,
     // Laid out below the status bar, like the sheet it opens from.
     useSafeArea: true,
-    builder: (BuildContext sheetContext) =>
-        _EventDetailSheet(repository: repository, event: event, day: day),
+    builder: (BuildContext sheetContext) => Padding(
+      // Keeps the fields above the keyboard.
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+      ),
+      child: _EventDetailSheet(repository: repository, event: event, day: day),
+    ),
   );
   return changed ?? false;
 }
+
+DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
 class _EventDetailSheet extends StatefulWidget {
   const _EventDetailSheet({
@@ -86,35 +108,96 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
   late final TextEditingController _description = TextEditingController(
     text: widget.event?.description ?? '',
   );
-  late final TextEditingController _date = TextEditingController(
-    text: formatEventDate(widget.event?.start ?? widget.day),
-  );
-  late final TextEditingController _start = TextEditingController(
-    text: widget.event == null ? '' : formatEventTime(widget.event!.start),
-  );
-  late final TextEditingController _end = TextEditingController(
-    text: widget.event == null ? '' : formatEventTime(widget.event!.end),
-  );
+
+  late DateTime _startDate = _dateOnly(widget.event?.start ?? widget.day);
+
+  /// Null means "the same day as [_startDate]": a field only shows up once
+  /// it is actually set to something else.
+  DateTime? _endDate;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+
+  List<CalendarInfo>? _calendars;
+  int? _calendarId;
+  bool _loadingCalendars = false;
+  String? _calendarsError;
 
   bool _busy = false;
   bool _confirmingDelete = false;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    final CalendarEvent? event = widget.event;
+    if (event != null) {
+      _startTime = TimeOfDay.fromDateTime(event.start);
+      _endTime = TimeOfDay.fromDateTime(event.end);
+      final DateTime endDay = _dateOnly(event.end);
+      if (endDay != _startDate) _endDate = endDay;
+    }
+    if (_editing) _loadCalendars();
+  }
+
+  @override
   void dispose() {
     _title.dispose();
     _location.dispose();
     _description.dispose();
-    _date.dispose();
-    _start.dispose();
-    _end.dispose();
     super.dispose();
   }
 
-  void _startEditing() => setState(() {
-    _editing = true;
-    _error = null;
-  });
+  Future<void> _loadCalendars() async {
+    setState(() {
+      _loadingCalendars = true;
+      _calendarsError = null;
+    });
+    final CalendarListResult result = await widget.repository
+        .writableCalendars();
+    if (!mounted) return;
+    switch (result) {
+      case CalendarList(:final List<CalendarInfo> calendars):
+        setState(() {
+          _loadingCalendars = false;
+          _calendars = calendars;
+          _calendarId = _defaultCalendarId(calendars);
+        });
+      case CalendarListDenied(:final bool permanent):
+        setState(() {
+          _loadingCalendars = false;
+          _calendarsError = permanent
+              ? Messages.agendaWriteAllowInSettings
+              : Messages.agendaWriteNotAllowed;
+        });
+      case CalendarListUnavailable(:final String reason):
+        setState(() {
+          _loadingCalendars = false;
+          _calendarsError = reason.toUpperCase();
+        });
+    }
+  }
+
+  /// The event's own calendar, if it is still one Android will accept an
+  /// insert for; otherwise (and always when adding) the account's primary
+  /// calendar, or just the first one on offer.
+  int? _defaultCalendarId(List<CalendarInfo> calendars) {
+    if (calendars.isEmpty) return null;
+    final int? current = widget.event?.calendarId;
+    if (current != null && calendars.any((CalendarInfo c) => c.id == current)) {
+      return current;
+    }
+    return (calendars.where((CalendarInfo c) => c.primary).firstOrNull ??
+            calendars.first)
+        .id;
+  }
+
+  void _startEditing() {
+    setState(() {
+      _editing = true;
+      _error = null;
+    });
+    if (_calendars == null && !_loadingCalendars) _loadCalendars();
+  }
 
   void _close() {
     final CalendarEvent? event = widget.event;
@@ -123,17 +206,69 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
       return;
     }
     // Back out of editing an existing event to its read view, discarding
-    // whatever was typed.
+    // whatever was chosen.
     setState(() {
       _editing = false;
       _error = null;
       _title.text = event.title;
       _location.text = event.location ?? '';
       _description.text = event.description ?? '';
-      _date.text = formatEventDate(event.start);
-      _start.text = formatEventTime(event.start);
-      _end.text = formatEventTime(event.end);
+      _startDate = _dateOnly(event.start);
+      final DateTime endDay = _dateOnly(event.end);
+      _endDate = endDay == _startDate ? null : endDay;
+      _startTime = TimeOfDay.fromDateTime(event.start);
+      _endTime = TimeOfDay.fromDateTime(event.end);
     });
+  }
+
+  Future<void> _pickStartDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _startDate = _dateOnly(picked);
+      // An explicit end date can never sit before the start it follows.
+      if (_endDate != null && _endDate!.isBefore(_startDate)) {
+        _endDate = _startDate;
+      }
+    });
+  }
+
+  Future<void> _pickEndDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _endDate ?? _startDate,
+      firstDate: _startDate,
+      lastDate: DateTime(2100),
+    );
+    if (picked == null || !mounted) return;
+    final DateTime day = _dateOnly(picked);
+    setState(() => _endDate = day == _startDate ? null : day);
+  }
+
+  void _clearEndDate() => setState(() => _endDate = null);
+
+  Future<void> _pickStartTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _startTime ?? const TimeOfDay(hour: 9, minute: 0),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _startTime = picked);
+  }
+
+  Future<void> _pickEndTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime:
+          _endTime ?? _startTime ?? const TimeOfDay(hour: 10, minute: 0),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _endTime = picked);
   }
 
   ({DateTime start, DateTime end})? _validated() {
@@ -142,68 +277,53 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
       setState(() => _error = Messages.agendaEventTitleNeeded);
       return null;
     }
-    final DateTime? date = parseEventDate(_date.text);
-    if (date == null) {
-      setState(() => _error = Messages.agendaEventBadDate);
+    final TimeOfDay? startTime = _startTime;
+    if (startTime == null) {
+      setState(() => _error = Messages.agendaEventStartTimeNeeded);
       return null;
     }
-    final DateTime? start = parseEventTime(date, _start.text);
-    if (start == null) {
-      setState(() => _error = Messages.agendaEventBadStart);
+    final TimeOfDay? endTime = _endTime;
+    if (endTime == null) {
+      setState(() => _error = Messages.agendaEventEndTimeNeeded);
       return null;
     }
-    final DateTime? end = parseEventTime(date, _end.text);
-    if (end == null || !end.isAfter(start)) {
-      setState(() => _error = Messages.agendaEventBadEnd);
+    final DateTime endDate = _endDate ?? _startDate;
+    final DateTime start = DateTime(
+      _startDate.year,
+      _startDate.month,
+      _startDate.day,
+      startTime.hour,
+      startTime.minute,
+    );
+    final DateTime end = DateTime(
+      endDate.year,
+      endDate.month,
+      endDate.day,
+      endTime.hour,
+      endTime.minute,
+    );
+    if (!end.isAfter(start)) {
+      setState(() => _error = Messages.agendaEventEndNotAfterStart);
       return null;
     }
     return (start: start, end: end);
   }
 
   Future<void> _save() async {
-    if (_busy) return;
+    if (_busy || _loadingCalendars) return;
     final ({DateTime start, DateTime end})? when = _validated();
     if (when == null) return;
+    final int? calendarId = _calendarId;
+    if (calendarId == null) {
+      setState(
+        () => _error = _calendarsError ?? Messages.agendaEventNoCalendar,
+      );
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
     });
-
-    int? calendarId;
-    if (widget.event == null) {
-      final CalendarListResult calendars = await widget.repository
-          .writableCalendars();
-      if (!mounted) return;
-      switch (calendars) {
-        case CalendarList(:final List<CalendarInfo> calendars):
-          if (calendars.isEmpty) {
-            setState(() {
-              _busy = false;
-              _error = Messages.agendaEventNoCalendar;
-            });
-            return;
-          }
-          calendarId =
-              (calendars.where((CalendarInfo c) => c.primary).firstOrNull ??
-                      calendars.first)
-                  .id;
-        case CalendarListDenied(:final bool permanent):
-          setState(() {
-            _busy = false;
-            _error = permanent
-                ? Messages.agendaWriteAllowInSettings
-                : Messages.agendaWriteNotAllowed;
-          });
-          return;
-        case CalendarListUnavailable(:final String reason):
-          setState(() {
-            _busy = false;
-            _error = reason.toUpperCase();
-          });
-          return;
-      }
-    }
-
     final NewCalendarEvent draft = NewCalendarEvent(
       calendarId: calendarId,
       title: _title.text.trim(),
@@ -417,6 +537,7 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
   }
 
   Widget _editForm(TextTheme text) {
+    final bool disabled = _busy || _loadingCalendars;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -436,29 +557,61 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
           controller: _description,
           maxLines: 3,
         ),
-        _EditField(
-          fieldKey: eventDetailDateFieldKey,
-          label: Messages.agendaEventDateLabel,
-          controller: _date,
-          keyboardType: TextInputType.datetime,
-        ),
+        _calendarField(text),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(
-              child: _EditField(
-                fieldKey: eventDetailStartFieldKey,
-                label: Messages.agendaEventStartLabel,
-                controller: _start,
-                keyboardType: TextInputType.datetime,
+              child: _PickerField(
+                fieldKey: eventDetailStartDateFieldKey,
+                label: Messages.agendaEventStartDateLabel,
+                value: formatClockDate(_startDate),
+                onTap: disabled ? null : _pickStartDate,
               ),
             ),
             const SizedBox(width: TileMetrics.gutter),
             Expanded(
-              child: _EditField(
-                fieldKey: eventDetailEndFieldKey,
-                label: Messages.agendaEventEndLabel,
-                controller: _end,
-                keyboardType: TextInputType.datetime,
+              child: _PickerField(
+                fieldKey: eventDetailStartTimeFieldKey,
+                label: Messages.agendaEventStartTimeLabel,
+                value:
+                    _startTime?.format(context) ?? Messages.agendaEventTapToSet,
+                muted: _startTime == null,
+                onTap: disabled ? null : _pickStartTime,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: _PickerField(
+                fieldKey: eventDetailEndDateFieldKey,
+                label: Messages.agendaEventEndDateLabel,
+                value: _endDate == null
+                    ? Messages.agendaEventSameDay
+                    : formatClockDate(_endDate!),
+                muted: _endDate == null,
+                onTap: disabled ? null : _pickEndDate,
+                trailing: _endDate == null
+                    ? null
+                    : _TextButton(
+                        key: eventDetailEndDateClearKey,
+                        label: Messages.agendaEventClear,
+                        onTap: disabled ? null : _clearEndDate,
+                      ),
+              ),
+            ),
+            const SizedBox(width: TileMetrics.gutter),
+            Expanded(
+              child: _PickerField(
+                fieldKey: eventDetailEndTimeFieldKey,
+                label: Messages.agendaEventEndTimeLabel,
+                value:
+                    _endTime?.format(context) ?? Messages.agendaEventTapToSet,
+                muted: _endTime == null,
+                onTap: disabled ? null : _pickEndTime,
               ),
             ),
           ],
@@ -467,9 +620,78 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
         _Button(
           key: eventDetailSaveKey,
           label: _busy ? Messages.agendaEventSaving : Messages.agendaEventSave,
-          onTap: _busy ? null : _save,
+          onTap: disabled ? null : _save,
         ),
       ],
+    );
+  }
+
+  Widget _calendarField(TextTheme text) {
+    final Widget content;
+    if (_loadingCalendars) {
+      content = Text(
+        Messages.agendaEventLoadingCalendars,
+        style: text.bodySmall?.copyWith(fontSize: 11, color: TileColors.muted),
+      );
+    } else {
+      final List<CalendarInfo>? calendars = _calendars;
+      if (calendars == null || calendars.isEmpty) {
+        content = Text(
+          _calendarsError ?? Messages.agendaEventNoCalendar,
+          style: text.bodySmall?.copyWith(
+            fontSize: 11,
+            color: TileColors.danger,
+          ),
+        );
+      } else {
+        content = DropdownButtonFormField<int>(
+          key: eventDetailCalendarFieldKey,
+          initialValue: _calendarId,
+          isExpanded: true,
+          dropdownColor: TileColors.canvas,
+          iconEnabledColor: TileColors.textBright,
+          style: text.bodySmall?.copyWith(
+            fontSize: 12,
+            color: TileColors.textBright,
+          ),
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: TileColors.bezel),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: TileColors.textBright),
+            ),
+          ),
+          items: <DropdownMenuItem<int>>[
+            for (final CalendarInfo c in calendars)
+              DropdownMenuItem<int>(
+                value: c.id,
+                child: Text(
+                  c.name.toUpperCase(),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: (int? value) => setState(() => _calendarId = value),
+        );
+      }
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: TileMetrics.gutter),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            Messages.agendaEventCalendarLabel,
+            style: text.bodySmall?.copyWith(
+              fontSize: 8,
+              color: TileColors.muted,
+            ),
+          ),
+          content,
+        ],
+      ),
     );
   }
 }
@@ -529,14 +751,12 @@ class _EditField extends StatelessWidget {
     required this.label,
     required this.controller,
     this.maxLines = 1,
-    this.keyboardType,
   });
 
   final Key fieldKey;
   final String label;
   final TextEditingController controller;
   final int maxLines;
-  final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
@@ -557,7 +777,6 @@ class _EditField extends StatelessWidget {
             key: fieldKey,
             controller: controller,
             maxLines: maxLines,
-            keyboardType: keyboardType,
             style: text.bodySmall?.copyWith(
               fontSize: 12,
               color: TileColors.textBright,
@@ -572,6 +791,75 @@ class _EditField extends StatelessWidget {
                 borderSide: BorderSide(color: TileColors.textBright),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One property picked from a dialog rather than typed: a small muted label
+/// over a tappable, underline-bordered box showing the current value (or a
+/// placeholder, muted, before anything is picked), with room for a
+/// [trailing] widget such as a CLEAR button.
+class _PickerField extends StatelessWidget {
+  const _PickerField({
+    required this.fieldKey,
+    required this.label,
+    required this.value,
+    required this.onTap,
+    this.muted = false,
+    this.trailing,
+  });
+
+  final Key fieldKey;
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+  final bool muted;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: TileMetrics.gutter),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: text.bodySmall?.copyWith(
+              fontSize: 8,
+              color: TileColors.muted,
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              Expanded(
+                child: InkWell(
+                  key: fieldKey,
+                  onTap: onTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: TileColors.bezel),
+                      ),
+                    ),
+                    child: Text(
+                      value,
+                      style: text.bodySmall?.copyWith(
+                        fontSize: 12,
+                        color: muted ? TileColors.muted : TileColors.textBright,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              ?trailing,
+            ],
           ),
         ],
       ),
@@ -603,6 +891,31 @@ class _Button extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.bodySmall
               ?.copyWith(fontSize: 11, color: colour),
+        ),
+      ),
+    );
+  }
+}
+
+/// A plain text tap target, no border: for a small aside like CLEAR beside a
+/// [_PickerField], where a boxed [_Button] would be too heavy.
+class _TextButton extends StatelessWidget {
+  const _TextButton({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color colour = onTap == null ? TileColors.textDim : TileColors.accent;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8, top: 10, bottom: 10),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(fontSize: 10, color: colour),
         ),
       ),
     );

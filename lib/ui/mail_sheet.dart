@@ -38,6 +38,21 @@ String _replySubject(String subject) {
   return trimmed.isEmpty ? 'Re:' : 'Re: $trimmed';
 }
 
+/// [body]'s own text, quoted under an "on ... wrote:" line and led by two
+/// blank lines for the reply itself — the compose sheet puts the cursor
+/// above it, so typing starts there, not inside the quote.
+String _quotedReply(MailBody body) {
+  final String who = body.date == null
+      ? '${body.from} wrote:'
+      : 'On ${formatClockDate(body.date!)} '
+            '${formatClockTime(body.date!)}, ${body.from} wrote:';
+  final String quoted = body.text
+      .split('\n')
+      .map((String line) => '> $line')
+      .join('\n');
+  return '\n\n$who\n$quoted';
+}
+
 DateTime _systemNow() => DateTime.now();
 
 /// What a tap on a mail tile with an inbox opens: the newest messages, newest
@@ -332,12 +347,14 @@ class _MailSheetState extends State<_MailSheet> {
   Future<void> _compose() => showComposeSheet(context, mail: widget.mail);
 
   /// Opens a reply to [body]'s own sender: addressed to them, the subject
-  /// prefixed `RE:` unless it already is one.
+  /// prefixed `RE:` unless it already is one, and the original text quoted
+  /// under the (empty) space for the reply itself.
   Future<void> _reply(MailBody body) => showComposeSheet(
     context,
     mail: widget.mail,
     to: body.fromAddress,
     subject: _replySubject(body.subject),
+    body: _quotedReply(body),
   );
 
   @override

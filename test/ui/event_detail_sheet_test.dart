@@ -27,6 +27,12 @@ Future<_Opened> _open(
   await tester.pumpWidget(
     MaterialApp(
       theme: tileLauncherTheme(),
+      // Forces a plain hour/minute entry in the time picker (no AM/PM
+      // segment), so tests can drive it without locale surprises.
+      builder: (BuildContext context, Widget? child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
       home: Builder(
         builder: (BuildContext context) => TextButton(
           onPressed: () async {
@@ -63,7 +69,35 @@ CalendarEvent _dentist({bool allDay = false}) => CalendarEvent(
   location: 'Storgatan 1',
   description: 'Bring the insurance card',
   allDay: allDay,
+  calendarId: 2,
 );
+
+FakeAgendaRepository _withOneCalendar() => FakeAgendaRepository()
+  ..listResult = const CalendarList(<CalendarInfo>[
+    CalendarInfo(id: 2, name: 'Home', primary: true),
+  ]);
+
+/// Picks [day] of the month already on screen and confirms it.
+Future<void> _pickDate(WidgetTester tester, int day) async {
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('$day').first);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('OK'));
+  await tester.pumpAndSettle();
+}
+
+/// Switches the time picker to text entry and types `hour:minute` (the test
+/// app forces 24-hour format, so there is no AM/PM segment to contend with).
+Future<void> _pickTime(WidgetTester tester, int hour, int minute) async {
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Icons.keyboard_outlined));
+  await tester.pumpAndSettle();
+  final Finder fields = find.byType(TextFormField);
+  await tester.enterText(fields.at(0), '$hour');
+  await tester.enterText(fields.at(1), '$minute');
+  await tester.tap(find.text('OK'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   testWidgets('shows the title, when, where and about', (
@@ -174,46 +208,38 @@ void main() {
   });
 
   group('edit', () {
-    testWidgets('EDIT shows the fields pre-filled, X backs out unsaved', (
-      WidgetTester tester,
-    ) async {
-      await _open(tester, FakeAgendaRepository(), event: _dentist());
+    testWidgets(
+      'EDIT shows the fields pre-filled, calendar included, X backs out unsaved',
+      (WidgetTester tester) async {
+        await _open(tester, _withOneCalendar(), event: _dentist());
 
-      await tester.tap(find.byKey(eventDetailEditKey));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byKey(eventDetailEditKey));
+        await tester.pumpAndSettle();
 
-      expect(
-        tester
-            .widget<TextField>(find.byKey(eventDetailTitleFieldKey))
-            .controller
-            ?.text,
-        'Dentist',
-      );
-      expect(
-        tester
-            .widget<TextField>(find.byKey(eventDetailDateFieldKey))
-            .controller
-            ?.text,
-        '2026-09-28',
-      );
-      expect(
-        tester
-            .widget<TextField>(find.byKey(eventDetailStartFieldKey))
-            .controller
-            ?.text,
-        '14:30',
-      );
+        expect(
+          tester
+              .widget<TextField>(find.byKey(eventDetailTitleFieldKey))
+              .controller
+              ?.text,
+          'Dentist',
+        );
+        expect(find.text('MON 28 SEP'), findsOneWidget);
+        expect(find.text('14:30'), findsOneWidget);
+        expect(find.text(Messages.agendaEventSameDay), findsOneWidget);
+        expect(find.text('15:00'), findsOneWidget);
+        expect(find.text('HOME'), findsOneWidget);
 
-      await tester.tap(find.byKey(eventDetailCloseKey));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byKey(eventDetailCloseKey));
+        await tester.pumpAndSettle();
 
-      // Back to the read view, not closed.
-      expect(find.text('DENTIST'), findsOneWidget);
-      expect(find.byKey(eventDetailTitleFieldKey), findsNothing);
-    });
+        // Back to the read view, not closed.
+        expect(find.text('DENTIST'), findsOneWidget);
+        expect(find.byKey(eventDetailTitleFieldKey), findsNothing);
+      },
+    );
 
     testWidgets('an empty title refuses to save', (WidgetTester tester) async {
-      await _open(tester, FakeAgendaRepository(), event: _dentist());
+      await _open(tester, _withOneCalendar(), event: _dentist());
       await tester.tap(find.byKey(eventDetailEditKey));
       await tester.pumpAndSettle();
 
@@ -224,57 +250,143 @@ void main() {
       expect(find.text(Messages.agendaEventTitleNeeded), findsOneWidget);
     });
 
-    testWidgets('a bad start time refuses to save', (
+    testWidgets(
+      'saving with nothing else touched keeps the times and calendar',
+      (WidgetTester tester) async {
+        final FakeAgendaRepository repository = _withOneCalendar();
+        final _Opened result = await _open(
+          tester,
+          repository,
+          event: _dentist(),
+        );
+        await tester.tap(find.byKey(eventDetailEditKey));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Doctor');
+        await tester.tap(find.byKey(eventDetailSaveKey));
+        await tester.pumpAndSettle();
+
+        expect(repository.updated, hasLength(1));
+        expect(repository.updated.single.$1, 1);
+        final NewCalendarEvent saved = repository.updated.single.$2;
+        expect(saved.title, 'Doctor');
+        expect(saved.calendarId, 2);
+        expect(saved.start, DateTime(2026, 9, 28, 14, 30));
+        expect(saved.end, DateTime(2026, 9, 28, 15));
+        expect(result.changed, isTrue);
+      },
+    );
+
+    testWidgets('picking a new start date moves the whole event', (
       WidgetTester tester,
     ) async {
-      await _open(tester, FakeAgendaRepository(), event: _dentist());
+      final FakeAgendaRepository repository = _withOneCalendar();
+      await _open(tester, repository, event: _dentist());
       await tester.tap(find.byKey(eventDetailEditKey));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byKey(eventDetailStartFieldKey), 'noon');
+      await tester.tap(find.byKey(eventDetailStartDateFieldKey));
+      await _pickDate(tester, 30);
       await tester.tap(find.byKey(eventDetailSaveKey));
       await tester.pumpAndSettle();
 
-      expect(find.text(Messages.agendaEventBadStart), findsOneWidget);
+      final NewCalendarEvent saved = repository.updated.single.$2;
+      expect(saved.start, DateTime(2026, 9, 30, 14, 30));
+      // The end date was never set explicitly, so it follows the start.
+      expect(saved.end, DateTime(2026, 9, 30, 15));
     });
 
-    testWidgets('an end not after the start refuses to save', (
+    testWidgets('picking a new start time changes only that', (
       WidgetTester tester,
     ) async {
-      await _open(tester, FakeAgendaRepository(), event: _dentist());
+      final FakeAgendaRepository repository = _withOneCalendar();
+      await _open(tester, repository, event: _dentist());
       await tester.tap(find.byKey(eventDetailEditKey));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byKey(eventDetailEndFieldKey), '14:00');
+      await tester.tap(find.byKey(eventDetailStartTimeFieldKey));
+      await _pickTime(tester, 8, 15);
       await tester.tap(find.byKey(eventDetailSaveKey));
       await tester.pumpAndSettle();
 
-      expect(find.text(Messages.agendaEventBadEnd), findsOneWidget);
+      final NewCalendarEvent saved = repository.updated.single.$2;
+      expect(saved.start, DateTime(2026, 9, 28, 8, 15));
+      expect(saved.end, DateTime(2026, 9, 28, 15));
     });
 
-    testWidgets('saving updates the event and never sends a calendar id', (
+    testWidgets('setting an end date makes the event span days', (
       WidgetTester tester,
     ) async {
-      final FakeAgendaRepository repository = FakeAgendaRepository();
-      final _Opened result = await _open(tester, repository, event: _dentist());
+      final FakeAgendaRepository repository = _withOneCalendar();
+      await _open(tester, repository, event: _dentist());
       await tester.tap(find.byKey(eventDetailEditKey));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Doctor');
+      await tester.tap(find.byKey(eventDetailEndDateFieldKey));
+      await _pickDate(tester, 29);
       await tester.tap(find.byKey(eventDetailSaveKey));
       await tester.pumpAndSettle();
 
-      expect(repository.updated, hasLength(1));
-      expect(repository.updated.single.$1, 1);
-      expect(repository.updated.single.$2.title, 'Doctor');
-      expect(repository.updated.single.$2.calendarId, isNull);
-      expect(result.changed, isTrue);
+      final NewCalendarEvent saved = repository.updated.single.$2;
+      expect(saved.start, DateTime(2026, 9, 28, 14, 30));
+      expect(saved.end, DateTime(2026, 9, 29, 15));
+    });
+
+    testWidgets('CLEAR resets the end date back to the same day', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _withOneCalendar(), event: _dentist());
+      await tester.tap(find.byKey(eventDetailEditKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(eventDetailEndDateFieldKey));
+      await _pickDate(tester, 29);
+      expect(find.byKey(eventDetailEndDateClearKey), findsOneWidget);
+
+      await tester.tap(find.byKey(eventDetailEndDateClearKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.agendaEventSameDay), findsOneWidget);
+      expect(find.byKey(eventDetailEndDateClearKey), findsNothing);
+    });
+
+    testWidgets('changing the calendar moves the event there', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = FakeAgendaRepository()
+        ..listResult = const CalendarList(<CalendarInfo>[
+          CalendarInfo(id: 2, name: 'Home', primary: true),
+          CalendarInfo(id: 3, name: 'Work'),
+        ]);
+      await _open(tester, repository, event: _dentist());
+      await tester.tap(find.byKey(eventDetailEditKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(eventDetailCalendarFieldKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('WORK').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(eventDetailSaveKey));
+      await tester.pumpAndSettle();
+
+      expect(repository.updated.single.$2.calendarId, 3);
+    });
+
+    testWidgets('no calendar can be written to: the field says so', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = FakeAgendaRepository()
+        ..listResult = const CalendarList(<CalendarInfo>[]);
+      await _open(tester, repository, event: _dentist());
+      await tester.tap(find.byKey(eventDetailEditKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.agendaEventNoCalendar), findsOneWidget);
     });
 
     testWidgets('write refused (permanently) says where to allow it', (
       WidgetTester tester,
     ) async {
-      final FakeAgendaRepository repository = FakeAgendaRepository()
+      final FakeAgendaRepository repository = _withOneCalendar()
         ..writeResult = const CalendarWriteDenied(permanent: true);
       await _open(tester, repository, event: _dentist());
       await tester.tap(find.byKey(eventDetailEditKey));
@@ -331,18 +443,14 @@ void main() {
     testWidgets('opens straight into the edit form, no EDIT/DELETE', (
       WidgetTester tester,
     ) async {
-      await _open(tester, FakeAgendaRepository(), day: DateTime(2026, 9, 28));
+      await _open(tester, _withOneCalendar(), day: DateTime(2026, 9, 28));
 
       expect(find.byKey(eventDetailTitleFieldKey), findsOneWidget);
       expect(find.byKey(eventDetailEditKey), findsNothing);
       expect(find.byKey(eventDetailDeleteKey), findsNothing);
-      expect(
-        tester
-            .widget<TextField>(find.byKey(eventDetailDateFieldKey))
-            .controller
-            ?.text,
-        '2026-09-28',
-      );
+      expect(find.text('MON 28 SEP'), findsOneWidget);
+      expect(find.text(Messages.agendaEventTapToSet), findsNWidgets(2));
+      expect(find.text('HOME'), findsOneWidget);
     });
 
     testWidgets(
@@ -350,7 +458,7 @@ void main() {
       (WidgetTester tester) async {
         final _Opened result = await _open(
           tester,
-          FakeAgendaRepository(),
+          _withOneCalendar(),
           day: DateTime(2026, 9, 28),
         );
 
@@ -362,14 +470,50 @@ void main() {
       },
     );
 
-    testWidgets('saves to the primary writable calendar', (
+    testWidgets('a start time is required to save', (
       WidgetTester tester,
     ) async {
-      final FakeAgendaRepository repository = FakeAgendaRepository()
-        ..listResult = const CalendarList(<CalendarInfo>[
-          CalendarInfo(id: 1, name: 'Work'),
-          CalendarInfo(id: 2, name: 'Home', primary: true),
-        ]);
+      await _open(tester, _withOneCalendar(), day: DateTime(2026, 9, 28));
+
+      await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Gym');
+      await tester.tap(find.byKey(eventDetailSaveKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.agendaEventStartTimeNeeded), findsOneWidget);
+    });
+
+    testWidgets('an end time is required to save', (WidgetTester tester) async {
+      await _open(tester, _withOneCalendar(), day: DateTime(2026, 9, 28));
+
+      await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Gym');
+      await tester.tap(find.byKey(eventDetailStartTimeFieldKey));
+      await _pickTime(tester, 18, 0);
+      await tester.tap(find.byKey(eventDetailSaveKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.agendaEventEndTimeNeeded), findsOneWidget);
+    });
+
+    testWidgets('an end not after the start refuses to save', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _withOneCalendar(), day: DateTime(2026, 9, 28));
+
+      await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Gym');
+      await tester.tap(find.byKey(eventDetailStartTimeFieldKey));
+      await _pickTime(tester, 18, 0);
+      await tester.tap(find.byKey(eventDetailEndTimeFieldKey));
+      await _pickTime(tester, 17, 0);
+      await tester.tap(find.byKey(eventDetailSaveKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.agendaEventEndNotAfterStart), findsOneWidget);
+    });
+
+    testWidgets('saves to the selected calendar with the picked times', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = _withOneCalendar();
       final _Opened result = await _open(
         tester,
         repository,
@@ -377,8 +521,10 @@ void main() {
       );
 
       await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Gym');
-      await tester.enterText(find.byKey(eventDetailStartFieldKey), '18:00');
-      await tester.enterText(find.byKey(eventDetailEndFieldKey), '19:00');
+      await tester.tap(find.byKey(eventDetailStartTimeFieldKey));
+      await _pickTime(tester, 18, 0);
+      await tester.tap(find.byKey(eventDetailEndTimeFieldKey));
+      await _pickTime(tester, 19, 0);
       await tester.tap(find.byKey(eventDetailSaveKey));
       await tester.pumpAndSettle();
 
@@ -398,13 +544,16 @@ void main() {
         ..listResult = const CalendarList(<CalendarInfo>[]);
       await _open(tester, repository, day: DateTime(2026, 9, 28));
 
+      expect(find.text(Messages.agendaEventNoCalendar), findsOneWidget);
+
       await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Gym');
-      await tester.enterText(find.byKey(eventDetailStartFieldKey), '18:00');
-      await tester.enterText(find.byKey(eventDetailEndFieldKey), '19:00');
+      await tester.tap(find.byKey(eventDetailStartTimeFieldKey));
+      await _pickTime(tester, 18, 0);
+      await tester.tap(find.byKey(eventDetailEndTimeFieldKey));
+      await _pickTime(tester, 19, 0);
       await tester.tap(find.byKey(eventDetailSaveKey));
       await tester.pumpAndSettle();
 
-      expect(find.text(Messages.agendaEventNoCalendar), findsOneWidget);
       expect(repository.created, isEmpty);
     });
   });
