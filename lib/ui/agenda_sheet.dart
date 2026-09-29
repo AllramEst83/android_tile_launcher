@@ -87,6 +87,9 @@ class _AgendaSheetState extends State<_AgendaSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            // So the DAY/WEEK toggle is not flush against the sheet's own
+            // top edge.
+            const SizedBox(height: TileMetrics.gutter),
             Row(
               children: <Widget>[
                 Text(Messages.agendaTitle, style: text.bodyMedium),
