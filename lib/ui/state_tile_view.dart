@@ -41,15 +41,22 @@ class StateTileContentView extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                state,
-                style: TextStyle(
-                  fontFamily: kPixelFontFamily,
-                  fontSize: 28,
-                  color: ink,
+            // `Flexible`, not a bare `FittedBox`: unwrapped, a non-flex child
+            // of a `Column` gets loose (unbounded) constraints and never
+            // actually shrinks, so a one-row-tall tile overflowed here
+            // (Phase 35, caught by the same "every kind, every size" check
+            // the clock tile's own one-row overflow prompted).
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  state,
+                  style: TextStyle(
+                    fontFamily: kPixelFontFamily,
+                    fontSize: 28,
+                    color: ink,
+                  ),
                 ),
               ),
             ),

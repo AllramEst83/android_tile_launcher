@@ -29,28 +29,35 @@ class AlarmTileContentView extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final bool compact = constraints.maxWidth < 120;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(Messages.alarmTitle, style: _text(compact ? 8 : 10)),
-                const SizedBox(height: 4),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
+            // `compact` alone decides the *content* (whether the third line
+            // fits the idea of the tile at all), not the *height* — a
+            // wide-but-one-row tile is `!compact` yet has no more vertical
+            // room than a small one, so the outer `FittedBox` (not just the
+            // time's own) is the actual safety net: it shrinks the whole
+            // stack to whatever room there really is, the same fix already
+            // applied to the files tile for the same reason.
+            return FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(Messages.alarmTitle, style: _text(compact ? 8 : 10)),
+                  const SizedBox(height: 4),
+                  Text(
                     next == null ? Messages.alarmNone : formatClockTime(next!),
                     style: _text(20),
                   ),
-                ),
-                if (!compact) ...<Widget>[
-                  const SizedBox(height: 6),
-                  Text(
-                    '${Messages.alarmTabTimer} & ${Messages.alarmTabAlarm}',
-                    style: _text(8),
-                  ),
+                  if (!compact) ...<Widget>[
+                    const SizedBox(height: 6),
+                    Text(
+                      '${Messages.alarmTabTimer} & ${Messages.alarmTabAlarm}',
+                      style: _text(8),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             );
           },
         ),

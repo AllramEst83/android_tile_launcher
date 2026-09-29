@@ -15,20 +15,45 @@ import 'fakes/fake_app_repository.dart';
 import 'fakes/fake_tile_services.dart';
 import 'fakes/in_memory_local_store.dart';
 
-/// One tile of every shape the mosaic offers, except [TileSize.small] and
-/// [TileSize.flat]: several content views (the clock among them) already
-/// overflow a one-row-tall tile at the phone width this file tests with,
-/// independently of font scale — reproduces at [FontScale.normal] too, so
-/// it predates this phase and is not this test's to fix. Tracked as a
-/// follow-up rather than silently dropped from coverage.
+/// One tile of every shape the mosaic offers, including the one-row-tall
+/// sizes ([TileSize.small], [TileSize.flat], and now [TileSize.size3x1] and
+/// [TileSize.size4x1]): the clock content view used to overflow those at the
+/// phone width this file tests with, independently of font scale, and was
+/// excluded here rather than fixed. Phase 35 fixed it (the time is now
+/// `Flexible` around its own `FittedBox`, and the date line drops first on a
+/// tile too short for both), so every size is exercised.
 List<PinnedTile> _oneOfEachSize() => <PinnedTile>[
   for (final TileSize size in TileSize.values)
-    if (size != TileSize.small && size != TileSize.flat)
+    PinnedTile(
+      id: 'clock-${size.name}',
+      kind: TileKind.clock,
+      size: size,
+      colour: C64Colour.red,
+    ),
+];
+
+/// Every kind at every size — 13 kinds by 24 sizes, one flat list rather than
+/// one pump per combination, the same trick [_oneOfEachSize] already uses.
+/// Phase 35's new one-row-tall widths ([TileSize.size3x1], [TileSize.size4x1])
+/// prompted the question for the clock specifically; this checks every other
+/// kind reacts the same width-agnostic way to a short tile instead of
+/// assuming it from the mail/weather/agenda tiles' own past fixes.
+List<PinnedTile> _oneOfEachKindAndSize() => <PinnedTile>[
+  for (final TileKind kind in TileKind.values)
+    for (final TileSize size in TileSize.values)
       PinnedTile(
-        id: 'clock-${size.name}',
-        kind: TileKind.clock,
+        id: switch (kind) {
+          TileKind.app => 'com.example.unknown.${size.name}',
+          TileKind.contact => contactTileId('c-${size.name}'),
+          _ => '${kind.name}-${size.name}',
+        },
+        kind: kind,
         size: size,
         colour: C64Colour.red,
+        label: switch (kind) {
+          TileKind.app || TileKind.contact => 'Test',
+          _ => null,
+        },
       ),
 ];
 
@@ -90,4 +115,16 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('every kind fits at every size, at EXTRA LARGE', (
+    WidgetTester tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      fontScale: FontScale.extraLarge,
+      tiles: _oneOfEachKindAndSize(),
+    );
+
+    expect(tester.takeException(), isNull);
+  });
 }

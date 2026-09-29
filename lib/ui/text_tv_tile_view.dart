@@ -79,15 +79,23 @@ class _Plain extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        Text(Messages.textTvTitle, style: _text(ink, 10)),
-        const SizedBox(height: 6),
-        for (final String line in lines)
-          Text(line, style: _text(ink, 9), softWrap: true),
-      ],
+    // An outer `FittedBox`, not a bare `Column`: a one-row-tall tile has no
+    // more height than a small one whatever its width, the same "width
+    // doesn't imply height" fix already applied to the files and alarm
+    // tiles, so this shrinks the whole message rather than overflowing.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(Messages.textTvTitle, style: _text(ink, 10)),
+          const SizedBox(height: 6),
+          for (final String line in lines)
+            Text(line, style: _text(ink, 9), softWrap: true),
+        ],
+      ),
     );
   }
 }

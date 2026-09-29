@@ -24,36 +24,59 @@ class DeviceTileContentView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(TileMetrics.gutter / 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: <Widget>[
-          _Meter(
-            icon: BatteryIcon(
-              fraction: status.batteryFraction,
-              size: _iconSize,
-              color: ink,
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          // Three meters need more height than a one-row-tall tile has —
+          // `spaceEvenly` alone doesn't shrink them, so the outer
+          // `FittedBox` (the same "shrink the whole stack" fix already used
+          // on the files, alarm and Text TV tiles) is what actually keeps
+          // them all visible, just smaller, instead of overflowing. It needs
+          // a real, bounded width to stretch each meter's bar against first
+          // (a `FittedBox` gives its child unconstrained space to measure
+          // its natural size in, and `CrossAxisAlignment.stretch` cannot
+          // stretch to an unbounded width), so the `Column` sits in a
+          // `SizedBox` fixed to the tile's own width rather than directly
+          // inside the `FittedBox`.
+          return FittedBox(
+            fit: BoxFit.scaleDown,
+            child: SizedBox(
+              width: constraints.maxWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  _Meter(
+                    icon: BatteryIcon(
+                      fraction: status.batteryFraction,
+                      size: _iconSize,
+                      color: ink,
+                    ),
+                    label: 'BATTERY',
+                    value: formatBattery(status),
+                    fraction: status.batteryFraction,
+                    ink: ink,
+                  ),
+                  const SizedBox(height: 4),
+                  _Meter(
+                    icon: DiskIcon(size: _iconSize, color: ink),
+                    label: 'STORAGE',
+                    value: formatStorageFree(status),
+                    fraction: status.storageFreeFraction,
+                    ink: ink,
+                  ),
+                  const SizedBox(height: 4),
+                  _Meter(
+                    icon: MemoryIcon(size: _iconSize, color: ink),
+                    label: 'MEMORY',
+                    value: formatMemoryAvailable(status),
+                    fraction: status.memoryAvailableFraction,
+                    ink: ink,
+                  ),
+                ],
+              ),
             ),
-            label: 'BATTERY',
-            value: formatBattery(status),
-            fraction: status.batteryFraction,
-            ink: ink,
-          ),
-          _Meter(
-            icon: DiskIcon(size: _iconSize, color: ink),
-            label: 'STORAGE',
-            value: formatStorageFree(status),
-            fraction: status.storageFreeFraction,
-            ink: ink,
-          ),
-          _Meter(
-            icon: MemoryIcon(size: _iconSize, color: ink),
-            label: 'MEMORY',
-            value: formatMemoryAvailable(status),
-            fraction: status.memoryAvailableFraction,
-            ink: ink,
-          ),
-        ],
+          );
+        },
       ),
     );
   }
