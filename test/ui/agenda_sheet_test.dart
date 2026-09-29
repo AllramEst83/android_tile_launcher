@@ -1,6 +1,7 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/services/calendar_service.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/event_detail_sheet.dart';
@@ -220,6 +221,63 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(Messages.agendaNothingPlanned), findsOneWidget);
+  });
+
+  testWidgets('+ ADD EVENT opens the form on the day being looked at', (
+    WidgetTester tester,
+  ) async {
+    await _open(tester, withEvents());
+
+    await tester.tap(find.byKey(agendaAddEventKey));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(eventDetailTitleFieldKey), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(eventDetailDateFieldKey))
+          .controller
+          ?.text,
+      '2026-09-28',
+    );
+  });
+
+  testWidgets('saving a new event reloads the list underneath', (
+    WidgetTester tester,
+  ) async {
+    final FakeAgendaRepository repository = withEvents()
+      ..listResult = const CalendarList(<CalendarInfo>[
+        CalendarInfo(id: 1, name: 'Home', primary: true),
+      ]);
+    await _open(tester, repository);
+    final int before = repository.betweenCalls;
+
+    await tester.tap(find.byKey(agendaAddEventKey));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Gym');
+    await tester.enterText(find.byKey(eventDetailStartFieldKey), '18:00');
+    await tester.enterText(find.byKey(eventDetailEndFieldKey), '19:00');
+    await tester.tap(find.byKey(eventDetailSaveKey));
+    await tester.pumpAndSettle();
+
+    expect(repository.betweenCalls, greaterThan(before));
+  });
+
+  testWidgets('deleting an event from its detail sheet reloads the list', (
+    WidgetTester tester,
+  ) async {
+    final FakeAgendaRepository repository = withEvents();
+    await _open(tester, repository);
+    final int before = repository.betweenCalls;
+
+    await tester.tap(find.text('DENTIST'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(eventDetailDeleteKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(eventDetailDeleteYesKey));
+    await tester.pumpAndSettle();
+
+    expect(repository.deleted, <int>[1]);
+    expect(repository.betweenCalls, greaterThan(before));
   });
 
   testWidgets('says why when the calendar cannot be shown', (

@@ -23,6 +23,8 @@
          more, and precise location is never requested. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Asked for only when the add/edit event form saves or deletes. -->
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <!-- Contact tiles: read the phone book. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Asked for only when CALL is tapped; refused, the dialer opens instead. -->

@@ -109,7 +109,9 @@ Future<void> main() async {
           ),
         ),
         agenda: LiveAgendaRepository(
-          calendar: const AndroidCalendarService(),
+          calendar: const AndroidCalendarService(
+            permissions: AndroidPermissionService(),
+          ),
           permissions: const AndroidPermissionService(),
         ),
         weather: LiveWeatherRepository(

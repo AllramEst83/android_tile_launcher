@@ -49,4 +49,59 @@ void main() {
       expect(groupByInitial(<String>[], (s) => s), isEmpty);
     });
   });
+
+  group('jumpFraction', () {
+    test('an empty list is 0, whatever the index', () {
+      expect(jumpFraction(<InitialGroup<String>>[], 0), 0);
+      expect(jumpFraction(<InitialGroup<String>>[], 5), 0);
+    });
+
+    test('the first group is always 0', () {
+      final groups = groupByInitial(['Apple', 'Banana'], (s) => s);
+
+      expect(jumpFraction(groups, 0), 0);
+    });
+
+    test(
+      'equal-sized groups split evenly, like the old proportional guess',
+      () {
+        final groups = groupByInitial(['A1', 'B1', 'C1'], (s) => s);
+
+        expect(jumpFraction(groups, 1), closeTo(1 / 3, 1e-9));
+        expect(jumpFraction(groups, 2), closeTo(2 / 3, 1e-9));
+      },
+    );
+
+    test('a heavy group pulls the next letter further down', () {
+      // A: fifty names, B: one. Pure letter-count (the old bug) would put B
+      // at 1/2; the weight of A's fifty rows must push it much further.
+      final groups = groupByInitial([
+        for (var i = 0; i < 50; i++) 'A$i',
+        'B1',
+      ], (s) => s);
+
+      final double fraction = jumpFraction(groups, 1);
+
+      expect(fraction, greaterThan(0.9));
+    });
+
+    test('a lone heavy group at the end barely moves the ones before it', () {
+      final groups = groupByInitial([
+        'A1',
+        'B1',
+        for (var i = 0; i < 50; i++) 'C$i',
+      ], (s) => s);
+
+      // A and B are two light groups out of 54 weighted rows (plus headers);
+      // B should sit just a little past the very top, not at 1/3.
+      expect(jumpFraction(groups, 1), lessThan(0.1));
+    });
+
+    test('an out-of-range index is clamped, not thrown', () {
+      final groups = groupByInitial(['Apple', 'Banana'], (s) => s);
+
+      expect(jumpFraction(groups, 99), jumpFraction(groups, 1));
+      expect(jumpFraction(groups, -1), jumpFraction(groups, 0));
+    });
+  });
 }

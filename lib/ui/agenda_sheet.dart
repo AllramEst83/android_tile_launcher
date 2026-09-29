@@ -15,6 +15,7 @@ const Key agendaWeekToggleKey = ValueKey<String>('agenda-week');
 const Key agendaNavBackKey = ValueKey<String>('agenda-nav-back');
 const Key agendaNavForwardKey = ValueKey<String>('agenda-nav-forward');
 const Key agendaNavLabelKey = ValueKey<String>('agenda-nav-label');
+const Key agendaAddEventKey = ValueKey<String>('agenda-add-event');
 
 DateTime _systemNow() => DateTime.now();
 
@@ -122,6 +123,15 @@ class _AgendaSheetState extends State<_AgendaSheet> {
     _load();
   }
 
+  Future<void> _addEvent() async {
+    final bool changed = await showEventDetailSheet(
+      context,
+      repository: widget.repository,
+      day: _rangeStart,
+    );
+    if (changed) await _load();
+  }
+
   String _navLabel() => _week
       ? formatWeekHeading(_rangeStart, _now)
       : formatDayHeading(_rangeStart, _now);
@@ -196,6 +206,11 @@ class _AgendaSheetState extends State<_AgendaSheet> {
                 ),
               ],
             ),
+            const SizedBox(height: TileMetrics.gutter),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _AddEventButton(key: agendaAddEventKey, onTap: _addEvent),
+            ),
             const SizedBox(height: TileMetrics.margin),
             if (snapshot == null)
               const SizedBox.shrink()
@@ -248,7 +263,12 @@ class _AgendaSheetState extends State<_AgendaSheet> {
                   ),
                 ),
               for (final CalendarEvent event in day.events)
-                _EventRow(event: event, day: day.day),
+                _EventRow(
+                  event: event,
+                  day: day.day,
+                  repository: widget.repository,
+                  onChanged: _load,
+                ),
             ],
           ],
         );
@@ -258,6 +278,35 @@ class _AgendaSheetState extends State<_AgendaSheet> {
       case AgendaUnavailable(:final String reason):
         return Text(reason.toUpperCase(), style: text.bodyMedium);
     }
+  }
+}
+
+/// A small bordered text button, the same look the mail and event sheets'
+/// own buttons use, rather than home's full-width bevelled key.
+class _AddEventButton extends StatelessWidget {
+  const _AddEventButton({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: TileColors.textBright,
+            width: TileMetrics.bevel,
+          ),
+        ),
+        child: Text(
+          Messages.agendaAddEvent,
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(fontSize: 11, color: TileColors.textBright),
+        ),
+      ),
+    );
   }
 }
 
@@ -291,10 +340,30 @@ class _Toggle extends StatelessWidget {
 }
 
 class _EventRow extends StatelessWidget {
-  const _EventRow({required this.event, required this.day});
+  const _EventRow({
+    required this.event,
+    required this.day,
+    required this.repository,
+    required this.onChanged,
+  });
 
   final CalendarEvent event;
   final DateTime day;
+  final AgendaRepository repository;
+
+  /// Reloads the sheet's own list once the detail sheet reports a change
+  /// (an edit or a delete).
+  final VoidCallback onChanged;
+
+  Future<void> _open(BuildContext context) async {
+    final bool changed = await showEventDetailSheet(
+      context,
+      repository: repository,
+      event: event,
+      day: day,
+    );
+    if (changed) onChanged();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -303,7 +372,7 @@ class _EventRow extends StatelessWidget {
     // The hours sit above the title, not beside it: a span like
     // `12:43-13:13` is too wide for a side column on a narrow phone.
     return InkWell(
-      onTap: () => showEventDetailSheet(context, event: event, day: day),
+      onTap: () => _open(context),
       child: Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Column(

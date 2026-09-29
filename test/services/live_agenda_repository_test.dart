@@ -126,4 +126,48 @@ void main() {
 
     expect(permissions.requested, hasLength(1));
   });
+
+  group('writes', () {
+    final NewCalendarEvent draft = NewCalendarEvent(
+      calendarId: 4,
+      title: 'Lunch',
+      start: DateTime(2026, 9, 28, 12),
+      end: DateTime(2026, 9, 28, 13),
+    );
+
+    test('writableCalendars passes straight through', () async {
+      calendar.listResult = const CalendarList(<CalendarInfo>[
+        CalendarInfo(id: 4, name: 'Family'),
+      ]);
+
+      expect(await repository.writableCalendars(), calendar.listResult);
+    });
+
+    test('createEvent passes the draft through and back', () async {
+      calendar.writeResult = const CalendarEventSaved(9);
+
+      final result = await repository.createEvent(draft);
+
+      expect(calendar.created, <NewCalendarEvent>[draft]);
+      expect(result, const CalendarEventSaved(9));
+    });
+
+    test('updateEvent passes the id and draft through and back', () async {
+      calendar.writeResult = const CalendarEventSaved(9);
+
+      final result = await repository.updateEvent(9, draft);
+
+      expect(calendar.updated, <(int, NewCalendarEvent)>[(9, draft)]);
+      expect(result, const CalendarEventSaved(9));
+    });
+
+    test('deleteEvent passes the id through and back', () async {
+      calendar.deleteResult = const CalendarEventAlreadyGone();
+
+      final result = await repository.deleteEvent(9);
+
+      expect(calendar.deleted, <int>[9]);
+      expect(result, const CalendarEventAlreadyGone());
+    });
+  });
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +47,7 @@ MailOpened _opened(
   int uid,
   String from,
   String subject, {
+  String fromAddress = '',
   String text = 'Hello, this is the whole message.',
   bool truncated = false,
   int attachments = 0,
@@ -55,6 +57,7 @@ MailOpened _opened(
   MailBody(
     uid: uid,
     from: from,
+    fromAddress: fromAddress,
     subject: subject,
     text: text,
     truncated: truncated,
@@ -75,6 +78,7 @@ FakeMailService _service([MailResult? result]) =>
           12,
           'Anna Andersson',
           'Lunch on Friday?',
+          fromAddress: 'anna@example.com',
           text: 'Hi Kay,\n\nShall we have lunch on Friday?\n\nAnna',
           date: DateTime(2026, 9, 28, 9, 5),
         ),
@@ -823,6 +827,86 @@ void main() {
       final Rect trash = tester.getRect(find.byKey(mailTrashKey));
       expect(trash.right, lessThanOrEqualTo(360 - TileMetrics.margin));
       expect(trash.left - mark.right, greaterThanOrEqualTo(TileMetrics.margin));
+    });
+
+    testWidgets('the list header with COMPOSE also fits a narrow phone', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(360 * 3, 780 * 3)
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      await _open(tester, _service());
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(mailComposeKey), findsOneWidget);
+    });
+  });
+
+  group('compose', () {
+    testWidgets('COMPOSE opens a blank message', (WidgetTester tester) async {
+      await _open(tester, _service());
+
+      await tester.tap(find.byKey(mailComposeKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.mailComposeTitle), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
+        '',
+      );
+    });
+
+    testWidgets('sending closes the sheet and reaches the service', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailComposeKey));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(composeToKey), 'anna@example.com');
+      await tester.enterText(find.byKey(composeSubjectKey), 'Hello');
+      await tester.enterText(find.byKey(composeBodyKey), 'Hi there');
+      await tester.tap(find.byKey(composeSendKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.sent, <(String, String, String)>[
+        ('anna@example.com', 'Hello', 'Hi there'),
+      ]);
+      expect(find.text(Messages.mailComposeTitle), findsNothing);
+    });
+
+    testWidgets('tapping the sender opens a reply, addressed and subjected', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailFromReplyKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
+        'anna@example.com',
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(composeSubjectKey))
+            .controller
+            ?.text,
+        'Re: Lunch on Friday?',
+      );
+    });
+
+    testWidgets('no address on the message: FROM is not tappable', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 11);
+
+      expect(find.byKey(mailFromReplyKey), findsNothing);
     });
   });
 }

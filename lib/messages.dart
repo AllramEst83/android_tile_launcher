@@ -59,6 +59,26 @@ abstract final class Messages {
   static const String agendaEventWhere = 'WHERE';
   static const String agendaEventAbout = 'ABOUT';
   static const String agendaEventNoDescription = 'NO DESCRIPTION.';
+  static const String agendaAddEvent = '+ ADD EVENT';
+  static const String agendaEventEdit = 'EDIT';
+  static const String agendaEventDelete = 'DELETE';
+  static const String agendaEventDeleteAsk = 'DELETE THIS EVENT?';
+  static const String agendaEventSave = 'SAVE';
+  static const String agendaEventTitleLabel = 'TITLE';
+  static const String agendaEventDateLabel = 'DATE (YYYY-MM-DD)';
+  static const String agendaEventStartLabel = 'START (HH:MM)';
+  static const String agendaEventEndLabel = 'END (HH:MM)';
+  static const String agendaEventTitleNeeded = 'GIVE IT A TITLE.';
+  static const String agendaEventBadDate = 'BAD DATE.';
+  static const String agendaEventBadStart = 'BAD START TIME.';
+  static const String agendaEventBadEnd = 'BAD END TIME, OR NOT AFTER START.';
+  static const String agendaEventNoCalendar = 'NO CALENDAR CAN BE WRITTEN TO.';
+  static const String agendaEventSaving = 'SAVING...';
+  static const String agendaEventDeleting = 'DELETING...';
+  static const String agendaEventGone = 'ALREADY GONE.';
+  static const String agendaWriteNotAllowed = 'CALENDAR WRITE NOT ALLOWED.';
+  static const String agendaWriteAllowInSettings =
+      'ALLOW CALENDAR WRITE IN ANDROID SETTINGS';
 
   static const String contactSearch = 'SEARCH CONTACTS...';
   static const String contactsLoading = 'LOADING...';
@@ -126,6 +146,16 @@ abstract final class Messages {
       'DELETING $done OF $total...';
   static String mailBulkMoved(int n) =>
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MOVED TO TRASH.';
+  static const String mailCompose = 'COMPOSE';
+  static const String mailComposeTitle = 'NEW MESSAGE';
+  static const String mailTo = 'TO';
+  static const String mailSubject = 'SUBJECT';
+  static const String mailBody = 'MESSAGE';
+  static const String mailSend = 'SEND';
+  static const String mailSending = 'SENDING...';
+  static const String mailSent = 'SENT.';
+  static const String mailSendNeedsTo = 'GIVE IT A RECIPIENT.';
+  static const String mailSendNeedsText = 'GIVE IT SOMETHING TO SAY.';
 
   static const String calcTitle = 'CALC';
   static const String calcTabCalc = 'CALC';

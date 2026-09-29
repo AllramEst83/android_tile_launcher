@@ -111,6 +111,7 @@ class MailBody {
   const MailBody({
     required this.uid,
     required this.from,
+    this.fromAddress = '',
     required this.subject,
     required this.text,
     this.date,
@@ -121,6 +122,10 @@ class MailBody {
 
   final int uid;
   final String from;
+
+  /// The sender's own address, for REPLY to address to (never shown itself:
+  /// [from] is what the reader shows). Empty if the message gave none.
+  final String fromAddress;
   final String subject;
   final DateTime? date;
 
@@ -189,6 +194,28 @@ class MailMarkNotSetUp extends MailMarkResult {
 /// Nothing was changed; [reason] is short and printable.
 class MailMarkFailed extends MailMarkResult {
   const MailMarkFailed(this.reason);
+
+  final String reason;
+}
+
+sealed class MailSendResult {
+  const MailSendResult();
+}
+
+/// The server accepted the message for delivery.
+class MailSent extends MailSendResult {
+  const MailSent();
+}
+
+/// No account has been set up yet: there is nothing to send as.
+class MailSendNotSetUp extends MailSendResult {
+  const MailSendNotSetUp();
+}
+
+/// Nothing was sent; [reason] is short and printable and never contains the
+/// password.
+class MailSendFailed extends MailSendResult {
+  const MailSendFailed(this.reason);
 
   final String reason;
 }

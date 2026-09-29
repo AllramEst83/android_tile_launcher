@@ -42,4 +42,12 @@ abstract interface class MailService {
   /// on the server. Same [validity] rule as [read]. Never throws, and changes
   /// nothing unless it returns [MailMarked].
   Future<MailMarkResult> mark(int uid, {required bool read, int? validity});
+
+  /// Sends a new message from the set-up account. Never throws; nothing is
+  /// sent unless it returns [MailSent].
+  Future<MailSendResult> send({
+    required String to,
+    required String subject,
+    required String text,
+  });
 }

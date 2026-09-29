@@ -98,4 +98,18 @@ class FakeMailService implements MailService {
     marks.add((uid, read, validity));
     return markResult ?? MailMarked(read: read);
   }
+
+  /// What `send` answers, and every `(to, subject, text)` it was given.
+  MailSendResult sendResult = const MailSent();
+  final List<(String, String, String)> sent = <(String, String, String)>[];
+
+  @override
+  Future<MailSendResult> send({
+    required String to,
+    required String subject,
+    required String text,
+  }) async {
+    sent.add((to, subject, text));
+    return sendResult;
+  }
 }

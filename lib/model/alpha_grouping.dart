@@ -76,6 +76,27 @@ class InitialGroup<T> {
   final List<T> items;
 }
 
+/// How far through a `groupByInitial` list the group at [index] starts, as a
+/// fraction of the whole (0 at the top, up to just under 1 for the last
+/// group) — for a jump index that scrubs by letter to land where the list
+/// actually scrolls to, not just where the letter sits among the others.
+/// Scroll distance tracks content, not letter count: a group of fifty names
+/// takes far more of it than one with a single name, so each group is
+/// weighted by its own header (one row's worth) plus one per item, and
+/// [index] counts for as much of the whole as the groups before it do.
+double jumpFraction<T>(List<InitialGroup<T>> groups, int index) {
+  if (groups.isEmpty) return 0;
+  final int target = index.clamp(0, groups.length - 1);
+  int before = 0;
+  int total = 0;
+  for (final (int i, InitialGroup<T> group) in groups.indexed) {
+    final int weight = 1 + group.items.length;
+    if (i < target) before += weight;
+    total += weight;
+  }
+  return total == 0 ? 0 : before / total;
+}
+
 /// Buckets [items] the way a Swedish phone book does: A to Z, then Å, Ä, Ö,
 /// with a name starting on a digit, a symbol, or nothing filed under `#` last.
 /// [label] names each item; two items with the same key keep their original

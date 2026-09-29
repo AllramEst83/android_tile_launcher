@@ -166,4 +166,21 @@ void main() {
 
     expect((await mail.account())?.email, 'a@b.se');
   });
+
+  test('sending passes straight through, and never drops the cache', () async {
+    await mail.latest(count: 10);
+
+    final MailSendResult result = await mail.send(
+      to: 'a@b.se',
+      subject: 'Hi',
+      text: 'Hi',
+    );
+
+    expect(result, isA<MailSent>());
+    expect(inner.sent, <(String, String, String)>[('a@b.se', 'Hi', 'Hi')]);
+    // Still within the kept listing's age, so this is served from the cache
+    // sending left untouched, not a second call to the server.
+    await mail.latest(count: 10);
+    expect(inner.counts, hasLength(1));
+  });
 }

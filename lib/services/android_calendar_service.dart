@@ -2,12 +2,17 @@ import 'dart:async';
 
 import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/services/calendar_service.dart';
+import 'package:android_tile_launcher/services/permission_service.dart';
 import 'package:flutter/services.dart';
 
 /// [CalendarService] backed by the Kotlin `CalendarChannelHandler`. The only
-/// file that knows about the channel. Never asks for permission itself.
+/// file that knows about the channel. [events] never asks for permission
+/// itself (it is polled in the background); every write, and listing which
+/// calendars can be written to, asks [permissions] first, which is safe
+/// because they are only ever reached from an explicit tap.
 class AndroidCalendarService implements CalendarService {
   const AndroidCalendarService({
+    required this.permissions,
     this.channel = const MethodChannel(channelName),
     this.timeout = const Duration(seconds: 15),
   });
@@ -15,6 +20,7 @@ class AndroidCalendarService implements CalendarService {
   static const String channelName =
       'com.codedbykay.android_tile_launcher/calendar';
 
+  final PermissionService permissions;
   final MethodChannel channel;
 
   /// Only guards against a reply that never comes.
@@ -55,6 +61,128 @@ class AndroidCalendarService implements CalendarService {
     } on TimeoutException {
       return const CalendarUnavailable('the calendar did not answer');
     }
+  }
+
+  @override
+  Future<CalendarListResult> writableCalendars() async {
+    final PermissionStatus status = await permissions.request(
+      AppPermission.calendar,
+    );
+    if (status != PermissionStatus.granted) {
+      return CalendarListDenied(
+        permanent: status == PermissionStatus.permanentlyDenied,
+      );
+    }
+    try {
+      final List<Map<Object?, Object?>>? raw = await channel
+          .invokeListMethod<Map<Object?, Object?>>('calendars')
+          .timeout(timeout);
+      final List<CalendarInfo> calendars = <CalendarInfo>[
+        for (final Map<Object?, Object?> entry
+            in raw ?? const <Map<Object?, Object?>>[])
+          ?_parseCalendar(entry),
+      ];
+      return CalendarList(List<CalendarInfo>.unmodifiable(calendars));
+    } on PlatformException catch (error) {
+      return switch (error.code) {
+        'NO_PERMISSION' => const CalendarListDenied(permanent: false),
+        _ => const CalendarListUnavailable('could not read the calendars'),
+      };
+    } on MissingPluginException {
+      return const CalendarListUnavailable('calendar is not supported here');
+    } on TimeoutException {
+      return const CalendarListUnavailable('the calendar did not answer');
+    }
+  }
+
+  @override
+  Future<CalendarWriteResult> createEvent(NewCalendarEvent event) =>
+      _write('insertEvent', event);
+
+  @override
+  Future<CalendarWriteResult> updateEvent(int id, NewCalendarEvent event) =>
+      _write('updateEvent', event, id: id);
+
+  Future<CalendarWriteResult> _write(
+    String method,
+    NewCalendarEvent event, {
+    int? id,
+  }) async {
+    final PermissionStatus status = await permissions.request(
+      AppPermission.calendarWrite,
+    );
+    if (status != PermissionStatus.granted) {
+      return CalendarWriteDenied(
+        permanent: status == PermissionStatus.permanentlyDenied,
+      );
+    }
+    try {
+      final int? result = await channel
+          .invokeMethod<int>(method, <String, Object?>{
+            'id': ?id,
+            'calendarId': ?event.calendarId,
+            'title': event.title,
+            'location': event.location,
+            'description': event.description,
+            'begin': event.start.millisecondsSinceEpoch,
+            'end': event.end.millisecondsSinceEpoch,
+          })
+          .timeout(timeout);
+      if (result == null) {
+        return const CalendarWriteFailed('could not save the event');
+      }
+      return CalendarEventSaved(result);
+    } on PlatformException catch (error) {
+      return switch (error.code) {
+        'NO_PERMISSION' => const CalendarWriteDenied(permanent: false),
+        'NOT_FOUND' => const CalendarWriteFailed('that event is gone'),
+        _ => const CalendarWriteFailed('could not save the event'),
+      };
+    } on MissingPluginException {
+      return const CalendarWriteFailed('calendar is not supported here');
+    } on TimeoutException {
+      return const CalendarWriteFailed('the calendar did not answer');
+    }
+  }
+
+  @override
+  Future<CalendarDeleteResult> deleteEvent(int id) async {
+    final PermissionStatus status = await permissions.request(
+      AppPermission.calendarWrite,
+    );
+    if (status != PermissionStatus.granted) {
+      return CalendarDeleteDenied(
+        permanent: status == PermissionStatus.permanentlyDenied,
+      );
+    }
+    try {
+      final bool? removed = await channel
+          .invokeMethod<bool>('deleteEvent', <String, Object?>{'id': id})
+          .timeout(timeout);
+      return removed == true
+          ? const CalendarEventDeleted()
+          : const CalendarEventAlreadyGone();
+    } on PlatformException catch (error) {
+      return switch (error.code) {
+        'NO_PERMISSION' => const CalendarDeleteDenied(permanent: false),
+        _ => const CalendarDeleteFailed('could not delete the event'),
+      };
+    } on MissingPluginException {
+      return const CalendarDeleteFailed('calendar is not supported here');
+    } on TimeoutException {
+      return const CalendarDeleteFailed('the calendar did not answer');
+    }
+  }
+
+  static CalendarInfo? _parseCalendar(Map<Object?, Object?> entry) {
+    final Object? id = entry['id'];
+    final Object? name = entry['name'];
+    if (id is! int || name is! String) return null;
+    return CalendarInfo(
+      id: id,
+      name: name.trim().isEmpty ? '?' : name.trim(),
+      primary: entry['primary'] == true,
+    );
   }
 
   static CalendarEvent? _parse(Map<Object?, Object?> entry) {

@@ -29,6 +29,33 @@ void main() {
     });
   });
 
+  group('guessSmtpHost', () {
+    test('the big providers have their own', () {
+      expect(guessSmtpHost('kay@gmail.com'), 'smtp.gmail.com');
+      expect(guessSmtpHost('kay@googlemail.com'), 'smtp.gmail.com');
+      expect(guessSmtpHost('kay@outlook.com'), 'smtp.office365.com');
+      expect(guessSmtpHost('kay@hotmail.com'), 'smtp.office365.com');
+      expect(guessSmtpHost('kay@icloud.com'), 'smtp.mail.me.com');
+      expect(guessSmtpHost('kay@yahoo.com'), 'smtp.mail.yahoo.com');
+    });
+
+    test('anyone else gets smtp. plus their domain', () {
+      expect(guessSmtpHost('kay@example.se'), 'smtp.example.se');
+    });
+
+    test('ignores case and stray spaces after the @', () {
+      expect(guessSmtpHost('Kay@GMail.COM'), 'smtp.gmail.com');
+      expect(guessSmtpHost('kay@ gmail.com'), 'smtp.gmail.com');
+    });
+
+    test('guesses nothing until there is a domain', () {
+      expect(guessSmtpHost(''), '');
+      expect(guessSmtpHost('kay'), '');
+      expect(guessSmtpHost('kay@'), '');
+      expect(guessSmtpHost('kay@gmail'), '');
+    });
+  });
+
   group('formatMailDate', () {
     final DateTime now = DateTime(2026, 9, 28, 15, 30);
 

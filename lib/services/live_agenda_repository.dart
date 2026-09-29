@@ -40,6 +40,21 @@ class LiveAgendaRepository implements AgendaRepository {
   Future<void> allow() =>
       _asking ??= _allow().whenComplete(() => _asking = null);
 
+  @override
+  Future<CalendarListResult> writableCalendars() =>
+      calendar.writableCalendars();
+
+  @override
+  Future<CalendarWriteResult> createEvent(NewCalendarEvent event) =>
+      calendar.createEvent(event);
+
+  @override
+  Future<CalendarWriteResult> updateEvent(int id, NewCalendarEvent event) =>
+      calendar.updateEvent(id, event);
+
+  @override
+  Future<CalendarDeleteResult> deleteEvent(int id) => calendar.deleteEvent(id);
+
   Future<void> _allow() async {
     final PermissionStatus status = await permissions.request(
       AppPermission.calendar,

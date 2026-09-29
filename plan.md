@@ -12,7 +12,15 @@ The sibling repo `../android_terminal_launcher` already solves some of these pro
 
 Each phase gets designed in detail only when it's reached; this is an outline so the order is agreed up front. Small, independent phases can be reordered without much cost — ask if a different order would be more useful before starting.
 
-*(none queued right now — add phases here when ready.)*
+1. **Events/Calender tile**
+- Lets implement the Add, edit form and delete events.
+
+2. **Email tile**
+- Lets implement a compose email view thru a button on th epane/sheet
+- Lets initiate the compose email view thru tapping on a email inside the view pane. 
+
+2. **App drawer and Contacts Scubber**
+- The scrubber is not entirly in sycnh with the list. Its a bit disaligned. See what you can do. 
 
 ## Deliberately different from the terminal launcher
 
@@ -35,3 +43,4 @@ Each phase gets designed in detail only when it's reached; this is an outline so
 ## Changelog
 
 - 2026-09-29: plan.md compacted. Phases 25–44 and their changelog moved to [.agents/archive/plan-phases-25-44.md](.agents/archive/plan-phases-25-44.md); phase numbering otherwise unchanged. Plan is now empty of phases, awaiting the user's next batch.
+- 2026-09-29: Phase 45 (calendar add/edit/delete), 46 (mail compose + reply), 47 (contacts/app-drawer jump-index alignment fix) implemented: `CalendarService` gained write methods behind a new `calendarWrite` permission and a reworked `event_detail_sheet.dart` (view/edit/add/delete in one sheet); `MailService` gained `send` over SMTP (`guessSmtpHost`) with a new `compose_sheet.dart`, wired to a COMPOSE button and a tappable sender address (reply); `GroupedList`'s jump-to-letter math now weighs each group by its row count (`jumpFraction` in `model/alpha_grouping.dart`) instead of treating every letter as equal-sized. User-tested on their phone; fixes for reply quoting, the event sheet's keyboard overlap, and date/time picker fields to follow.

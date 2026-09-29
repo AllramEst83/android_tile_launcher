@@ -115,6 +115,8 @@ class PermissionsChannelHandler(
             "location" to arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
             // Read only: the agenda tile shows events, it never changes them.
             "calendar" to arrayOf(Manifest.permission.READ_CALENDAR),
+            // Asked for only when the add/edit event form saves or deletes.
+            "calendarWrite" to arrayOf(Manifest.permission.WRITE_CALENDAR),
             // A contact tile reads the phone book; calling and texting are asked
             // for only when CALL or SEND is tapped.
             "contacts" to arrayOf(Manifest.permission.READ_CONTACTS),

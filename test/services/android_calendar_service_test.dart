@@ -1,7 +1,11 @@
+import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/services/android_calendar_service.dart';
 import 'package:android_tile_launcher/services/calendar_service.dart';
+import 'package:android_tile_launcher/services/permission_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../fakes/fake_permission_service.dart';
 
 const MethodChannel _channel = MethodChannel(
   AndroidCalendarService.channelName,
@@ -52,7 +56,13 @@ void main() {
 
   tearDown(() => _mockChannel((call) => null));
 
+  final FakePermissionService permissions = FakePermissionService();
+  setUp(() {
+    permissions.answer = PermissionStatus.granted;
+    permissions.requested.clear();
+  });
   final AndroidCalendarService service = AndroidCalendarService(
+    permissions: permissions,
     channel: _channel,
     timeout: const Duration(milliseconds: 50),
   );
@@ -260,5 +270,156 @@ void main() {
       await service.events(from: _from, to: _to),
       isA<CalendarUnavailable>(),
     );
+  });
+
+  group('writableCalendars', () {
+    test('asks for read permission and maps the calendars', () async {
+      _mockChannel(
+        (call) async => <Object?>[
+          <String, Object?>{'id': 1, 'name': 'Family', 'primary': false},
+          <String, Object?>{'id': 2, 'name': '', 'primary': true},
+        ],
+      );
+
+      final result = await service.writableCalendars();
+
+      expect(permissions.requested, <AppPermission>[AppPermission.calendar]);
+      expect(
+        (result as CalendarList).calendars.map(
+          (c) => (c.id, c.name, c.primary),
+        ),
+        <(int, String, bool)>[(1, 'Family', false), (2, '?', true)],
+      );
+    });
+
+    test('refused permission is denied, and connects to nothing', () async {
+      permissions.answer = PermissionStatus.denied;
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return <Object?>[];
+      });
+
+      final result = await service.writableCalendars();
+
+      expect(result, isA<CalendarListDenied>());
+      expect(seen, isNull);
+    });
+  });
+
+  group('createEvent / updateEvent', () {
+    NewCalendarEvent event({int? calendarId}) => NewCalendarEvent(
+      calendarId: calendarId,
+      title: 'Lunch',
+      location: 'Cafe',
+      description: 'Bring the report',
+      start: DateTime(2026, 9, 26, 12),
+      end: DateTime(2026, 9, 26, 13),
+    );
+
+    test('insert asks for write permission and sends the fields', () async {
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return 9;
+      });
+
+      final result = await service.createEvent(event(calendarId: 4));
+
+      expect(permissions.requested, <AppPermission>[
+        AppPermission.calendarWrite,
+      ]);
+      expect(seen?.method, 'insertEvent');
+      expect(seen?.arguments, <String, Object?>{
+        'calendarId': 4,
+        'title': 'Lunch',
+        'location': 'Cafe',
+        'description': 'Bring the report',
+        'begin': _ms(DateTime(2026, 9, 26, 12)),
+        'end': _ms(DateTime(2026, 9, 26, 13)),
+      });
+      expect(result, isA<CalendarEventSaved>());
+      expect((result as CalendarEventSaved).id, 9);
+    });
+
+    test('update never sends a calendar id of its own', () async {
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return 9;
+      });
+
+      await service.updateEvent(9, event());
+
+      expect(seen?.method, 'updateEvent');
+      expect(seen?.arguments, isA<Map<Object?, Object?>>());
+      expect((seen!.arguments as Map<Object?, Object?>)['id'], 9);
+      expect(
+        (seen!.arguments as Map<Object?, Object?>).containsKey('calendarId'),
+        isFalse,
+      );
+    });
+
+    test('refused permission is denied, and connects to nothing', () async {
+      permissions.answer = PermissionStatus.permanentlyDenied;
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return 9;
+      });
+
+      final result = await service.createEvent(event(calendarId: 4));
+
+      expect(result, isA<CalendarWriteDenied>());
+      expect((result as CalendarWriteDenied).permanent, isTrue);
+      expect(seen, isNull);
+    });
+
+    test('an event that no longer exists is a failure that says so', () async {
+      _mockChannel((call) async => throw PlatformException(code: 'NOT_FOUND'));
+
+      final result = await service.updateEvent(9, event());
+
+      expect(result, isA<CalendarWriteFailed>());
+    });
+  });
+
+  group('deleteEvent', () {
+    test('asks for write permission and reports whether a row went', () async {
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return true;
+      });
+
+      final result = await service.deleteEvent(5);
+
+      expect(permissions.requested, <AppPermission>[
+        AppPermission.calendarWrite,
+      ]);
+      expect(seen?.method, 'deleteEvent');
+      expect(seen?.arguments, <String, Object?>{'id': 5});
+      expect(result, isA<CalendarEventDeleted>());
+    });
+
+    test('nothing removed is already gone, not a failure', () async {
+      _mockChannel((call) async => false);
+
+      expect(await service.deleteEvent(5), isA<CalendarEventAlreadyGone>());
+    });
+
+    test('refused permission is denied, and connects to nothing', () async {
+      permissions.answer = PermissionStatus.denied;
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return true;
+      });
+
+      final result = await service.deleteEvent(5);
+
+      expect(result, isA<CalendarDeleteDenied>());
+      expect(seen, isNull);
+    });
   });
 }

@@ -11,21 +11,29 @@ import 'package:enough_mail/enough_mail.dart'
         ContentDisposition,
         ImapClient,
         ImapException,
+        MailAddress,
+        MessageBuilder,
         MessageFlags,
         MessageSequence,
         MimeMessage,
+        SmtpClient,
+        SmtpException,
+        SmtpResponse,
         StatusFlags,
         StoreAction;
 
-/// [MailService] on `enough_mail`'s IMAP client. This is the only file that
-/// knows about the package. Listing only reads (a message is fetched by its
-/// envelope, so no body is downloaded). The one change it can make is moving a
-/// message to Trash, which never deletes anything outright.
+/// [MailService] on `enough_mail`'s IMAP and SMTP clients. This is the only
+/// file that knows about the package. Listing only reads (a message is
+/// fetched by its envelope, so no body is downloaded). The changes it can
+/// make are moving a message to Trash (never deleting anything outright) and
+/// sending a new one.
 class ImapMailService implements MailService {
   ImapMailService({
     required this._accounts,
     this.secure = true,
     this.timeout = const Duration(seconds: 20),
+    this.smtpHost,
+    this.smtpPort = 465,
   });
 
   final MailAccountStore _accounts;
@@ -38,6 +46,14 @@ class ImapMailService implements MailService {
 
   /// For connecting and for each answer after that.
   final Duration timeout;
+
+  /// Overrides [guessSmtpHost] (tests only, against a local fake server);
+  /// normally null, so the account's own address is used to guess it.
+  final String? smtpHost;
+
+  /// TLS from the first byte (no `STARTTLS`), the same as [secure] does for
+  /// IMAP; ports 465 and 993 both expect this.
+  final int smtpPort;
 
   @override
   Future<MailAccountInfo?> account() async {
@@ -284,6 +300,86 @@ class ImapMailService implements MailService {
     };
   }
 
+  @override
+  Future<MailSendResult> send({
+    required String to,
+    required String subject,
+    required String text,
+  }) async {
+    final MailAccount? saved;
+    try {
+      saved = await _accounts.load();
+    } on LocalStoreException catch (error) {
+      return MailSendFailed(error.message);
+    }
+    if (saved == null) return const MailSendNotSetUp();
+
+    final String host = smtpHost ?? guessSmtpHost(saved.email);
+    if (host.isEmpty) {
+      return const MailSendFailed(
+        'could not work out the mail server to send through',
+      );
+    }
+    final client = SmtpClient('android-tile-launcher.local');
+    var loggedIn = false;
+    try {
+      await client.connectToServer(
+        host,
+        smtpPort,
+        isSecure: secure,
+        timeout: timeout,
+      );
+      await client.ehlo();
+      try {
+        final SmtpResponse authResponse = await client
+            .authenticate(saved.email, saved.password)
+            .timeout(timeout);
+        if (!authResponse.isOkStatus) throw SmtpException.message(client, '');
+      } on SmtpException {
+        return MailSendFailed(
+          '$host refused the login (check the address and the app password)',
+        );
+      }
+      loggedIn = true;
+      final MimeMessage message = MessageBuilder.buildSimpleTextMessage(
+        MailAddress('', saved.email),
+        <MailAddress>[MailAddress('', to)],
+        text,
+        subject: subject,
+      );
+      final SmtpResponse sendResponse = await client
+          .sendMessage(message)
+          .timeout(timeout);
+      if (!sendResponse.isOkStatus) {
+        return MailSendFailed('$host refused the message');
+      }
+      return const MailSent();
+    } on SocketException {
+      return MailSendFailed("can't reach $host (no connection?)");
+    } on HandshakeException {
+      return MailSendFailed('could not make a secure connection to $host');
+    } on TimeoutException {
+      return MailSendFailed('$host did not answer in time');
+    } on SmtpException catch (error) {
+      return MailSendFailed('$host: ${_scrub(error.message, saved.password)}');
+    } on Object catch (error) {
+      return MailSendFailed(
+        '$host: ${_scrub(error.toString(), saved.password)}',
+      );
+    } finally {
+      try {
+        if (loggedIn) await client.quit().timeout(const Duration(seconds: 3));
+      } on Object {
+        // Leaving is best effort; the socket is closed below either way.
+      }
+      try {
+        await client.disconnect();
+      } on Object {
+        // Nothing left to clean up.
+      }
+    }
+  }
+
   /// Connects, logs in, runs [body] and always hangs up. Every way it can go
   /// wrong is a [_Failed] with a sentence for the user; none contains the
   /// password.
@@ -429,6 +525,7 @@ MailBody mailBodyFrom(
   return MailBody(
     uid: entry.uid,
     from: entry.from,
+    fromAddress: message.from?.firstOrNull?.email.trim() ?? '',
     subject: entry.subject,
     date: entry.date,
     text: tidy.text,

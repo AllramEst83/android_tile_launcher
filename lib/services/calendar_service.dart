@@ -25,9 +25,102 @@ class CalendarUnavailable extends CalendarResult {
   final String reason;
 }
 
-/// The phone's calendars (every account Android syncs), read through Android's
-/// calendar provider. Read only; writing arrives in a later phase.
+sealed class CalendarListResult {
+  const CalendarListResult();
+}
+
+class CalendarList extends CalendarListResult {
+  const CalendarList(this.calendars);
+
+  final List<CalendarInfo> calendars;
+}
+
+/// The user said no. [permanent] means Android will no longer ask, so the
+/// caller should say where the setting is instead of asking again.
+class CalendarListDenied extends CalendarListResult {
+  const CalendarListDenied({required this.permanent});
+
+  final bool permanent;
+}
+
+class CalendarListUnavailable extends CalendarListResult {
+  const CalendarListUnavailable(this.reason);
+
+  final String reason;
+}
+
+sealed class CalendarWriteResult {
+  const CalendarWriteResult();
+}
+
+/// The event now exists (an add) or was changed (an edit); [id] is its
+/// Android id either way.
+class CalendarEventSaved extends CalendarWriteResult {
+  const CalendarEventSaved(this.id);
+
+  final int id;
+}
+
+class CalendarWriteDenied extends CalendarWriteResult {
+  const CalendarWriteDenied({required this.permanent});
+
+  final bool permanent;
+}
+
+class CalendarWriteFailed extends CalendarWriteResult {
+  const CalendarWriteFailed(this.reason);
+
+  final String reason;
+}
+
+sealed class CalendarDeleteResult {
+  const CalendarDeleteResult();
+}
+
+class CalendarEventDeleted extends CalendarDeleteResult {
+  const CalendarEventDeleted();
+}
+
+/// It was gone already (deleted elsewhere, or twice from this phone): not a
+/// failure, since the end state is what was wanted.
+class CalendarEventAlreadyGone extends CalendarDeleteResult {
+  const CalendarEventAlreadyGone();
+}
+
+class CalendarDeleteDenied extends CalendarDeleteResult {
+  const CalendarDeleteDenied({required this.permanent});
+
+  final bool permanent;
+}
+
+class CalendarDeleteFailed extends CalendarDeleteResult {
+  const CalendarDeleteFailed(this.reason);
+
+  final String reason;
+}
+
+/// The phone's calendars (every account Android syncs), read through
+/// Android's calendar provider.
 abstract interface class CalendarService {
-  /// Events overlapping the half-open range [from, to). Never throws.
+  /// Events overlapping the half-open range [from, to). Never throws; never
+  /// asks for permission itself.
   Future<CalendarResult> events({required DateTime from, required DateTime to});
+
+  /// The calendars an event could be added to. Asks for calendar permission
+  /// itself; only ever called from an explicit tap (the add/edit form
+  /// opening). Never throws.
+  Future<CalendarListResult> writableCalendars();
+
+  /// Adds [event] as a new event. Asks for calendar write permission itself;
+  /// only ever called from an explicit Save tap. Never throws.
+  Future<CalendarWriteResult> createEvent(NewCalendarEvent event);
+
+  /// Replaces the event [id]'s fields with [event]'s. Same permission
+  /// behaviour as [createEvent]. Never throws; an event that no longer exists
+  /// is a [CalendarWriteFailed].
+  Future<CalendarWriteResult> updateEvent(int id, NewCalendarEvent event);
+
+  /// Removes the event [id]. Asks for calendar write permission itself; only
+  /// ever called from an explicit Delete tap. Never throws.
+  Future<CalendarDeleteResult> deleteEvent(int id);
 }

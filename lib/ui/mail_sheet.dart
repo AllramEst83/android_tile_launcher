@@ -5,12 +5,15 @@ import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
+import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
 /// Keys so tests can find the parts.
 Key mailMessageKey(int uid) => ValueKey<String>('mail-message-$uid');
 Key mailCheckboxKey(int uid) => ValueKey<String>('mail-checkbox-$uid');
+const Key mailComposeKey = ValueKey<String>('mail-compose');
+const Key mailFromReplyKey = ValueKey<String>('mail-from-reply');
 const Key mailTrashKey = ValueKey<String>('mail-trash');
 const Key mailTrashYesKey = ValueKey<String>('mail-trash-yes');
 const Key mailTrashNoKey = ValueKey<String>('mail-trash-no');
@@ -28,6 +31,13 @@ const Key mailBulkDeleteKey = ValueKey<String>('mail-bulk-delete');
 const Key mailBulkYesKey = ValueKey<String>('mail-bulk-yes');
 const Key mailBulkNoKey = ValueKey<String>('mail-bulk-no');
 
+/// `RE: <subject>`, unless [subject] already reads as a reply.
+String _replySubject(String subject) {
+  final String trimmed = subject.trim();
+  if (trimmed.toLowerCase().startsWith('re:')) return trimmed;
+  return trimmed.isEmpty ? 'Re:' : 'Re: $trimmed';
+}
+
 DateTime _systemNow() => DateTime.now();
 
 /// What a tap on a mail tile with an inbox opens: the newest messages, newest
@@ -35,9 +45,10 @@ DateTime _systemNow() => DateTime.now();
 /// its own (BACK returns to the list), and marks it read, as opening a mail
 /// does anywhere. In the pane, MARK AS UNREAD (or MARK AS READ, whichever the
 /// message is not) and TRASH, which asks again before moving it to the server's
-/// Trash (never deleting it outright). The list also has REFRESH, and FORGET
-/// ACCOUNT (which asks first, then removes the account and its password from
-/// the phone).
+/// Trash (never deleting it outright); tapping the sender's own address opens
+/// a reply, addressed to them with the subject prefixed `RE:`. The list also
+/// has COMPOSE (a blank message), REFRESH, and FORGET ACCOUNT (which asks
+/// first, then removes the account and its password from the phone).
 Future<void> showMailSheet(
   BuildContext context, {
   required MailService mail,
@@ -318,6 +329,17 @@ class _MailSheetState extends State<_MailSheet> {
     Navigator.pop(context);
   }
 
+  Future<void> _compose() => showComposeSheet(context, mail: widget.mail);
+
+  /// Opens a reply to [body]'s own sender: addressed to them, the subject
+  /// prefixed `RE:` unless it already is one.
+  Future<void> _reply(MailBody body) => showComposeSheet(
+    context,
+    mail: widget.mail,
+    to: body.fromAddress,
+    subject: _replySubject(body.subject),
+  );
+
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
@@ -387,15 +409,33 @@ class _MailSheetState extends State<_MailSheet> {
                 ],
               ],
             ),
-            if (_email != null && open == null)
-              Text(
-                _email!.toUpperCase(),
-                style: text.bodySmall?.copyWith(
-                  fontSize: 11,
-                  color: TileColors.muted,
-                ),
-                overflow: TextOverflow.ellipsis,
+            // Its own row, under the title's: three buttons on top of it would
+            // not fit a narrow phone.
+            if (open == null && !_selecting) ...<Widget>[
+              const SizedBox(height: TileMetrics.gutter),
+              Row(
+                children: <Widget>[
+                  if (_email != null)
+                    Expanded(
+                      child: Text(
+                        _email!.toUpperCase(),
+                        style: text.bodySmall?.copyWith(
+                          fontSize: 11,
+                          color: TileColors.muted,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )
+                  else
+                    const Spacer(),
+                  _Button(
+                    key: mailComposeKey,
+                    label: Messages.mailCompose,
+                    onTap: _busy ? null : _compose,
+                  ),
+                ],
               ),
+            ],
             const SizedBox(height: 4),
             Container(height: 2, color: TileColors.bezel),
             const SizedBox(height: TileMetrics.gutter),
@@ -467,7 +507,17 @@ class _MailSheetState extends State<_MailSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(Messages.mailFrom, style: label),
-          Text(body.from.toUpperCase(), style: value),
+          if (body.fromAddress.isNotEmpty)
+            InkWell(
+              key: mailFromReplyKey,
+              onTap: _busy ? null : () => _reply(body),
+              child: Text(
+                body.from.toUpperCase(),
+                style: value?.copyWith(color: TileColors.accent),
+              ),
+            )
+          else
+            Text(body.from.toUpperCase(), style: value),
           if (body.date != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(Messages.mailDate, style: label),

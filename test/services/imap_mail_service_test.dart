@@ -6,6 +6,7 @@ import 'package:android_tile_launcher/services/mail_account.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_imap_server.dart';
+import '../fakes/fake_smtp_server.dart';
 import '../fakes/in_memory_secret_store.dart';
 
 const _password = 'abcd efgh ijkl mnop';
@@ -764,6 +765,130 @@ void main() {
 
       await mail.mark(22, read: false);
       expect((await mail.latest() as MailMessages).unread, 1);
+    });
+  });
+
+  group('send', () {
+    late FakeSmtpServer smtp;
+    late InMemorySecretStore smtpSecrets;
+    late ImapMailService smtpMail;
+
+    Future<void> bootSmtp({bool account = true}) async {
+      smtp = FakeSmtpServer(user: 'kay@example.com', password: _password);
+      await smtp.start();
+      smtpSecrets = InMemorySecretStore();
+      smtpMail = ImapMailService(
+        accounts: MailAccountStore(smtpSecrets),
+        secure: false,
+        smtpHost: '127.0.0.1',
+        smtpPort: smtp.port,
+        timeout: const Duration(seconds: 5),
+      );
+      if (account) {
+        // Bypasses IMAP login: `send` only needs a saved account, not one
+        // this server would accept for reading.
+        await MailAccountStore(smtpSecrets).save(
+          const MailAccount(
+            email: 'kay@example.com',
+            host: 'imap.example.com',
+            password: _password,
+          ),
+        );
+      }
+    }
+
+    tearDown(() async {
+      await smtp.stop();
+    });
+
+    test('without an account it is not set up, and never connects', () async {
+      await bootSmtp(account: false);
+
+      expect(
+        await smtpMail.send(to: 'a@b.com', subject: 'Hi', text: 'Hi'),
+        isA<MailSendNotSetUp>(),
+      );
+      expect(smtp.sent, isEmpty);
+    });
+
+    test('logs in and hands the server a message', () async {
+      await bootSmtp();
+
+      final result = await smtpMail.send(
+        to: 'anna@example.com',
+        subject: 'Lunch?',
+        text: 'Same place as usual?',
+      );
+
+      expect(result, isA<MailSent>());
+      expect(smtp.sent, hasLength(1));
+      expect(smtp.sent.single.from, 'kay@example.com');
+      expect(smtp.sent.single.to, 'anna@example.com');
+      expect(smtp.sent.single.data, contains('Same place as usual?'));
+      expect(smtp.sent.single.data, contains('Lunch?'));
+    });
+
+    test('the wrong password refuses the login, without saying it', () async {
+      await bootSmtp();
+      await MailAccountStore(smtpSecrets).save(
+        const MailAccount(
+          email: 'kay@example.com',
+          host: 'imap.example.com',
+          password: 'wrong password',
+        ),
+      );
+
+      final result = await smtpMail.send(
+        to: 'a@b.com',
+        subject: 'Hi',
+        text: 'Hi',
+      );
+
+      expect(result, isA<MailSendFailed>());
+      expect((result as MailSendFailed).reason, contains('refused the login'));
+      expect(result.reason, isNot(contains('wrong password')));
+      expect(smtp.sent, isEmpty);
+    });
+
+    test('a refused recipient is a failure, and sends nothing', () async {
+      await bootSmtp();
+      smtp.rejectRecipient = true;
+
+      final result = await smtpMail.send(
+        to: 'nobody@example.com',
+        subject: 'Hi',
+        text: 'Hi',
+      );
+
+      expect(result, isA<MailSendFailed>());
+      expect(smtp.sent, isEmpty);
+    });
+
+    test('an unreachable server is a failure with a reason', () async {
+      await bootSmtp();
+      await smtp.stop();
+
+      final result = await smtpMail.send(
+        to: 'a@b.com',
+        subject: 'Hi',
+        text: 'Hi',
+      );
+
+      expect(result, isA<MailSendFailed>());
+    });
+
+    test('an unreadable saved account says how to recover', () async {
+      await bootSmtp(account: false);
+      smtpSecrets.data['mailAccount'] = 'not json';
+
+      final result = await smtpMail.send(
+        to: 'a@b.com',
+        subject: 'Hi',
+        text: 'Hi',
+      );
+
+      expect(result, isA<MailSendFailed>());
+      expect(smtp.sent, isEmpty);
     });
   });
 }

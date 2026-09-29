@@ -20,6 +20,26 @@ String guessImapHost(String email) {
   };
 }
 
+/// The SMTP server most likely to send mail as [email], to save typing it:
+/// the big providers' own, else `smtp.` plus the domain. Empty when [email]
+/// has no domain yet. Only ever a guess, the same way [guessImapHost] is.
+String guessSmtpHost(String email) {
+  final int at = email.lastIndexOf('@');
+  if (at < 0 || at == email.length - 1) return '';
+  final String domain = email.substring(at + 1).trim().toLowerCase();
+  if (domain.isEmpty || !domain.contains('.')) return '';
+  return switch (domain) {
+    'gmail.com' || 'googlemail.com' => 'smtp.gmail.com',
+    'outlook.com' ||
+    'hotmail.com' ||
+    'live.com' ||
+    'msn.com' => 'smtp.office365.com',
+    'icloud.com' || 'me.com' || 'mac.com' => 'smtp.mail.me.com',
+    'yahoo.com' || 'ymail.com' => 'smtp.mail.yahoo.com',
+    _ => 'smtp.$domain',
+  };
+}
+
 /// When a message was sent, short: `14:32` if today, else `28 SEP`; empty when
 /// the date is unknown.
 String formatMailDate(DateTime? sent, DateTime now) {

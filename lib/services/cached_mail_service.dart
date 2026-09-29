@@ -94,4 +94,13 @@ class CachedMailService implements MailService {
     _drop();
     return inner.mark(uid, read: read, validity: validity);
   }
+
+  @override
+  Future<MailSendResult> send({
+    required String to,
+    required String subject,
+    required String text,
+  }) =>
+      // Sending changes nothing about the inbox listing kept above.
+      inner.send(to: to, subject: subject, text: text);
 }

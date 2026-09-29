@@ -39,12 +39,13 @@ class _GroupedListState<T> extends State<GroupedList<T>> {
 
   // Proportional, not a scroll-to-widget: with a long list most letters
   // haven't been built yet (ListView only builds what's near the viewport),
-  // so there's no GlobalKey/context to scroll to. A fraction of
-  // maxScrollExtent works everywhere and tracks a drag 1:1.
-  void _jumpToIndex(int index, int count) {
+  // so there's no GlobalKey/context to scroll to. jumpFraction weighs each
+  // group by how much of the list it actually holds, so a heavy letter (many
+  // items) does not land the list on some other, lighter one.
+  void _jumpToIndex(int index, List<InitialGroup<T>> groups) {
     if (!_scrollController.hasClients) return;
     final ScrollPosition position = _scrollController.position;
-    final double fraction = count <= 1 ? 0 : index / (count - 1);
+    final double fraction = jumpFraction(groups, index);
     position.jumpTo(
       (position.maxScrollExtent * fraction).clamp(
         0.0,
@@ -77,7 +78,7 @@ class _GroupedListState<T> extends State<GroupedList<T>> {
         JumpIndex(
           key: const Key('jump-index'),
           initials: <String>[for (final InitialGroup<T> g in groups) g.initial],
-          onTap: (int index) => _jumpToIndex(index, groups.length),
+          onTap: (int index) => _jumpToIndex(index, groups),
         ),
       ],
     );
