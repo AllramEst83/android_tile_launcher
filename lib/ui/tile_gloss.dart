@@ -37,20 +37,24 @@ class TileGlossPainter extends CustomPainter {
   final bool sunk;
   final bool outlined;
 
+  // Phase 38 ("lean further into the C64 look"): sharper, closer-set
+  // scanlines, a more pronounced shine, and the dithered shade nudged up to
+  // match it — bolder throughout, not just the one line the user named.
+
   /// A scanline every this many pixels, one pixel thick.
-  static const double scanlineEvery = 4;
-  static const double scanlineAlpha = 0.05;
+  static const double scanlineEvery = 3;
+  static const double scanlineAlpha = 0.09;
 
   /// The shine: how far in from the bevel, how thick, and its longest run.
   static const double shineInset = 1;
-  static const double shineThickness = 2;
+  static const double shineThickness = 3;
   static const double shineLength = 44;
-  static const double shineAlpha = 0.32;
+  static const double shineAlpha = 0.42;
 
   /// The dithered shade: a strip this deep of squares this big.
   static const double ditherDepth = 4;
   static const double ditherCell = 2;
-  static const double ditherAlpha = 0.20;
+  static const double ditherAlpha = 0.24;
 
   /// The plain outline of a selected tile (matches `TileView`).
   static const double outline = TileMetrics.bevel * 2;

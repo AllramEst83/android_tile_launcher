@@ -204,5 +204,16 @@ void main() {
       );
       expect(TileMetrics.tileBevelLight, greaterThan(TileMetrics.bevel));
     });
+
+    test('pressing sinks the content by exactly one bevel unit', () {
+      // `tile_press_test.dart`'s own "sinks by the width of the bevel" asserts
+      // this in pixels; this is the design invariant behind that number, so a
+      // future bevel tweak that breaks it fails here with a clear reason
+      // rather than a bare offset mismatch there.
+      expect(
+        TileMetrics.tileBevelDark - TileMetrics.tileBevelLight,
+        TileMetrics.bevel,
+      );
+    });
   });
 }

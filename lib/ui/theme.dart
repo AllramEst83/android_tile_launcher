@@ -170,9 +170,12 @@ abstract final class TileMetrics {
 
   /// A tile's bevel: the lit top and left sides, and the thicker shaded bottom
   /// and right ones, so a tile stands up like a key. A pressed tile swaps them,
-  /// which is what moves its content down and right.
-  static const double tileBevelLight = 3;
-  static const double tileBevelDark = 5;
+  /// which is what moves its content down and right, by exactly [bevel] — kept
+  /// true here too (`tileBevelDark - tileBevelLight == bevel`), the same
+  /// designed relationship as before. Bumped for Phase 38's "lean further into
+  /// the C64 look" (was 3/5) — bolder, not doubled.
+  static const double tileBevelLight = 4;
+  static const double tileBevelDark = 6;
 }
 
 /// Turns a [C64Colour] selector into an actual fill and a contrasting ink
