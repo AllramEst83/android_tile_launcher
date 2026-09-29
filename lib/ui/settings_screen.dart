@@ -6,7 +6,9 @@ import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/services/wallpaper_service.dart';
+import 'package:android_tile_launcher/ui/help_screen.dart';
 import 'package:android_tile_launcher/ui/pad_key.dart';
+import 'package:android_tile_launcher/ui/section_box.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +21,7 @@ const Key settingsMessageKey = ValueKey<String>('settings-message');
 const Key settingsAskKey = ValueKey<String>('settings-ask');
 const Key settingsYesKey = ValueKey<String>('settings-yes');
 const Key settingsNoKey = ValueKey<String>('settings-no');
+const Key settingsHelpKey = ValueKey<String>('settings-help');
 
 /// Opens the settings over the whole screen, like the Text TV viewer: a close
 /// key on top, then the theme, the grid, the gestures, the Home-app shortcut,
@@ -191,10 +194,20 @@ class _SettingsScreenState extends State<SettingsScreen>
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(width: TileMetrics.margin),
-                  Text(
-                    Messages.settingsTitle,
-                    style: Theme.of(context).textTheme.headlineMedium
-                        ?.copyWith(fontSize: 14),
+                  Expanded(
+                    child: Text(
+                      Messages.settingsTitle,
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontSize: 14),
+                    ),
+                  ),
+                  PadKey(
+                    key: settingsHelpKey,
+                    label: '?',
+                    height: 48,
+                    fontSize: 12,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    onTap: () => showHelpScreen(context),
                   ),
                 ],
               ),
@@ -236,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   // --- sections ------------------------------------------------------------
 
   Widget _themeSection() {
-    return _Section(
+    return SectionBox(
       title: Messages.settingsTheme,
       children: <Widget>[
         Row(
@@ -262,7 +275,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _gridSection() {
-    return _Section(
+    return SectionBox(
       title: Messages.settingsGrid,
       children: <Widget>[
         _Label(text: Messages.settingsColumns),
@@ -286,7 +299,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _textSizeSection() {
-    return _Section(
+    return SectionBox(
       title: Messages.settingsTextSize,
       children: <Widget>[
         _Choices<FontScale>(
@@ -315,7 +328,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _gestureSection() {
-    return _Section(
+    return SectionBox(
       title: Messages.settingsGestures,
       children: <Widget>[
         const _Note(text: Messages.settingsSwipeLeft),
@@ -343,7 +356,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _feelSection() {
-    return _Section(
+    return SectionBox(
       title: Messages.settingsFeel,
       children: <Widget>[
         _Label(text: Messages.settingsHaptics),
@@ -380,7 +393,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget _wallpaperSection() {
     final ThemeVariant paper = _paperTheme ?? _current.theme;
     final WallpaperTarget target = _paperTarget;
-    return _Section(
+    return SectionBox(
       title: Messages.settingsWallpaper,
       children: <Widget>[
         _Label(text: Messages.settingsPicture),
@@ -490,7 +503,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             false => Messages.settingsHomeNotSet,
             null => Messages.settingsHomeUnknown,
           };
-    return _Section(
+    return SectionBox(
       title: Messages.settingsSystem,
       children: <Widget>[
         _Label(text: Messages.settingsHomeApp),
@@ -574,7 +587,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _layoutSection() {
-    return _Section(
+    return SectionBox(
       title: Messages.settingsLayout,
       children: <Widget>[
         Row(
@@ -664,52 +677,6 @@ class _WallpaperPreview extends StatelessWidget {
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A bordered group, boxed like a tile so its members read as one unit and
-/// the gap to the next group reads as a real gap, not just more text — the
-/// same bevel this app already draws around every tile, reused here instead
-/// of a plain rule under a heading.
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: TileMetrics.margin * 2),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: TileColors.bezel, width: TileMetrics.bevel),
-        ),
-        padding: const EdgeInsets.all(TileMetrics.margin),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Container(width: 4, height: 14, color: TileColors.accent),
-                const SizedBox(width: 6),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: kPixelFontFamily,
-                    fontSize: 12,
-                    letterSpacing: 1,
-                    color: TileColors.textBright,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: TileMetrics.gutter),
-            ...children,
-          ],
         ),
       ),
     );

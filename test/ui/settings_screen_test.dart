@@ -7,6 +7,7 @@ import 'package:android_tile_launcher/model/wallpaper.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/services/wallpaper_service.dart';
+import 'package:android_tile_launcher/ui/help_screen.dart';
 import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -88,6 +89,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(settingsCloseKey), findsNothing);
+    });
+
+    testWidgets('the ? key opens the help screen, and closes it', (
+      WidgetTester tester,
+    ) async {
+      await _Rig().open(tester);
+
+      await tester.tap(find.byKey(settingsHelpKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(helpCloseKey), findsOneWidget);
+
+      await tester.tap(find.byKey(helpCloseKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(helpCloseKey), findsNothing);
+      // Back on the settings screen, not popped past it.
+      expect(find.byKey(settingsCloseKey), findsOneWidget);
     });
 
     testWidgets('has a section for each thing that can be set', (
