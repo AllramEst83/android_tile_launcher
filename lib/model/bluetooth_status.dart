@@ -55,9 +55,23 @@ class BluetoothOff extends BluetoothStatus {
   const BluetoothOff();
 }
 
-/// The phone has no Bluetooth radio at all.
+/// The phone has no Bluetooth radio at all. Genuinely rare — reserved for
+/// when the platform side itself says so cleanly, never used as a catch-all
+/// for a native error (see [BluetoothUnavailable], which a real crash or
+/// platform exception becomes instead — conflating the two once already
+/// showed a phone that plainly has Bluetooth this message, hiding a real bug
+/// as if it were expected hardware absence).
 class BluetoothUnsupported extends BluetoothStatus {
   const BluetoothUnsupported();
+}
+
+/// Something on the platform side actually went wrong reading Bluetooth's
+/// state — a real, printable [reason], not silently reinterpreted as
+/// [BluetoothUnsupported].
+class BluetoothUnavailable extends BluetoothStatus {
+  const BluetoothUnavailable(this.reason);
+
+  final String reason;
 }
 
 /// `BluetoothService.allow` has not been asked yet, or was refused.

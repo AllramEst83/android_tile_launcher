@@ -32,12 +32,17 @@ class AndroidBluetoothService implements BluetoothService {
     final Map<Object?, Object?>? raw;
     try {
       raw = await channel.invokeMapMethod<Object?, Object?>('status');
-    } on PlatformException {
-      return const BluetoothUnsupported();
+    } on PlatformException catch (error) {
+      // A real native error, never reworded as "no radio": a phone that
+      // plainly has Bluetooth once showed exactly that message, because this
+      // used to treat every platform exception as [BluetoothUnsupported].
+      return BluetoothUnavailable(error.message ?? 'could not read bluetooth');
     } on MissingPluginException {
-      return const BluetoothUnsupported();
+      return const BluetoothUnavailable('bluetooth is not supported here');
     }
-    if (raw == null) return const BluetoothUnsupported();
+    if (raw == null) {
+      return const BluetoothUnavailable('bluetooth did not answer');
+    }
 
     if (raw['supported'] != true) return const BluetoothUnsupported();
     if (raw['hasAccess'] != true) {

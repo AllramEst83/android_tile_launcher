@@ -128,6 +128,10 @@ class _BluetoothSheetState extends State<_BluetoothSheet>
         Messages.bluetoothUnsupportedBody,
         style: text.bodyMedium,
       ),
+      BluetoothUnavailable(:final String reason) => Text(
+        reason.toUpperCase(),
+        style: text.bodyMedium,
+      ),
       BluetoothNeedsPermission(:final bool permanent) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

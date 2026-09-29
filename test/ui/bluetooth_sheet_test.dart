@@ -33,6 +33,18 @@ void main() {
     expect(find.text(Messages.bluetoothUnsupportedBody), findsOneWidget);
   });
 
+  testWidgets('a real platform error says its own reason, not "no radio"', (
+    WidgetTester tester,
+  ) async {
+    final bluetooth = FakeBluetoothService()
+      ..statusResult = const BluetoothUnavailable('boom');
+
+    await _open(tester, bluetooth);
+
+    expect(find.text('BOOM'), findsOneWidget);
+    expect(find.text(Messages.bluetoothUnsupportedBody), findsNothing);
+  });
+
   group('needs permission', () {
     testWidgets('offers to allow it, and asks when tapped', (
       WidgetTester tester,

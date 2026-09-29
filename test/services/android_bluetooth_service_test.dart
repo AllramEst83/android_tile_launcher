@@ -141,23 +141,31 @@ void main() {
       expect((result as BluetoothNeedsPermission).permanent, isFalse);
     });
 
-    test('a platform error is unsupported, not thrown', () async {
-      _mockChannel((call) async => throw PlatformException(code: 'BOOM'));
+    test('a platform error is unavailable, not thrown or reworded as '
+        'unsupported', () async {
+      // A native crash used to be misreported as "this phone has no
+      // Bluetooth radio" (a real bug, found on a phone that plainly has
+      // one) — [BluetoothUnavailable] carries the real reason instead.
+      _mockChannel(
+        (call) async => throw PlatformException(code: 'BOOM', message: 'boom'),
+      );
       final service = AndroidBluetoothService(
         permissions: FakePermissionService(),
       );
 
-      expect(await service.status(), isA<BluetoothUnsupported>());
+      final result = await service.status();
+      expect(result, isA<BluetoothUnavailable>());
+      expect((result as BluetoothUnavailable).reason, 'boom');
     });
 
-    test('no handler at all is unsupported, not a crash', () async {
+    test('no handler at all is unavailable, not a crash', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(_channel, null);
       final service = AndroidBluetoothService(
         permissions: FakePermissionService(),
       );
 
-      expect(await service.status(), isA<BluetoothUnsupported>());
+      expect(await service.status(), isA<BluetoothUnavailable>());
     });
   });
 

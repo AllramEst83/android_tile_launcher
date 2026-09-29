@@ -44,7 +44,15 @@ class BluetoothChannelHandler(
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "status" -> result.success(status())
+            // A genuinely unexpected exception here must reach Dart as a
+            // readable error, not crash the channel outright — the same
+            // "never throw across the boundary" rule every other handler in
+            // this app already follows.
+            "status" -> try {
+                result.success(status())
+            } catch (e: Exception) {
+                result.error("UNAVAILABLE", e.message, null)
+            }
             "openPanel" -> open(panelIntent(), result)
             "openSettings" -> open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS), result)
             else -> result.notImplemented()
@@ -81,10 +89,19 @@ class BluetoothChannelHandler(
                 // per-profile read; connecting or disconnecting one is not
                 // (see this class's own doc comment), so this only ever
                 // reports state. A device counts as connected if any of the
-                // profiles an ordinary peripheral actually uses reports it so.
+                // profiles an ordinary peripheral actually uses reports it
+                // so. Each read is its own try/catch, not one around the
+                // whole map: a device or profile this device doesn't support
+                // throwing here must not take the rest of the (working)
+                // status down with it — first found reported as
+                // "bluetooth is off" on a phone that plainly has it on.
                 "connected" to CONNECTION_PROFILES.any { profile ->
-                    manager?.getConnectionState(device, profile) ==
-                        BluetoothProfile.STATE_CONNECTED
+                    try {
+                        manager?.getConnectionState(device, profile) ==
+                            BluetoothProfile.STATE_CONNECTED
+                    } catch (e: Exception) {
+                        false
+                    }
                 },
             )
         }

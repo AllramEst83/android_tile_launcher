@@ -438,6 +438,7 @@ String _bluetoothStateLabel(BluetoothStatus status) => switch (status) {
   BluetoothOn() => Messages.bluetoothOn,
   BluetoothOff() => Messages.bluetoothOff,
   BluetoothUnsupported() => Messages.bluetoothUnsupported,
+  BluetoothUnavailable() => Messages.bluetoothUnsupported,
   BluetoothNeedsPermission() => Messages.bluetoothOff,
 };
 
