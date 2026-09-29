@@ -637,6 +637,139 @@ void main() {
       expect(find.byKey(mailForgetKey), findsNothing);
     });
   });
+
+  group('bulk delete', () {
+    testWidgets('SELECT shows a checkbox on every message, none checked yet', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+
+      expect(find.byKey(mailCheckboxKey(12)), findsOneWidget);
+      expect(find.byKey(mailCheckboxKey(11)), findsOneWidget);
+      expect(find.text(Messages.mailSelectedCount(0)), findsOneWidget);
+      // Tapping a message now selects it rather than opening it.
+      await tester.tap(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+      expect(find.byKey(mailReaderKey), findsNothing);
+      expect(find.text(Messages.mailSelectedCount(1)), findsOneWidget);
+    });
+
+    testWidgets('DELETE is disabled until something is selected', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailBulkDeleteKey));
+      await tester.pump();
+
+      expect(find.text(Messages.mailBulkTrashAsk(0)), findsNothing);
+    });
+
+    testWidgets('CANCEL leaves the list untouched', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      await tester.tap(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailCancelSelectKey));
+      await tester.pump();
+
+      expect(find.byKey(mailSelectKey), findsOneWidget);
+      expect(find.byKey(mailCheckboxKey(12)), findsNothing);
+      expect(mail.moves, isEmpty);
+    });
+
+    testWidgets('DELETE asks first, and nothing moves until YES', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      await tester.tap(find.byKey(mailMessageKey(12)));
+      await tester.tap(find.byKey(mailMessageKey(11)));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailBulkDeleteKey));
+      await tester.pump();
+
+      expect(find.text(Messages.mailBulkTrashAsk(2)), findsOneWidget);
+      expect(mail.moves, isEmpty);
+    });
+
+    testWidgets(
+      'YES moves every selected message and refreshes the list from the server',
+      (WidgetTester tester) async {
+        final FakeMailService mail = _service();
+        await _open(tester, mail);
+        await tester.tap(find.byKey(mailSelectKey));
+        await tester.pump();
+        await tester.tap(find.byKey(mailMessageKey(12)));
+        await tester.tap(find.byKey(mailMessageKey(11)));
+        await tester.pump();
+        await tester.tap(find.byKey(mailBulkDeleteKey));
+        await tester.pump();
+
+        await tester.tap(find.byKey(mailBulkYesKey));
+        await tester.pumpAndSettle();
+
+        expect(mail.moves, <(int, int?)>[(12, 77), (11, 77)]);
+        expect(find.text(Messages.mailBulkMoved(2)), findsOneWidget);
+        // "automatically refresh the email list" once it is done.
+        expect(mail.freshCalls, 2);
+        expect(find.byKey(mailSelectKey), findsOneWidget);
+        expect(find.byKey(mailCheckboxKey(12)), findsNothing);
+      },
+    );
+
+    testWidgets('NO backs out of the bulk ask and moves nothing', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      await tester.tap(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+      await tester.tap(find.byKey(mailBulkDeleteKey));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailBulkNoKey));
+      await tester.pump();
+
+      expect(mail.moves, isEmpty);
+      expect(find.text(Messages.mailSelectedCount(1)), findsOneWidget);
+    });
+
+    testWidgets('a narrow phone still fits the select and bulk-ask rows', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(360 * 3, 780 * 3)
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await _open(tester, _service());
+
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+      await tester.tap(find.byKey(mailBulkDeleteKey));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    });
+  });
   group('type size', () {
     testWidgets(
       'the text of a message is easy to read, well over the tiny 9 px',

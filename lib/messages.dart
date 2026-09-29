@@ -116,6 +116,16 @@ abstract final class Messages {
   static const String mailForget = 'FORGET ACCOUNT';
   static const String mailForgetAsk = 'FORGET THIS ACCOUNT AND ITS PASSWORD?';
   static const String mailRefresh = 'REFRESH';
+  static const String mailSelect = 'SELECT';
+  static const String mailCancelSelect = 'CANCEL';
+  static String mailSelectedCount(int n) => '$n SELECTED';
+  static String mailDeleteSelected(int n) => 'DELETE ($n)';
+  static String mailBulkTrashAsk(int n) =>
+      'MOVE $n ${n == 1 ? 'EMAIL' : 'EMAILS'} TO TRASH? THIS CAN\'T BE UNDONE.';
+  static String mailBulkDeleting(int done, int total) =>
+      'DELETING $done OF $total...';
+  static String mailBulkMoved(int n) =>
+      '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MOVED TO TRASH.';
 
   static const String calcTitle = 'CALC';
   static const String calcTabCalc = 'CALC';

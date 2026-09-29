@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 /// Keys so tests can find the parts.
 Key mailMessageKey(int uid) => ValueKey<String>('mail-message-$uid');
+Key mailCheckboxKey(int uid) => ValueKey<String>('mail-checkbox-$uid');
 const Key mailTrashKey = ValueKey<String>('mail-trash');
 const Key mailTrashYesKey = ValueKey<String>('mail-trash-yes');
 const Key mailTrashNoKey = ValueKey<String>('mail-trash-no');
@@ -21,6 +22,11 @@ const Key mailReaderKey = ValueKey<String>('mail-reader');
 const Key mailBodyKey = ValueKey<String>('mail-body');
 const Key mailForgetYesKey = ValueKey<String>('mail-forget-yes');
 const Key mailForgetNoKey = ValueKey<String>('mail-forget-no');
+const Key mailSelectKey = ValueKey<String>('mail-select');
+const Key mailCancelSelectKey = ValueKey<String>('mail-cancel-select');
+const Key mailBulkDeleteKey = ValueKey<String>('mail-bulk-delete');
+const Key mailBulkYesKey = ValueKey<String>('mail-bulk-yes');
+const Key mailBulkNoKey = ValueKey<String>('mail-bulk-no');
 
 DateTime _systemNow() => DateTime.now();
 
@@ -83,6 +89,14 @@ class _MailSheetState extends State<_MailSheet> {
   bool _busy = false;
   String? _status;
 
+  // Bulk delete from the list, never while a message is open.
+  bool _selecting = false;
+  final Set<int> _selected = <int>{};
+  bool _confirmingBulkTrash = false;
+  bool _bulkDeleting = false;
+  int _bulkDone = 0;
+  int _bulkTotal = 0;
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +109,9 @@ class _MailSheetState extends State<_MailSheet> {
       _openUid = null;
       _opened = null;
       _confirmingTrash = null;
+      _selecting = false;
+      _selected.clear();
+      _confirmingBulkTrash = false;
     });
     final MailAccountInfo? account = await widget.mail.account();
     // Always from the server: the sheet is for looking at what is there now.
@@ -239,6 +256,61 @@ class _MailSheetState extends State<_MailSheet> {
     });
   }
 
+  void _startSelecting() => setState(() {
+    _selecting = true;
+    _selected.clear();
+  });
+
+  void _cancelSelecting() => setState(() {
+    _selecting = false;
+    _selected.clear();
+    _confirmingBulkTrash = false;
+  });
+
+  void _toggleSelected(int uid) => setState(() {
+    if (!_selected.remove(uid)) _selected.add(uid);
+  });
+
+  /// Moves every selected message to Trash, one at a time (so
+  /// [_bulkTrash]'s own progress line means something), then reloads from
+  /// the server — the same "look at what is actually there now" reasoning
+  /// [_load] itself already uses, not just a local list edit.
+  Future<void> _bulkTrash() async {
+    final List<int> uids = _selected.toList();
+    setState(() {
+      _busy = true;
+      _confirmingBulkTrash = false;
+      _bulkDeleting = true;
+      _bulkDone = 0;
+      _bulkTotal = uids.length;
+      _status = null;
+    });
+    int moved = 0;
+    for (final int uid in uids) {
+      final MailMoveResult result = await widget.mail.moveToTrash(
+        uid,
+        validity: _validity,
+      );
+      if (!mounted) return;
+      switch (result) {
+        case MailMoved():
+        case MailGone():
+          moved++;
+        case MailMoveNotSetUp():
+        case MailMoveFailed():
+          break;
+      }
+      setState(() => _bulkDone++);
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _bulkDeleting = false;
+      _status = Messages.mailBulkMoved(moved);
+    });
+    await _load();
+  }
+
   Future<void> _forget() async {
     setState(() => _busy = true);
     await widget.mail.forget();
@@ -269,6 +341,28 @@ class _MailSheetState extends State<_MailSheet> {
                     onTap: _busy ? null : _back,
                   ),
                   const Spacer(),
+                ] else if (_selecting) ...<Widget>[
+                  Expanded(
+                    child: Text(
+                      Messages.mailSelectedCount(_selected.length),
+                      style: text.bodyMedium?.copyWith(
+                        color: TileColors.textBright,
+                      ),
+                    ),
+                  ),
+                  _Button(
+                    key: mailCancelSelectKey,
+                    label: Messages.mailCancelSelect,
+                    onTap: _busy ? null : _cancelSelecting,
+                  ),
+                  const SizedBox(width: 8),
+                  _Button(
+                    key: mailBulkDeleteKey,
+                    label: Messages.mailDeleteSelected(_selected.length),
+                    onTap: _busy || _selected.isEmpty
+                        ? null
+                        : () => setState(() => _confirmingBulkTrash = true),
+                  ),
                 ] else ...<Widget>[
                   Text(
                     Messages.mailTitle,
@@ -277,6 +371,14 @@ class _MailSheetState extends State<_MailSheet> {
                     ),
                   ),
                   const Spacer(),
+                  _Button(
+                    key: mailSelectKey,
+                    label: Messages.mailSelect,
+                    onTap: _busy || _loading || _messages.isEmpty
+                        ? null
+                        : _startSelecting,
+                  ),
+                  const SizedBox(width: 8),
                   _Button(
                     key: mailRefreshKey,
                     label: Messages.mailRefresh,
@@ -297,6 +399,21 @@ class _MailSheetState extends State<_MailSheet> {
             const SizedBox(height: 4),
             Container(height: 2, color: TileColors.bezel),
             const SizedBox(height: TileMetrics.gutter),
+            if (_confirmingBulkTrash) ...<Widget>[
+              _BulkTrashAsk(
+                count: _selected.length,
+                onYes: _bulkTrash,
+                onNo: () => setState(() => _confirmingBulkTrash = false),
+              ),
+              const SizedBox(height: TileMetrics.gutter),
+            ],
+            if (_bulkDeleting) ...<Widget>[
+              Text(
+                Messages.mailBulkDeleting(_bulkDone, _bulkTotal),
+                style: text.bodyMedium,
+              ),
+              const SizedBox(height: TileMetrics.gutter),
+            ],
             Expanded(
               child: open != null ? _reader(text, open) : _body(text, result),
             ),
@@ -315,7 +432,7 @@ class _MailSheetState extends State<_MailSheet> {
                   ),
                 ),
               ),
-            if (open == null) ...<Widget>[
+            if (open == null && !_selecting) ...<Widget>[
               const SizedBox(height: TileMetrics.gutter),
               _forgetRow(text),
             ],
@@ -469,48 +586,67 @@ class _MailSheetState extends State<_MailSheet> {
 
   Widget _row(TextTheme text, MailMessage m, DateTime now) {
     final Color bright = m.unread ? TileColors.textBright : TileColors.muted;
+    final bool selected = _selected.contains(m.uid);
     return InkWell(
       key: mailMessageKey(m.uid),
-      onTap: _busy ? null : () => _open(m),
+      onTap: _busy
+          ? null
+          : _selecting
+          ? () => _toggleSelected(m.uid)
+          : () => _open(m),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: TileColors.bezel)),
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    '${m.unread ? '* ' : ''}${m.from.toUpperCase()}',
+            if (_selecting) ...<Widget>[
+              _Checkbox(key: mailCheckboxKey(m.uid), checked: selected),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          '${m.unread ? '* ' : ''}${m.from.toUpperCase()}',
+                          style: text.bodySmall?.copyWith(
+                            fontSize: 13,
+                            color: bright,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        formatMailDate(m.date, now),
+                        style: text.bodySmall?.copyWith(
+                          fontSize: 11,
+                          color: TileColors.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    m.subject.isEmpty
+                        ? Messages.mailNoSubject
+                        : m.subject.toUpperCase(),
                     style: text.bodySmall?.copyWith(
-                      fontSize: 13,
+                      fontSize: 11,
                       color: bright,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  formatMailDate(m.date, now),
-                  style: text.bodySmall?.copyWith(
-                    fontSize: 11,
-                    color: TileColors.accent,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              m.subject.isEmpty
-                  ? Messages.mailNoSubject
-                  : m.subject.toUpperCase(),
-              style: text.bodySmall?.copyWith(fontSize: 11, color: bright),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+                ],
+              ),
             ),
           ],
         ),
@@ -583,6 +719,67 @@ class _Button extends StatelessWidget {
               ?.copyWith(fontSize: 11, color: colour),
         ),
       ),
+    );
+  }
+}
+
+/// A small bordered square, filled when [checked] — the same flat,
+/// no-glyph look the size grid picker's own cells use, rather than a
+/// platform checkbox that would look like a different app's control.
+class _Checkbox extends StatelessWidget {
+  const _Checkbox({super.key, required this.checked});
+
+  final bool checked;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 18,
+      height: 18,
+      margin: const EdgeInsets.only(top: 2),
+      decoration: BoxDecoration(
+        color: checked ? TileColors.accent : Colors.transparent,
+        border: Border.all(color: TileColors.bezel, width: TileMetrics.bevel),
+      ),
+    );
+  }
+}
+
+/// The ask before a bulk delete — the list's own version of the single
+/// message's TRASH confirm.
+class _BulkTrashAsk extends StatelessWidget {
+  const _BulkTrashAsk({
+    required this.count,
+    required this.onYes,
+    required this.onNo,
+  });
+
+  final int count;
+  final VoidCallback onYes;
+  final VoidCallback onNo;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          Messages.mailBulkTrashAsk(count),
+          style: text.bodySmall?.copyWith(
+            fontSize: 11,
+            color: TileColors.highlight,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: <Widget>[
+            _Button(key: mailBulkYesKey, label: Messages.mailYes, onTap: onYes),
+            const SizedBox(width: 8),
+            _Button(key: mailBulkNoKey, label: Messages.mailNo, onTap: onNo),
+          ],
+        ),
+      ],
     );
   }
 }
