@@ -1,24 +1,26 @@
 import 'package:android_tile_launcher/model/file_entry.dart';
 
-/// What listing a folder came back with.
+/// What listing a folder (or the top-level list of storage roots) came back
+/// with.
 sealed class FilesResult {
   const FilesResult();
 }
 
 /// [entries] is everything directly inside the folder asked for (not
 /// recursive) — folders first, then files, each already sorted biggest
-/// first within its own group.
+/// first within its own group; or, from [FilesService.roots], one entry per
+/// storage volume in whatever order the platform reports them.
 class FilesListed extends FilesResult {
   const FilesListed(this.entries);
 
   final List<FileEntry> entries;
 }
 
-/// No folder has been picked yet (or it's since been revoked, e.g. from
-/// Android's own storage settings) — [FilesService.pickFolder] is how the
-/// user gives access.
-class FilesNoFolder extends FilesResult {
-  const FilesNoFolder();
+/// File access has not been granted yet (or was since revoked from
+/// Android's own Settings) — [FilesService.requestAccess] is how the user
+/// gives it.
+class FilesNoAccess extends FilesResult {
+  const FilesNoAccess();
 }
 
 /// The folder — or the path asked for inside it — could not be read;
@@ -29,25 +31,19 @@ class FilesUnavailable extends FilesResult {
   final String reason;
 }
 
-/// What asking the user to pick a folder came back with.
-sealed class PickFolderResult {
-  const PickFolderResult();
+/// What asking Android for file access came back with.
+sealed class AccessResult {
+  const AccessResult();
 }
 
-class FolderPicked extends PickFolderResult {
-  const FolderPicked();
+class AccessGranted extends AccessResult {
+  const AccessGranted();
 }
 
-/// The user backed out of the system picker without choosing anything —
-/// nothing changed, not a failure.
-class FolderPickCancelled extends PickFolderResult {
-  const FolderPickCancelled();
-}
-
-class FolderPickFailed extends PickFolderResult {
-  const FolderPickFailed(this.reason);
-
-  final String reason;
+/// The user backed out of Android's own settings screen without turning it
+/// on, or turned it off again — not necessarily a failure, just not granted.
+class AccessDenied extends AccessResult {
+  const AccessDenied();
 }
 
 /// Whether deleting one entry worked.
@@ -65,24 +61,26 @@ class DeleteFailed extends DeleteResult {
   final String reason;
 }
 
-/// A lightweight disk-usage utility: the user picks one folder (Android's own
-/// folder picker, not a broad "all files" permission) and this browses and
-/// deletes inside it. Never throws: every failure is a typed result the sheet
-/// can word.
+/// A disk-usage utility in the shape Android's own Files app is: one
+/// permission ("all files access"), granted once from Android's own Settings
+/// screen, then every storage volume on the phone (internal, an SD card, …)
+/// is browsable and deletable as an ordinary file tree — not just one folder
+/// picked through a document tree, the way this used to work. Never throws:
+/// every failure is a typed result the sheet can word.
 abstract interface class FilesService {
-  /// Whether a folder has already been picked and access to it still holds.
-  Future<bool> hasFolder();
+  /// Whether file access has already been granted.
+  Future<bool> hasAccess();
 
-  /// Opens Android's own folder picker. Only ever called from a tap: the
-  /// system UI it opens must never appear on its own.
-  Future<PickFolderResult> pickFolder();
+  /// Opens Android's own "all files access" settings screen. Only ever
+  /// called from a tap: the system UI it opens must never appear on its own.
+  Future<AccessResult> requestAccess();
 
-  /// Gives up access to the picked folder, so [hasFolder] is false again and
-  /// the sheet can offer to pick a different one.
-  Future<void> forgetFolder();
+  /// One entry per storage volume on the phone (`INTERNAL STORAGE`, an SD
+  /// card if there is one, …) — the file tree's own roots.
+  Future<FilesResult> roots();
 
-  /// The entries directly inside [path] (`""` for the picked folder's own
-  /// root), slash-separated and relative to it.
+  /// The entries directly inside the folder at [path] (an absolute path, as
+  /// [roots] or a previous [list] gave it).
   Future<FilesResult> list(String path);
 
   /// Deletes the file or folder (and everything under it) at [path].

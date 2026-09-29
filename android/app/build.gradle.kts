@@ -6,7 +6,11 @@ plugins {
 
 android {
     namespace = "com.codedbykay.android_tile_launcher"
-    compileSdk = flutter.compileSdkVersion
+    // `permission_handler_android` (the files tile's "all files access"
+    // request) needs 37; Flutter's own default (`flutter.compileSdkVersion`)
+    // hadn't caught up yet. Compiling against a newer SDK than `targetSdk`
+    // is normal and backward compatible.
+    compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

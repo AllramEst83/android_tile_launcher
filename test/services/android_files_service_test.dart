@@ -1,253 +1,200 @@
+import 'dart:io';
+
 import 'package:android_tile_launcher/services/android_files_service.dart';
 import 'package:android_tile_launcher/services/files_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:saf_util/saf_util.dart';
-import 'package:saf_util/saf_util_platform_interface.dart' show SafDocumentFile;
 
-import '../fakes/in_memory_local_store.dart';
+const MethodChannel _channel = MethodChannel(AndroidFilesService.channelName);
 
-SafDocumentFile _doc({
-  required String uri,
-  required String name,
-  bool isDir = false,
-  int length = -1,
-}) => SafDocumentFile(
-  uri: uri,
-  name: name,
-  isDir: isDir,
-  length: length,
-  lastModified: 0,
-);
-
-/// Stands in for `package:saf_util`'s platform channel; the real Storage
-/// Access Framework is never touched in tests.
-class _FakeSafUtil extends SafUtil {
-  SafDocumentFile? pickResult;
-  Object? pickError;
-  bool persisted = false;
-  Map<String, List<SafDocumentFile>> childrenByUri =
-      <String, List<SafDocumentFile>>{};
-  Object? listError;
-  Object? deleteError;
-
-  String? releasedUri;
-  final List<String> deletedUris = <String>[];
-
-  @override
-  Future<SafDocumentFile?> pickDirectory({
-    String? initialUri,
-    bool? writePermission,
-    bool? persistablePermission,
-  }) async {
-    final Object? error = pickError;
-    if (error != null) throw error;
-    return pickResult;
-  }
-
-  @override
-  Future<bool> hasPersistedPermission(
-    String uri, {
-    bool checkRead = true,
-    bool checkWrite = false,
-  }) async => persisted;
-
-  @override
-  Future<void> releasePersistedPermission(
-    String uri, {
-    bool read = true,
-    bool write = false,
-  }) async {
-    releasedUri = uri;
-  }
-
-  @override
-  Future<List<SafDocumentFile>> list(String uri) async {
-    final Object? error = listError;
-    if (error != null) throw error;
-    return childrenByUri[uri] ?? const <SafDocumentFile>[];
-  }
-
-  @override
-  Future<SafDocumentFile?> child(String uri, List<String> names) async {
-    SafDocumentFile? current = _doc(uri: uri, name: '', isDir: true);
-    for (final String name in names) {
-      final List<SafDocumentFile> siblings =
-          childrenByUri[current!.uri] ?? const <SafDocumentFile>[];
-      current = siblings
-          .where((SafDocumentFile d) => d.name == name)
-          .firstOrNull;
-      if (current == null) return null;
-    }
-    return current;
-  }
-
-  @override
-  Future<void> delete(String uri, bool isDir) async {
-    final Object? error = deleteError;
-    if (error != null) throw error;
-    deletedUris.add(uri);
-  }
+/// Stands in for the Kotlin side; the real platform is never touched in
+/// tests.
+void _mockChannel(Future<Object?>? Function(MethodCall call) handler) {
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(_channel, handler);
 }
 
 void main() {
-  late _FakeSafUtil saf;
-  late InMemoryLocalStore store;
-  late AndroidFilesService service;
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    saf = _FakeSafUtil();
-    store = InMemoryLocalStore();
-    service = AndroidFilesService(store: store, saf: saf);
+  tearDown(() => _mockChannel((call) async => null));
+
+  final AndroidFilesService service = AndroidFilesService(channel: _channel);
+
+  group('roots', () {
+    test('one entry per storage directory, named in order', () async {
+      _mockChannel(
+        (call) async => <String>['/storage/emulated/0', '/storage/AAAA-1111'],
+      );
+
+      final result = await service.roots();
+
+      expect(result, isA<FilesListed>());
+      final entries = (result as FilesListed).entries;
+      expect(entries.map((e) => e.name), <String>[
+        'INTERNAL STORAGE',
+        'SD CARD',
+      ]);
+      expect(entries.map((e) => e.path), <String>[
+        '/storage/emulated/0',
+        '/storage/AAAA-1111',
+      ]);
+      expect(entries.every((e) => e.isDirectory), isTrue);
+    });
+
+    test('a third volume is numbered', () async {
+      _mockChannel((call) async => <String>['/a', '/b', '/c']);
+
+      final entries = ((await service.roots()) as FilesListed).entries;
+
+      expect(entries.map((e) => e.name), <String>[
+        'INTERNAL STORAGE',
+        'SD CARD',
+        'SD CARD 2',
+      ]);
+    });
+
+    test('none found is worded, not an empty silent list', () async {
+      _mockChannel((call) async => <String>[]);
+
+      expect(await service.roots(), isA<FilesUnavailable>());
+    });
+
+    test('a platform error is worded', () async {
+      _mockChannel(
+        (call) async => throw PlatformException(
+          code: 'BOOM',
+          message: 'could not read volumes',
+        ),
+      );
+
+      final result = await service.roots();
+
+      expect(result, isA<FilesUnavailable>());
+      expect((result as FilesUnavailable).reason, 'could not read volumes');
+    });
+
+    test('no handler at all is unsupported, not a crash', () async {
+      _mockChannel((call) async => null);
+      // No handler registered at all is the `MissingPluginException` case;
+      // simulate it by removing the mock entirely.
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_channel, null);
+
+      expect(await service.roots(), isA<FilesUnavailable>());
+    });
   });
 
-  group('hasFolder', () {
-    test('false with nothing picked yet', () async {
-      expect(await service.hasFolder(), isFalse);
+  group('hasAccess / requestAccess', () {
+    test('reflects the injected check', () async {
+      final service = AndroidFilesService(hasAccessCheck: () async => true);
+      expect(await service.hasAccess(), isTrue);
     });
 
-    test('true once picked and the permission still holds', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-      await service.pickFolder();
-      saf.persisted = true;
-
-      expect(await service.hasFolder(), isTrue);
+    test('a failing check is not granted', () async {
+      final service = AndroidFilesService(
+        hasAccessCheck: () async => throw Exception('boom'),
+      );
+      expect(await service.hasAccess(), isFalse);
     });
 
-    test('false if the permission was revoked elsewhere', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-      await service.pickFolder();
-      saf.persisted = false;
-
-      expect(await service.hasFolder(), isFalse);
-    });
-  });
-
-  group('pickFolder', () {
-    test('remembers the picked folder', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-
-      final result = await service.pickFolder();
-
-      expect(result, isA<FolderPicked>());
-      expect(await store.read(AndroidFilesService.storeKey), 'tree://root');
+    test('requestAccess grants when the check says so', () async {
+      final service = AndroidFilesService(requestAccessCheck: () async => true);
+      expect(await service.requestAccess(), isA<AccessGranted>());
     });
 
-    test('backing out of the picker is cancelled, not a failure', () async {
-      saf.pickResult = null;
+    test('backing out (or a failure) is denied, not thrown', () async {
+      final granted = AndroidFilesService(
+        requestAccessCheck: () async => false,
+      );
+      expect(await granted.requestAccess(), isA<AccessDenied>());
 
-      expect(await service.pickFolder(), isA<FolderPickCancelled>());
-    });
-
-    test('a platform failure is worded', () async {
-      saf.pickError = Exception('boom');
-
-      final result = await service.pickFolder();
-
-      expect(result, isA<FolderPickFailed>());
-      expect((result as FolderPickFailed).reason, 'boom');
+      final failing = AndroidFilesService(
+        requestAccessCheck: () async => throw Exception('boom'),
+      );
+      expect(await failing.requestAccess(), isA<AccessDenied>());
     });
   });
 
-  group('forgetFolder', () {
-    test('releases the permission and clears the saved folder', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-      await service.pickFolder();
+  group('list and delete (against a real temp directory)', () {
+    late Directory root;
+    late AndroidFilesService service;
 
-      await service.forgetFolder();
-
-      expect(saf.releasedUri, 'tree://root');
-      expect(await service.hasFolder(), isFalse);
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('files_service_test_');
+      service = AndroidFilesService(hasAccessCheck: () async => true);
     });
-  });
 
-  group('list', () {
-    test('no folder picked', () async {
-      expect(await service.list(''), isA<FilesNoFolder>());
+    tearDown(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+
+    test('no access: not even a real path is read', () async {
+      final noAccess = AndroidFilesService(hasAccessCheck: () async => false);
+
+      expect(await noAccess.list(root.path), isA<FilesNoAccess>());
     });
 
     test('folders before files, biggest first within each', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-      await service.pickFolder();
-      saf.childrenByUri['tree://root'] = <SafDocumentFile>[
-        _doc(uri: 'tree://root/small.txt', name: 'small.txt', length: 10),
-        _doc(uri: 'tree://root/photos', name: 'Photos', isDir: true),
-        _doc(uri: 'tree://root/big.zip', name: 'big.zip', length: 9000),
-      ];
+      await File('${root.path}/small.txt').writeAsString('0123456789');
+      await Directory('${root.path}/Photos').create();
+      await File('${root.path}/big.bin').writeAsBytes(List.filled(9000, 0));
 
-      final result = await service.list('');
+      final result = await service.list(root.path);
 
       expect(result, isA<FilesListed>());
       final entries = (result as FilesListed).entries;
       expect(entries.map((e) => e.name), <String>[
         'Photos',
-        'big.zip',
+        'big.bin',
         'small.txt',
       ]);
       expect(entries[0].isDirectory, isTrue);
       expect(entries[0].sizeBytes, 0);
-      expect(entries[0].path, 'Photos');
+      expect(entries[1].sizeBytes, 9000);
+      expect(entries[2].sizeBytes, 10);
     });
 
-    test('a subfolder is resolved through child(), not by hand', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-      await service.pickFolder();
-      saf.childrenByUri['tree://root'] = <SafDocumentFile>[
-        _doc(uri: 'tree://root/photos', name: 'photos', isDir: true),
-      ];
-      saf.childrenByUri['tree://root/photos'] = <SafDocumentFile>[
-        _doc(uri: 'tree://root/photos/a.jpg', name: 'a.jpg', length: 5),
-      ];
+    test('a path is the real filesystem path, not a synthetic one', () async {
+      await File('${root.path}/a.txt').writeAsString('x');
 
-      final result = await service.list('photos');
+      final entries = ((await service.list(root.path)) as FilesListed).entries;
 
-      expect(result, isA<FilesListed>());
-      final entries = (result as FilesListed).entries;
-      expect(entries.single.name, 'a.jpg');
-      expect(entries.single.path, 'photos/a.jpg');
+      // `Platform.pathSeparator`, not a literal `/`: `Directory.list()`
+      // joins with whatever the host actually uses, `\` on this Windows dev
+      // machine's own test run, not the `/` Android alone ever uses.
+      expect(entries.single.path, '${root.path}${Platform.pathSeparator}a.txt');
     });
 
-    test('a read failure is worded', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-      await service.pickFolder();
-      saf.listError = Exception('gone');
-
-      final result = await service.list('');
+    test('a folder that no longer exists is worded', () async {
+      final result = await service.list('${root.path}/does-not-exist');
 
       expect(result, isA<FilesUnavailable>());
-      expect((result as FilesUnavailable).reason, 'gone');
-    });
-  });
-
-  group('delete', () {
-    test('no folder picked', () async {
-      expect(await service.delete('a.txt'), isA<DeleteFailed>());
     });
 
-    test('deletes the resolved document', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-      await service.pickFolder();
-      saf.childrenByUri['tree://root'] = <SafDocumentFile>[
-        _doc(uri: 'tree://root/a.txt', name: 'a.txt', length: 5),
-      ];
+    test('delete removes a file', () async {
+      final file = File('${root.path}/a.txt')..writeAsStringSync('x');
 
-      final result = await service.delete('a.txt');
+      final result = await service.delete(file.path);
 
       expect(result, isA<DeleteSucceeded>());
-      expect(saf.deletedUris, <String>['tree://root/a.txt']);
+      expect(await file.exists(), isFalse);
     });
 
-    test('a delete failure is worded', () async {
-      saf.pickResult = _doc(uri: 'tree://root', name: 'Downloads', isDir: true);
-      await service.pickFolder();
-      saf.childrenByUri['tree://root'] = <SafDocumentFile>[
-        _doc(uri: 'tree://root/a.txt', name: 'a.txt', length: 5),
-      ];
-      saf.deleteError = Exception('read-only');
+    test('delete removes a folder and everything in it', () async {
+      final dir = Directory('${root.path}/Photos')..createSync();
+      File('${dir.path}/a.jpg').writeAsStringSync('x');
 
-      final result = await service.delete('a.txt');
+      final result = await service.delete(dir.path);
+
+      expect(result, isA<DeleteSucceeded>());
+      expect(await dir.exists(), isFalse);
+    });
+
+    test('deleting something already gone says so, not thrown', () async {
+      final result = await service.delete('${root.path}/never-existed.txt');
 
       expect(result, isA<DeleteFailed>());
-      expect((result as DeleteFailed).reason, 'read-only');
     });
   });
 }

@@ -234,10 +234,8 @@ abstract final class Messages {
 
   static const String filesTitle = 'FILES';
   static const String filesSubtitle = 'BROWSE STORAGE';
-  static const String filesTapToChoose = 'TAP TO CHOOSE A FOLDER';
+  static const String filesTapToAllow = 'TAP TO ALLOW FILE ACCESS';
   static const String filesLoading = 'LOADING...';
-  static const String filesChangeFolder = 'CHANGE FOLDER';
-  static const String filesForgetFolder = 'FORGET THIS FOLDER';
   static const String filesEmpty = 'NOTHING HERE.';
   static const String filesBack = '< BACK';
   static const String filesDelete = 'DELETE';

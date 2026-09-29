@@ -1,31 +1,29 @@
+import 'package:android_tile_launcher/model/file_entry.dart';
 import 'package:android_tile_launcher/services/files_service.dart';
 
 /// Answers with whatever the test sets, and remembers what was asked for.
 class FakeFilesService implements FilesService {
-  bool folder = false;
-  PickFolderResult pickResult = const FolderPicked();
+  bool access = false;
+  AccessResult accessResult = const AccessGranted();
+  FilesResult rootsResult = const FilesListed(<FileEntry>[]);
   Map<String, FilesResult> resultsByPath = <String, FilesResult>{};
   DeleteResult deleteResult = const DeleteSucceeded();
 
-  int pickCalls = 0;
-  int forgetCalls = 0;
+  int requestCalls = 0;
   final List<String> deletedPaths = <String>[];
 
   @override
-  Future<bool> hasFolder() async => folder;
+  Future<bool> hasAccess() async => access;
 
   @override
-  Future<PickFolderResult> pickFolder() async {
-    pickCalls++;
-    if (pickResult is FolderPicked) folder = true;
-    return pickResult;
+  Future<AccessResult> requestAccess() async {
+    requestCalls++;
+    if (accessResult is AccessGranted) access = true;
+    return accessResult;
   }
 
   @override
-  Future<void> forgetFolder() async {
-    forgetCalls++;
-    folder = false;
-  }
+  Future<FilesResult> roots() async => rootsResult;
 
   @override
   Future<FilesResult> list(String path) async =>

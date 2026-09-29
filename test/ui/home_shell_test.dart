@@ -965,7 +965,7 @@ void main() {
       await tester.tap(_onHome(find.byType(FilesTileContentView)));
       await tester.pumpAndSettle();
 
-      expect(find.text(Messages.filesTapToChoose), findsOneWidget);
+      expect(find.text(Messages.filesTapToAllow), findsOneWidget);
 
       await tester.tap(find.byKey(filesCloseKey));
       await tester.pumpAndSettle();

@@ -1,108 +1,124 @@
+import 'dart:io';
+
 import 'package:android_tile_launcher/model/file_entry.dart';
 import 'package:android_tile_launcher/services/files_service.dart';
-import 'package:android_tile_launcher/services/local_store.dart';
-import 'package:android_tile_launcher/services/local_store_exception.dart';
-import 'package:saf_util/saf_util.dart';
-import 'package:saf_util/saf_util_platform_interface.dart' show SafDocumentFile;
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-/// [FilesService] on `package:saf_util` (Android's Storage Access Framework:
-/// the user picks one folder through the system's own picker, this app never
-/// gets broader access than that) and a [LocalStore] for the one thing SAF
-/// itself doesn't remember across launches — *which* folder was picked. The
-/// only file that knows about the package.
+/// [FilesService] on Android's "all files access" special permission
+/// (`package:permission_handler`, a well-established, actively-maintained
+/// plugin for exactly this fiddly Settings-redirect flow) and plain
+/// `dart:io` once it is granted — no document-tree API is needed here, since
+/// this app now has the same ordinary filesystem access Android's own Files
+/// app does. `roots` alone needs a platform call: `dart:io` has no way to ask
+/// Android what storage volumes exist, only to read paths once it already
+/// knows them — the Kotlin `FilesChannelHandler`'s one job, kept as this
+/// app's own small channel rather than a second package, after the
+/// once-considered `external_path` turned out to still apply the Kotlin
+/// Gradle Plugin the old way, one Flutter is phasing out.
 class AndroidFilesService implements FilesService {
-  // Not `this._store`: that would make the parameter name the private
-  // `_store`, which a caller in another file could not pass by name.
-  AndroidFilesService({required LocalStore store, SafUtil? saf})
+  // Not `this._channel`: that would make the parameter name the private
+  // `_channel`, which a caller in another file could not pass by name.
+  AndroidFilesService({
+    MethodChannel channel = const MethodChannel(channelName),
+    Future<bool> Function()? hasAccessCheck,
+    Future<bool> Function()? requestAccessCheck,
     // ignore: prefer_initializing_formals
-    : _store = store,
-      _saf = saf ?? SafUtil();
+  }) : _channel = channel,
+       _hasAccessCheck = hasAccessCheck ?? _defaultHasAccess,
+       _requestAccessCheck = requestAccessCheck ?? _defaultRequestAccess;
 
-  static const String storeKey = 'filesRootUri';
+  static const String channelName =
+      'com.codedbykay.android_tile_launcher/files';
 
-  final LocalStore _store;
-  final SafUtil _saf;
+  final MethodChannel _channel;
+  final Future<bool> Function() _hasAccessCheck;
+  final Future<bool> Function() _requestAccessCheck;
 
-  Future<String?> _rootUri() async {
-    final Object? saved;
-    try {
-      saved = await _store.read(storeKey);
-    } on LocalStoreException {
-      return null;
-    }
-    return saved is String ? saved : null;
-  }
+  static Future<bool> _defaultHasAccess() async =>
+      (await Permission.manageExternalStorage.status).isGranted;
+
+  static Future<bool> _defaultRequestAccess() async =>
+      (await Permission.manageExternalStorage.request()).isGranted;
 
   @override
-  Future<bool> hasFolder() async {
-    final String? uri = await _rootUri();
-    if (uri == null) return false;
+  Future<bool> hasAccess() async {
     try {
-      return await _saf.hasPersistedPermission(uri);
+      return await _hasAccessCheck();
     } catch (_) {
       return false;
     }
   }
 
   @override
-  Future<PickFolderResult> pickFolder() async {
-    final SafDocumentFile? picked;
+  Future<AccessResult> requestAccess() async {
     try {
-      picked = await _saf.pickDirectory(
-        writePermission: true,
-        persistablePermission: true,
-      );
-    } catch (error) {
-      return FolderPickFailed(_reason(error));
+      final bool granted = await _requestAccessCheck();
+      return granted ? const AccessGranted() : const AccessDenied();
+    } catch (_) {
+      return const AccessDenied();
     }
-    if (picked == null) return const FolderPickCancelled();
-    try {
-      await _store.write(storeKey, picked.uri);
-    } on LocalStoreException {
-      // The folder is still picked and usable this run; only remembering it
-      // for next time failed.
-    }
-    return const FolderPicked();
   }
 
   @override
-  Future<void> forgetFolder() async {
-    final String? uri = await _rootUri();
-    if (uri != null) {
-      try {
-        await _saf.releasePersistedPermission(uri, write: true);
-      } catch (_) {
-        // Nothing sensible to do with a failure to give up access; forgetting
-        // it locally below still stops this app offering to browse it.
-      }
-    }
+  Future<FilesResult> roots() async {
+    List<String> paths;
     try {
-      await _store.delete(storeKey);
-    } on LocalStoreException {
-      // Best effort; the next `hasFolder` may still say yes if this failed.
+      final List<Object?>? raw = await _channel.invokeListMethod<Object?>(
+        'storageRoots',
+      );
+      paths = (raw ?? const <Object?>[]).whereType<String>().toList();
+    } on PlatformException catch (error) {
+      return FilesUnavailable(error.message ?? 'could not read storage');
+    } on MissingPluginException {
+      return const FilesUnavailable('not supported here');
+    } catch (error) {
+      return FilesUnavailable(_reason(error));
     }
+    if (paths.isEmpty) return const FilesUnavailable('no storage found');
+    return FilesListed(<FileEntry>[
+      for (final (int i, String path) in paths.indexed)
+        FileEntry(
+          name: _rootName(i),
+          path: path,
+          isDirectory: true,
+          sizeBytes: 0,
+        ),
+    ]);
   }
 
   @override
   Future<FilesResult> list(String path) async {
-    final String? root = await _rootUri();
-    if (root == null) return const FilesNoFolder();
+    if (!await hasAccess()) return const FilesNoAccess();
     try {
-      final String? targetUri = await _resolve(root, path);
-      if (targetUri == null) {
+      final Directory directory = Directory(path);
+      if (!await directory.exists()) {
         return const FilesUnavailable('that folder is gone');
       }
-      final List<SafDocumentFile> children = await _saf.list(targetUri);
-      final List<FileEntry> entries = <FileEntry>[
-        for (final SafDocumentFile child in children)
+      final List<FileEntry> entries = <FileEntry>[];
+      await for (final FileSystemEntity child in directory.list()) {
+        final bool isDirectory = child is Directory;
+        int size = 0;
+        if (!isDirectory) {
+          try {
+            size = await (child as File).length();
+          } on FileSystemException {
+            // Unreadable for whatever reason; shown as 0 B rather than
+            // dropped, so it is still there to delete.
+          }
+        }
+        entries.add(
           FileEntry(
-            name: child.name,
-            path: path.isEmpty ? child.name : '$path/${child.name}',
-            isDirectory: child.isDir,
-            sizeBytes: child.isDir || child.length < 0 ? 0 : child.length,
+            name: _basename(child.path),
+            path: child.path,
+            isDirectory: isDirectory,
+            sizeBytes: size,
           ),
-      ];
+        );
+      }
       return FilesListed(_sorted(entries));
+    } on FileSystemException catch (error) {
+      return FilesUnavailable(error.osError?.message ?? error.message);
     } catch (error) {
       return FilesUnavailable(_reason(error));
     }
@@ -110,25 +126,36 @@ class AndroidFilesService implements FilesService {
 
   @override
   Future<DeleteResult> delete(String path) async {
-    final String? root = await _rootUri();
-    if (root == null) return const DeleteFailed('no folder picked');
     try {
-      final SafDocumentFile? target = await _saf.child(root, path.split('/'));
-      if (target == null) return const DeleteFailed('already gone');
-      await _saf.delete(target.uri, target.isDir);
+      final FileSystemEntityType type = await FileSystemEntity.type(path);
+      switch (type) {
+        case FileSystemEntityType.directory:
+          await Directory(path).delete(recursive: true);
+        case FileSystemEntityType.notFound:
+          return const DeleteFailed('already gone');
+        default:
+          await File(path).delete();
+      }
       return const DeleteSucceeded();
+    } on FileSystemException catch (error) {
+      return DeleteFailed(error.osError?.message ?? error.message);
     } catch (error) {
       return DeleteFailed(_reason(error));
     }
   }
 
-  /// The document at [path] (`""` is the picked folder's own root) under
-  /// [root], resolved through `saf_util`'s own `child` rather than walking
-  /// each segment by hand.
-  Future<String?> _resolve(String root, String path) async {
-    if (path.isEmpty) return root;
-    final SafDocumentFile? child = await _saf.child(root, path.split('/'));
-    return child?.uri;
+  static String _rootName(int index) => switch (index) {
+    0 => 'INTERNAL STORAGE',
+    1 => 'SD CARD',
+    _ => 'SD CARD $index',
+  };
+
+  // Android paths are always '/'-separated; `\` is only ever seen running
+  // this same code against a real filesystem on a Windows dev machine's own
+  // tests, not on the phone this actually ships to.
+  static String _basename(String path) {
+    final int slash = path.lastIndexOf(RegExp(r'[/\\]'));
+    return slash < 0 ? path : path.substring(slash + 1);
   }
 
   /// Folders before files (browsing a tree reads better than a flat list

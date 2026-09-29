@@ -10,8 +10,7 @@ import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
 /// Keys so tests can find the parts.
-const Key filesChooseKey = ValueKey<String>('files-choose');
-const Key filesChangeFolderKey = ValueKey<String>('files-change-folder');
+const Key filesAllowKey = ValueKey<String>('files-allow');
 const Key filesBackKey = ValueKey<String>('files-back');
 const Key filesCloseKey = ValueKey<String>('files-close');
 const Key filesAskKey = ValueKey<String>('files-ask');
@@ -20,9 +19,10 @@ const Key filesNoKey = ValueKey<String>('files-no');
 Key filesRowKey(String path) => ValueKey<String>('files-row-$path');
 Key filesDeleteKey(String path) => ValueKey<String>('files-delete-$path');
 
-/// What a tap on the files tile opens: one folder the user picked through
-/// Android's own folder picker (never broader access than that), browsed one
-/// level at a time, each entry deletable directly.
+/// What a tap on the files tile opens: every storage volume on the phone
+/// (internal, an SD card, …), browsed one level at a time like an ordinary
+/// file tree, each entry deletable directly — the way Android's own Files
+/// app works, once "all files access" is granted.
 Future<void> showFilesSheet(
   BuildContext context, {
   required FilesService service,
@@ -37,27 +37,21 @@ Future<void> showFilesSheet(
   );
 }
 
-class _FilesSheet extends StatefulWidget {
-  const _FilesSheet({required this.service});
-
-  final FilesService service;
-
-  @override
-  State<_FilesSheet> createState() => _FilesSheetState();
-}
-
 class _FilesSheetState extends State<_FilesSheet> {
   bool _loading = true;
-  bool _hasFolder = false;
+  bool _hasAccess = false;
 
-  /// The folder names entered so far, root first; joined with `/` this is
-  /// the `path` [FilesService.list] and [FilesService.delete] take.
-  final List<String> _stack = <String>[];
+  /// `null` is the top-level list of storage volumes; otherwise the
+  /// absolute path of the folder currently open.
+  String? _path;
+
+  /// Ancestor paths (`null` included, for "was at the volume list"), so BACK
+  /// can step out one level at a time.
+  final List<String?> _history = <String?>[];
+
   FilesResult? _result;
   FileEntry? _pendingDelete;
   String? _error;
-
-  String get _path => _stack.join('/');
 
   @override
   void initState() {
@@ -66,10 +60,10 @@ class _FilesSheetState extends State<_FilesSheet> {
   }
 
   Future<void> _init() async {
-    final bool has = await widget.service.hasFolder();
+    final bool has = await widget.service.hasAccess();
     if (!mounted) return;
     setState(() {
-      _hasFolder = has;
+      _hasAccess = has;
       _loading = false;
     });
     if (has) unawaited(_load());
@@ -77,47 +71,37 @@ class _FilesSheetState extends State<_FilesSheet> {
 
   Future<void> _load() async {
     setState(() => _result = null);
-    final FilesResult result = await widget.service.list(_path);
+    final String? path = _path;
+    final FilesResult result = path == null
+        ? await widget.service.roots()
+        : await widget.service.list(path);
     if (!mounted) return;
     setState(() {
       _result = result;
-      if (result is FilesNoFolder) _hasFolder = false;
+      if (result is FilesNoAccess) _hasAccess = false;
     });
   }
 
-  Future<void> _pick() async {
-    final PickFolderResult result = await widget.service.pickFolder();
+  Future<void> _allow() async {
+    final AccessResult result = await widget.service.requestAccess();
     if (!mounted) return;
     switch (result) {
-      case FolderPicked():
+      case AccessGranted():
         setState(() {
-          _hasFolder = true;
-          _stack.clear();
+          _hasAccess = true;
           _error = null;
         });
         unawaited(_load());
-      case FolderPickCancelled():
+      case AccessDenied():
         break;
-      case FolderPickFailed(:final String reason):
-        setState(() => _error = reason.toUpperCase());
     }
-  }
-
-  Future<void> _changeFolder() async {
-    await widget.service.forgetFolder();
-    if (!mounted) return;
-    setState(() {
-      _hasFolder = false;
-      _stack.clear();
-      _result = null;
-      _error = null;
-    });
   }
 
   void _open(FileEntry entry) {
     if (!entry.isDirectory) return;
     setState(() {
-      _stack.add(entry.name);
+      _history.add(_path);
+      _path = entry.path;
       _pendingDelete = null;
     });
     unawaited(_load());
@@ -125,7 +109,7 @@ class _FilesSheetState extends State<_FilesSheet> {
 
   void _back() {
     setState(() {
-      _stack.removeLast();
+      _path = _history.removeLast();
       _pendingDelete = null;
     });
     unawaited(_load());
@@ -164,17 +148,6 @@ class _FilesSheetState extends State<_FilesSheet> {
                 Expanded(
                   child: Text(Messages.filesTitle, style: text.bodyMedium),
                 ),
-                if (_hasFolder) ...<Widget>[
-                  PadKey(
-                    key: filesChangeFolderKey,
-                    label: Messages.filesChangeFolder,
-                    height: 32,
-                    fontSize: 10,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    onTap: _changeFolder,
-                  ),
-                  const SizedBox(width: TileMetrics.gutter),
-                ],
                 SizedBox(
                   width: 48,
                   child: PadKey(
@@ -206,13 +179,13 @@ class _FilesSheetState extends State<_FilesSheet> {
     if (_loading) {
       return Text(Messages.filesLoading, style: text.bodyMedium);
     }
-    if (!_hasFolder) {
+    if (!_hasAccess) {
       return PadKey(
-        key: filesChooseKey,
-        label: Messages.filesTapToChoose,
+        key: filesAllowKey,
+        label: Messages.filesTapToAllow,
         height: 48,
         fontSize: 12,
-        onTap: _pick,
+        onTap: _allow,
       );
     }
     final FileEntry? pending = _pendingDelete;
@@ -232,7 +205,7 @@ class _FilesSheetState extends State<_FilesSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          if (_stack.isNotEmpty) ...<Widget>[
+          if (_path != null) ...<Widget>[
             SizedBox(
               width: 80,
               child: PadKey(
@@ -256,16 +229,21 @@ class _FilesSheetState extends State<_FilesSheet> {
                     _FileRow(
                       entry: entry,
                       onOpen: () => _open(entry),
-                      onDelete: () => _askDelete(entry),
+                      // Deleting a whole storage volume makes no sense; only
+                      // offered once inside one.
+                      onDelete: _path == null ? null : () => _askDelete(entry),
                     ),
                 ],
               ),
             ),
         ],
       ),
-      FilesNoFolder() => Text(
-        Messages.filesTapToChoose,
-        style: text.bodyMedium,
+      FilesNoAccess() => PadKey(
+        key: filesAllowKey,
+        label: Messages.filesTapToAllow,
+        height: 48,
+        fontSize: 12,
+        onTap: _allow,
       ),
       FilesUnavailable(:final String reason) => Text(
         reason.toUpperCase(),
@@ -273,6 +251,15 @@ class _FilesSheetState extends State<_FilesSheet> {
       ),
     };
   }
+}
+
+class _FilesSheet extends StatefulWidget {
+  const _FilesSheet({required this.service});
+
+  final FilesService service;
+
+  @override
+  State<_FilesSheet> createState() => _FilesSheetState();
 }
 
 class _DeleteAsk extends StatelessWidget {
@@ -328,15 +315,14 @@ class _DeleteAsk extends StatelessWidget {
 }
 
 class _FileRow extends StatelessWidget {
-  const _FileRow({
-    required this.entry,
-    required this.onOpen,
-    required this.onDelete,
-  });
+  const _FileRow({required this.entry, required this.onOpen, this.onDelete});
 
   final FileEntry entry;
   final VoidCallback onOpen;
-  final VoidCallback onDelete;
+
+  /// `null` hides the delete control entirely — a storage volume itself
+  /// (the top-level list) is not something to offer deleting.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -344,6 +330,7 @@ class _FileRow extends StatelessWidget {
     final TextStyle nameStyle =
         text.bodySmall?.copyWith(fontSize: 11, color: TileColors.textBright) ??
         const TextStyle(fontSize: 11);
+    final VoidCallback? delete = onDelete;
     return Padding(
       key: filesRowKey(entry.path),
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -378,30 +365,32 @@ class _FileRow extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(width: 8),
-            Semantics(
-              button: true,
-              label: Messages.filesDelete,
-              child: SizedBox(
-                key: filesDeleteKey(entry.path),
-                width: 28,
-                height: 28,
-                child: InkWell(
-                  onTap: onDelete,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: TileColors.accent,
-                        width: TileMetrics.bevel,
+            if (delete != null) ...<Widget>[
+              const SizedBox(width: 8),
+              Semantics(
+                button: true,
+                label: Messages.filesDelete,
+                child: SizedBox(
+                  key: filesDeleteKey(entry.path),
+                  width: 28,
+                  height: 28,
+                  child: InkWell(
+                    onTap: delete,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: TileColors.accent,
+                          width: TileMetrics.bevel,
+                        ),
                       ),
-                    ),
-                    child: Center(
-                      child: TrashIcon(size: 16, color: TileColors.accent),
+                      child: Center(
+                        child: TrashIcon(size: 16, color: TileColors.accent),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

@@ -1,7 +1,20 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Lets the drawer's "uninstall" quick action open Android's uninstall
          confirmation dialog (API 28+). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
+    <!-- The files tile: browsing and deleting anywhere on the phone's
+         storage (not just this app's own folder), the way Android's own
+         Files app can. A "special access" permission the user grants once
+         from its own Settings screen, not a runtime dialog — `tools:ignore`
+         only silences the lint warning that scoped storage is the usual
+         path; a file explorer is exactly the kind of app this permission
+         exists for. Meaningless below Android 11 (API 30); older phones
+         simply never see the toggle granted. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <!-- The weather tile fetches forecasts (SMHI, Open-Meteo)... -->
     <uses-permission android:name="android.permission.INTERNET" />

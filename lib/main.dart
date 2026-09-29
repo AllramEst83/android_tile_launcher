@@ -95,7 +95,7 @@ Future<void> main() async {
         shade: const AndroidShadeService(),
         wallpaper: const AndroidWallpaperService(),
         icons: appRepository.icon,
-        files: AndroidFilesService(store: store),
+        files: AndroidFilesService(),
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),
