@@ -44,6 +44,7 @@ void main() {
         haptics: false,
         effects: false,
         appIcons: false,
+        agendaWeekView: true,
       );
 
       expect(LauncherSettings.fromJson(settings.toJson()), settings);

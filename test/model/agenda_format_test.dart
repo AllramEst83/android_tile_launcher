@@ -148,10 +148,24 @@ void main() {
   });
 
   group('formatDayHeading', () {
-    test('today, tomorrow, then the date', () {
+    test('today, tomorrow, yesterday, then the date', () {
       expect(formatDayHeading(DateTime(2026, 9, 28), _now), 'TODAY');
       expect(formatDayHeading(DateTime(2026, 9, 29), _now), 'TOMORROW');
+      expect(formatDayHeading(DateTime(2026, 9, 27), _now), 'YESTERDAY');
       expect(formatDayHeading(DateTime(2026, 9, 30), _now), 'WED 30 SEP');
+    });
+  });
+
+  group('formatWeekHeading', () {
+    test('this week, next week, last week, then the range', () {
+      expect(formatWeekHeading(DateTime(2026, 9, 28), _now), 'THIS WEEK');
+      expect(formatWeekHeading(DateTime(2026, 10, 5), _now), 'NEXT WEEK');
+      expect(formatWeekHeading(DateTime(2026, 9, 21), _now), 'LAST WEEK');
+      expect(formatWeekHeading(DateTime(2026, 10, 12), _now), '12 OCT-18 OCT');
+    });
+
+    test('a range that crosses a month end', () {
+      expect(formatWeekHeading(DateTime(2026, 9, 29), _now), '29 SEP-5 OCT');
     });
   });
 

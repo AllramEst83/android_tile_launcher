@@ -79,6 +79,7 @@ class LauncherSettings {
     this.haptics = true,
     this.effects = true,
     this.appIcons = true,
+    this.agendaWeekView = false,
   });
 
   final ThemeVariant theme;
@@ -101,6 +102,12 @@ class LauncherSettings {
 
   /// Each app's own icon on its home tile and its drawer row.
   final bool appIcons;
+
+  /// The agenda sheet's last-chosen tab: `false` for DAY, `true` for WEEK.
+  /// Not offered on the settings screen — it is remembered UI state, not a
+  /// deliberate preference — but it rides along in the same saved blob
+  /// rather than inventing a second store for one bool.
+  final bool agendaWeekView;
 
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
@@ -128,6 +135,7 @@ class LauncherSettings {
     bool? haptics,
     bool? effects,
     bool? appIcons,
+    bool? agendaWeekView,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -138,6 +146,7 @@ class LauncherSettings {
     haptics: haptics ?? this.haptics,
     effects: effects ?? this.effects,
     appIcons: appIcons ?? this.appIcons,
+    agendaWeekView: agendaWeekView ?? this.agendaWeekView,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -150,6 +159,7 @@ class LauncherSettings {
     'haptics': haptics,
     'effects': effects,
     'appIcons': appIcons,
+    'agendaWeekView': agendaWeekView,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -194,6 +204,9 @@ class LauncherSettings {
       appIcons: json['appIcons'] is bool
           ? json['appIcons']! as bool
           : defaults.appIcons,
+      agendaWeekView: json['agendaWeekView'] is bool
+          ? json['agendaWeekView']! as bool
+          : defaults.agendaWeekView,
     );
   }
 
@@ -208,7 +221,8 @@ class LauncherSettings {
       other.swipeUp == swipeUp &&
       other.haptics == haptics &&
       other.effects == effects &&
-      other.appIcons == appIcons;
+      other.appIcons == appIcons &&
+      other.agendaWeekView == agendaWeekView;
 
   @override
   int get hashCode => Object.hash(
@@ -221,9 +235,10 @@ class LauncherSettings {
     haptics,
     effects,
     appIcons,
+    agendaWeekView,
   );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView)';
 }

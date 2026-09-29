@@ -92,6 +92,7 @@ void main() {
             DateTime(2026, 9, 26, 13),
           ),
           'location': ' Cafe ',
+          'description': ' Bring the report ',
         },
       ],
     );
@@ -105,6 +106,7 @@ void main() {
     expect(found.single.end, DateTime(2026, 9, 26, 13));
     expect(found.single.allDay, isFalse);
     expect(found.single.location, 'Cafe');
+    expect(found.single.description, 'Bring the report');
   });
 
   test('an all-day event is a date, whatever the time zone', () async {
@@ -200,6 +202,7 @@ void main() {
           'end': _ms(DateTime(2026, 9, 26, 10)),
           'title': null,
           'location': ' ',
+          'description': ' ',
         },
       ],
     );
@@ -209,6 +212,7 @@ void main() {
     expect(found, hasLength(1));
     expect(found.single.title, '');
     expect(found.single.location, isNull);
+    expect(found.single.description, isNull);
   });
 
   test('a broken range (end before start) is made harmless', () async {

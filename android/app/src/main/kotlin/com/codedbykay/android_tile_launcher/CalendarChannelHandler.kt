@@ -18,7 +18,7 @@ import java.util.concurrent.Executors
  * provider (no library: it is one query).
  *
  * `events` takes `begin`/`end` in epoch milliseconds and replies a list of
- * `{id, title, begin, end, allDay, location}`, one per occurrence (repeating
+ * `{id, title, begin, end, allDay, location, description}`, one per occurrence (repeating
  * events are already expanded by `Instances`). Times are raw: an all-day
  * event's are UTC midnights, and turning them into local dates is the Dart
  * side's job, where it is tested. Permission is asked for in Dart first; this
@@ -88,6 +88,7 @@ class CalendarChannelHandler(
             CalendarContract.Instances.END,
             CalendarContract.Instances.ALL_DAY,
             CalendarContract.Instances.EVENT_LOCATION,
+            CalendarContract.Instances.DESCRIPTION,
         )
         // Only calendars the user has switched on, and not cancelled events.
         val selection = "${CalendarContract.Instances.VISIBLE} = 1 AND " +
@@ -106,6 +107,7 @@ class CalendarChannelHandler(
                             "end" to cursor.getLong(3),
                             "allDay" to (cursor.getInt(4) != 0),
                             "location" to cursor.getString(5),
+                            "description" to cursor.getString(6),
                         ),
                     )
                 }

@@ -1,12 +1,16 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
+import 'package:android_tile_launcher/ui/event_detail_sheet.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_agenda_repository.dart';
+import '../fakes/in_memory_local_store.dart';
 
 // Monday 28 September 2026, half past ten.
 final DateTime _now = DateTime(2026, 9, 28, 10, 30);
@@ -24,21 +28,27 @@ CalendarEvent _event(
   location: location,
 );
 
-Future<void> _open(WidgetTester tester, FakeAgendaRepository repository) async {
-  await tester.pumpWidget(
-    MaterialApp(
-      theme: tileLauncherTheme(),
-      home: Builder(
-        builder: (BuildContext context) => TextButton(
-          onPressed: () => showAgendaSheet(
-            context,
-            repository: repository,
-            clock: () => _now,
-          ),
-          child: const Text('open'),
-        ),
+Future<void> _open(
+  WidgetTester tester,
+  FakeAgendaRepository repository, {
+  SettingsState? settings,
+}) async {
+  final Widget app = MaterialApp(
+    theme: tileLauncherTheme(),
+    home: Builder(
+      builder: (BuildContext context) => TextButton(
+        onPressed: () =>
+            showAgendaSheet(context, repository: repository, clock: () => _now),
+        child: const Text('open'),
       ),
     ),
+  );
+  // Wraps the whole `MaterialApp`, not just `home`: a modal sheet's route is
+  // a sibling of `home` inside the Navigator, so a scope inside `home` would
+  // never be an ancestor of it, the same way `app.dart` wraps its own
+  // `MaterialApp` for exactly this to reach every sheet.
+  await tester.pumpWidget(
+    settings == null ? app : SettingsScope(state: settings, child: app),
   );
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
@@ -93,7 +103,107 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('TEAM LUNCH'), findsNothing);
-    expect(find.text('TODAY'), findsNothing);
+    // No week-style day-group heading bleeds through; the "TODAY" now on
+    // screen is the nav label's own, which Day view always shows.
+    expect(find.byKey(agendaNavLabelKey), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(agendaNavLabelKey)).data, 'TODAY');
+  });
+
+  testWidgets('the forward chevron steps a day, and back returns', (
+    WidgetTester tester,
+  ) async {
+    final FakeAgendaRepository repository = withEvents();
+    await _open(tester, repository);
+
+    await tester.tap(find.byKey(agendaNavForwardKey));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastFrom, DateTime(2026, 9, 29));
+    expect(repository.lastTo, DateTime(2026, 9, 30));
+    expect(tester.widget<Text>(find.byKey(agendaNavLabelKey)).data, 'TOMORROW');
+
+    await tester.tap(find.byKey(agendaNavBackKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(agendaNavBackKey));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastFrom, DateTime(2026, 9, 27));
+    expect(repository.lastTo, DateTime(2026, 9, 28));
+    expect(
+      tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+      'YESTERDAY',
+    );
+  });
+
+  testWidgets('WEEK navigation steps by seven days', (
+    WidgetTester tester,
+  ) async {
+    final FakeAgendaRepository repository = withEvents();
+    await _open(tester, repository);
+    await tester.tap(find.byKey(agendaWeekToggleKey));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(agendaNavForwardKey));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastFrom, DateTime(2026, 10, 5));
+    expect(repository.lastTo, DateTime(2026, 10, 12));
+    expect(
+      tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+      'NEXT WEEK',
+    );
+  });
+
+  testWidgets('switching tabs resets navigation back to today', (
+    WidgetTester tester,
+  ) async {
+    await _open(tester, withEvents());
+    await tester.tap(find.byKey(agendaNavForwardKey));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(agendaWeekToggleKey));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+      'THIS WEEK',
+    );
+  });
+
+  testWidgets('the chosen tab is remembered across sheets', (
+    WidgetTester tester,
+  ) async {
+    final SettingsState settings = SettingsState(store: InMemoryLocalStore());
+    await _open(tester, withEvents(), settings: settings);
+
+    await tester.tap(find.byKey(agendaWeekToggleKey));
+    await tester.pumpAndSettle();
+
+    expect(settings.settings.agendaWeekView, isTrue);
+
+    // Close this sheet and open a fresh one on the same settings.
+    Navigator.of(tester.element(find.byKey(agendaWeekToggleKey))).pop();
+    await tester.pumpAndSettle();
+    await _open(tester, withEvents(), settings: settings);
+
+    expect(find.byKey(agendaWeekToggleKey), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+      'THIS WEEK',
+    );
+  });
+
+  testWidgets('tapping an event opens its own details', (
+    WidgetTester tester,
+  ) async {
+    await _open(tester, withEvents());
+
+    await tester.tap(find.text('DENTIST'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(Messages.agendaEventTitle), findsOneWidget);
+    expect(find.byKey(eventDetailWhereKey), findsOneWidget);
+    expect(find.text('STORGATAN 1'), findsWidgets);
   });
 
   testWidgets('an empty day and an empty week say so', (

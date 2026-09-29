@@ -58,12 +58,28 @@ CalendarEvent? nextEvent(List<CalendarEvent> events) {
   return events.isEmpty ? null : events.first;
 }
 
-/// `TODAY`, `TOMORROW`, else `TUE 29 SEP`.
+/// `TODAY`, `TOMORROW`, `YESTERDAY`, else `TUE 29 SEP` — for a day the agenda
+/// sheet may have navigated to, not only today's own group heading.
 String formatDayHeading(DateTime day, DateTime now) {
   final DateTime today = startOfDay(now);
   if (day == today) return 'TODAY';
   if (day == addDays(today, 1)) return 'TOMORROW';
+  if (day == addDays(today, -1)) return 'YESTERDAY';
   return formatClockDate(day);
+}
+
+/// `THIS WEEK`, `NEXT WEEK`, `LAST WEEK`, else the rolling seven-day window's
+/// first and last day, `29 SEP-5 OCT` (the agenda's week is never far enough
+/// out to need a year). [weekStart] is the window's first day, the same one
+/// [groupByDay]'s own `from` would be given.
+String formatWeekHeading(DateTime weekStart, DateTime now) {
+  final DateTime thisWeek = startOfDay(now);
+  if (weekStart == thisWeek) return 'THIS WEEK';
+  if (weekStart == addDays(thisWeek, 7)) return 'NEXT WEEK';
+  if (weekStart == addDays(thisWeek, -7)) return 'LAST WEEK';
+  final DateTime last = addDays(weekStart, 6);
+  return '${weekStart.day} ${monthAbbreviation(weekStart.month)}'
+      '-${last.day} ${monthAbbreviation(last.month)}';
 }
 
 /// When [event] happens, for a tile line: `NOW` if under way, `14:30` today,

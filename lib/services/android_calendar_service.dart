@@ -71,6 +71,7 @@ class AndroidCalendarService implements CalendarService {
     }
     final Object? title = entry['title'];
     final Object? location = entry['location'];
+    final Object? description = entry['description'];
     return CalendarEvent(
       id: id,
       title: title is String ? title.trim() : '',
@@ -79,6 +80,9 @@ class AndroidCalendarService implements CalendarService {
       allDay: allDay,
       location: location is String && location.trim().isNotEmpty
           ? location.trim()
+          : null,
+      description: description is String && description.trim().isNotEmpty
+          ? description.trim()
           : null,
     );
   }

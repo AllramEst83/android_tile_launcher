@@ -53,6 +53,11 @@ abstract final class Messages {
   static const String agendaDay = 'DAY';
   static const String agendaWeek = 'WEEK';
   static const String agendaUntitled = '(NO TITLE)';
+  static const String agendaEventTitle = 'EVENT';
+  static const String agendaEventWhen = 'WHEN';
+  static const String agendaEventWhere = 'WHERE';
+  static const String agendaEventAbout = 'ABOUT';
+  static const String agendaEventNoDescription = 'NO DESCRIPTION.';
 
   static const String contactSearch = 'SEARCH CONTACTS...';
   static const String contactsLoading = 'LOADING...';
