@@ -9,6 +9,7 @@ import 'services/android_app_repository.dart';
 import 'services/android_calendar_service.dart';
 import 'services/android_contacts_service.dart';
 import 'services/android_device_repository.dart';
+import 'services/android_files_service.dart';
 import 'services/android_home_role_service.dart';
 import 'services/android_location_service.dart';
 import 'services/android_permission_service.dart';
@@ -94,6 +95,7 @@ Future<void> main() async {
         shade: const AndroidShadeService(),
         wallpaper: const AndroidWallpaperService(),
         icons: appRepository.icon,
+        files: AndroidFilesService(store: store),
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

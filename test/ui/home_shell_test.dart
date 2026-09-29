@@ -36,6 +36,8 @@ import 'package:android_tile_launcher/ui/contact_sheet.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/digit_pad.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
+import 'package:android_tile_launcher/ui/files_sheet.dart';
+import 'package:android_tile_launcher/ui/files_tile_view.dart';
 import 'package:android_tile_launcher/ui/home_shell.dart';
 import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
@@ -949,6 +951,26 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(calcCloseKey), findsNothing);
+    });
+
+    testWidgets('the files tile opens the file explorer', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await pumpShell(tester, FakeAppRepository(), gridState: gridState);
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.files);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.byType(FilesTileContentView)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.filesTapToChoose), findsOneWidget);
+
+      await tester.tap(find.byKey(filesCloseKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(filesCloseKey), findsNothing);
     });
 
     testWidgets('tapping the sound tile cycles normal, vibrate, silent', (

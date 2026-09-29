@@ -34,6 +34,8 @@ import 'package:android_tile_launcher/ui/calc_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
 import 'package:android_tile_launcher/ui/contact_sheet.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
+import 'package:android_tile_launcher/ui/files_sheet.dart';
+import 'package:android_tile_launcher/ui/files_tile_view.dart';
 import 'package:android_tile_launcher/ui/haptics.dart';
 import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
@@ -322,6 +324,18 @@ Widget tileContent(
           ink: tile.colour.ink,
           onTap: interactive
               ? () => unawaited(showCalcSheet(context, rates: services.rates))
+              : null,
+        ),
+      );
+    case TileKind.files:
+      // Nothing to read from outside either: it opens the file explorer, and
+      // that is all it does.
+      return Builder(
+        builder: (context) => FilesTileContentView(
+          ink: tile.colour.ink,
+          onTap: interactive
+              ? () =>
+                    unawaited(showFilesSheet(context, service: services.files))
               : null,
         ),
       );

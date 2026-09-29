@@ -232,6 +232,19 @@ abstract final class Messages {
   static String textTvPageNotBroadcast(int number) =>
       'PAGE $number IS NOT IN BROADCAST.';
 
+  static const String filesTitle = 'FILES';
+  static const String filesSubtitle = 'BROWSE STORAGE';
+  static const String filesTapToChoose = 'TAP TO CHOOSE A FOLDER';
+  static const String filesLoading = 'LOADING...';
+  static const String filesChangeFolder = 'CHANGE FOLDER';
+  static const String filesForgetFolder = 'FORGET THIS FOLDER';
+  static const String filesEmpty = 'NOTHING HERE.';
+  static const String filesBack = '< BACK';
+  static const String filesDelete = 'DELETE';
+  static String filesDeleteAsk(String name) =>
+      'DELETE "$name"? THIS CAN\'T BE UNDONE.';
+  static const String filesDeleteFailed = 'COULD NOT DELETE THAT.';
+
   // Why an expression could not be worked out: lower case, as they are said;
   // the pad shows them in capitals.
   static String exprUnexpected(String found) => "unexpected '$found'";

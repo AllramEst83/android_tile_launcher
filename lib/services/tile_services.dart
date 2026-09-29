@@ -4,6 +4,7 @@ import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
+import 'package:android_tile_launcher/services/files_service.dart';
 import 'package:android_tile_launcher/services/home_role_service.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
@@ -38,6 +39,7 @@ class TileServices {
     required this.shade,
     required this.wallpaper,
     required this.icons,
+    required this.files,
   });
 
   final SystemControlService systemControl;
@@ -65,4 +67,6 @@ class TileServices {
 
   /// Where an app's tile gets its icon from (`AppRepository.icon`).
   final AppIconLoader icons;
+
+  final FilesService files;
 }

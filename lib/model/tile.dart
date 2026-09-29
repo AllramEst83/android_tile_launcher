@@ -19,6 +19,7 @@ enum TileKind {
   alarm,
   soundMode,
   flashlight,
+  files,
 }
 
 /// The app package [tile] launches when tapped, or `null` for a tile with no
@@ -43,6 +44,7 @@ String displayNameOf(TileKind kind) => switch (kind) {
   TileKind.alarm => 'ALARM',
   TileKind.soundMode => 'SOUND',
   TileKind.flashlight => 'FLASHLIGHT',
+  TileKind.files => 'FILES',
 };
 
 /// The id of the tile for the contact with lookup [key]. Unlike a system kind

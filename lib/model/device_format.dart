@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/byte_format.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 
 /// `87%`, `87% +` while charging, `--` when unknown.
@@ -12,7 +13,7 @@ String formatBattery(DeviceStatus status) {
 String formatStorageFree(DeviceStatus status) {
   final int? free = status.storageFreeBytes;
   if (free == null) return '--';
-  return '${_formatBytes(free)} FREE';
+  return '${formatBytes(free)} FREE';
 }
 
 /// `2.1 GB FREE`, `--` when unknown — the same units and wording as
@@ -20,15 +21,5 @@ String formatStorageFree(DeviceStatus status) {
 String formatMemoryAvailable(DeviceStatus status) {
   final int? available = status.memoryAvailableBytes;
   if (available == null) return '--';
-  return '${_formatBytes(available)} FREE';
-}
-
-String _formatBytes(int bytes) {
-  const int mb = 1000 * 1000;
-  const int gb = 1000 * mb;
-  if (bytes >= gb) {
-    final double value = bytes / gb;
-    return '${value.toStringAsFixed(value >= 100 ? 0 : 1)} GB';
-  }
-  return '${(bytes / mb).round()} MB';
+  return '${formatBytes(available)} FREE';
 }
