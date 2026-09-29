@@ -1,5 +1,7 @@
 # Tile Launcher
 
+[![Codemagic build status](https://api.codemagic.io/apps/6aba5762cacdf23a36e799c8/6aba5762cacdf23a36e799c7/status_badge.svg)](https://codemagic.io/app/6aba5762cacdf23a36e799c8/6aba5762cacdf23a36e799c7/latest_build)
+
 An Android home-screen launcher made of live tiles, in a Commodore 64 look.
 
 The home screen is a scrolling mosaic you arrange yourself. Each tile shows
