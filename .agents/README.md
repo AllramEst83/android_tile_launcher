@@ -9,6 +9,7 @@ Entry points: [`../AGENTS.md`](../AGENTS.md) and [`../CLAUDE.md`](../CLAUDE.md) 
 | [architecture.md](architecture.md) | Adding a tile kind, screen, or service; deciding where code lives |
 | [android-launcher.md](android-launcher.md) | Touching the manifest, Kotlin, permissions, or app listing/launching |
 | [testing-and-quality.md](testing-and-quality.md) | Writing tests, running checks, before declaring work done |
+| [google-services-survey.md](google-services-survey.md) | Considering a Google-account-tied tile (Gmail API, Drive, Photos, …) or Health Connect |
 
 The sibling repo `../../android_terminal_launcher` is the same author's other launcher and the source of these conventions. Its solutions are worth reading before inventing one, but it is a **separate product**: nothing transfers automatically.
 
