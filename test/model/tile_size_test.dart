@@ -50,4 +50,20 @@ void main() {
     expect(TileSize.size3x1.spanIn(4), 3);
     expect(TileSize.size1x6.spanIn(4), 1);
   });
+
+  group('of', () {
+    test('finds the size matching any in-range columns x rows', () {
+      expect(TileSize.of(1, 1), TileSize.small);
+      expect(TileSize.of(4, 4), TileSize.large);
+      expect(TileSize.of(3, 5), TileSize.size3x5);
+      for (final TileSize size in TileSize.values) {
+        expect(TileSize.of(size.columns, size.rows), size);
+      }
+    });
+
+    test('an out-of-range request falls back to small, not a crash', () {
+      expect(TileSize.of(0, 0), TileSize.small);
+      expect(TileSize.of(5, 7), TileSize.small);
+    });
+  });
 }

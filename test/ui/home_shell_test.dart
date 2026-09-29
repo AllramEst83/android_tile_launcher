@@ -49,6 +49,7 @@ import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/text_tv_screen.dart';
 import 'package:android_tile_launcher/ui/text_tv_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/tile_size_grid_picker.dart';
 import 'package:android_tile_launcher/ui/tile_view.dart';
 import 'package:android_tile_launcher/ui/timer_pad.dart';
 import 'package:android_tile_launcher/ui/weather_tile_view.dart';
@@ -330,7 +331,7 @@ void main() {
 
       await tester.longPress(_onHome(find.text('CLOCK')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('2x2'));
+      await tester.tap(find.byKey(sizeGridCellKey(2, 2)));
       await tester.pump();
       await tester.tap(find.text(Messages.apply));
       await tester.pumpAndSettle();
@@ -339,23 +340,61 @@ void main() {
       expect(clock.size, TileSize.medium);
     });
 
-    testWidgets('every size option is reachable without overflowing', (
+    testWidgets(
+      'the largest size in the grid picker is reachable without overflowing',
+      (WidgetTester tester) async {
+        final GridState gridState = await pinTwo(tester);
+
+        await tester.longPress(_onHome(find.text('CLOCK')));
+        await tester.pumpAndSettle();
+        // The panel is narrow on a phone; the picker's own 4x6 grid (Phase
+        // 37, replacing 24 separate size buttons) must fit it without a
+        // RenderFlex overflow.
+        await tester.tap(find.byKey(sizeGridCellKey(4, 6)));
+        await tester.pump();
+        await tester.tap(find.text(Messages.apply));
+        await tester.pumpAndSettle();
+
+        final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
+        expect(clock.size, TileSize.size4x6);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('FLIP swaps the columns and rows of a resized tile', (
       WidgetTester tester,
     ) async {
       final GridState gridState = await pinTwo(tester);
 
       await tester.longPress(_onHome(find.text('CLOCK')));
       await tester.pumpAndSettle();
-      // The panel is narrow on a phone; eight size buttons must wrap, not
-      // overflow the row (a RenderFlex overflow would fail the test).
-      await tester.tap(find.text('3x2'));
+      await tester.tap(find.byKey(sizeGridCellKey(3, 2)));
+      await tester.pump();
+      await tester.tap(find.text(Messages.tileSizeFlip));
       await tester.pump();
       await tester.tap(find.text(Messages.apply));
       await tester.pumpAndSettle();
 
       final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
-      expect(clock.size, TileSize.broad);
-      expect(tester.takeException(), isNull);
+      expect(clock.size, TileSize.size2x3);
+    });
+
+    testWidgets('FLIP does nothing once a tile is taller than 4 rows', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = await pinTwo(tester);
+
+      await tester.longPress(_onHome(find.text('CLOCK')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(sizeGridCellKey(2, 5)));
+      await tester.pump();
+      await tester.tap(find.text(Messages.tileSizeFlip));
+      await tester.pump();
+      await tester.tap(find.text(Messages.apply));
+      await tester.pumpAndSettle();
+
+      final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
+      expect(clock.size, TileSize.size2x5);
     });
 
     testWidgets('apply commits a recolour', (WidgetTester tester) async {

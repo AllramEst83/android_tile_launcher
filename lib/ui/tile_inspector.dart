@@ -2,8 +2,9 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
-import 'package:android_tile_launcher/ui/settings_scope.dart';
+import 'package:android_tile_launcher/ui/pad_key.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:android_tile_launcher/ui/tile_size_grid_picker.dart';
 import 'package:flutter/material.dart';
 
 /// The panel below the canvas in the grid editor. The label/Apply row is
@@ -54,18 +55,45 @@ class TileInspector extends StatelessWidget {
             ),
             if (selected != null) ...<Widget>[
               const SizedBox(height: TileMetrics.gutter * 2),
-              Text(Messages.tileSize, style: text.labelSmall),
-              const SizedBox(height: TileMetrics.gutter),
-              Wrap(
-                spacing: TileMetrics.gutter,
-                runSpacing: TileMetrics.gutter,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
-                  for (final TileSize size in TileSize.values)
-                    _SizeButton(
-                      size: size,
-                      selected: size == selected.size,
-                      onTap: () => onSizeSelected(size),
+                  Text(Messages.tileSize, style: text.labelSmall),
+                  Text(
+                    '${selected.size.columns} × ${selected.size.rows}',
+                    style: text.labelSmall?.copyWith(
+                      color: TileColors.highlight,
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: TileMetrics.gutter),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  TileSizeGridPicker(
+                    size: selected.size,
+                    onSizeSelected: onSizeSelected,
+                  ),
+                  const SizedBox(width: TileMetrics.gutter),
+                  Expanded(
+                    child: PadKey(
+                      label: Messages.tileSizeFlip,
+                      height: 44,
+                      fontSize: 9,
+                      // Flipping only ever makes sense when the result still
+                      // fits `TileSize`'s own 4-column cap — a tile taller
+                      // than 4 rows has no matching width to flip into.
+                      onTap: selected.size.rows > 4
+                          ? null
+                          : () => onSizeSelected(
+                              TileSize.of(
+                                selected.size.rows,
+                                selected.size.columns,
+                              ),
+                            ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: TileMetrics.gutter * 2),
@@ -86,39 +114,6 @@ class TileInspector extends StatelessWidget {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SizeButton extends StatelessWidget {
-  const _SizeButton({
-    required this.size,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final TileSize size;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? TileColors.bezel : Colors.transparent,
-          border: Border.all(color: TileColors.bezel, width: TileMetrics.bevel),
-        ),
-        child: Text(
-          '${size.spanIn(SettingsScope.of(context).columns)}x${size.rows}',
-          style: Theme.of(context).textTheme.labelSmall
-              ?.copyWith(color: selected ? C64.black : TileColors.textBright),
         ),
       ),
     );

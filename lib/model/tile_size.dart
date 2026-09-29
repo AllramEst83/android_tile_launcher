@@ -56,4 +56,14 @@ enum TileSize {
   /// [fullWidth].
   int spanIn(int gridColumns) =>
       fullWidth ? gridColumns : (columns < gridColumns ? columns : gridColumns);
+
+  /// The size that is exactly [columns] by [rows] — every 1–4 by 1–6
+  /// combination has one, Phase 37's grid picker's whole premise, so this
+  /// never returns `null` for an in-range request. Out of range (a picker
+  /// bug, not a real tile) falls back to [small] rather than throwing, the
+  /// same never-crash-the-editor spirit as the rest of this app's UI code.
+  static TileSize of(int columns, int rows) => values.firstWhere(
+    (TileSize size) => size.columns == columns && size.rows == rows,
+    orElse: () => small,
+  );
 }

@@ -27,6 +27,7 @@ abstract final class Messages {
   static const String cancel = 'CANCEL';
   static const String apply = 'APPLY';
   static const String tileSize = 'SIZE';
+  static const String tileSizeFlip = 'FLIP';
   static const String tileColour = 'COLOUR';
 
   static const String addTile = '+ ADD TILE';
