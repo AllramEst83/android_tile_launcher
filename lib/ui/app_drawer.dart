@@ -94,32 +94,42 @@ class _AppDrawerState extends State<AppDrawer> {
             TileMetrics.margin,
             TileMetrics.gutter,
           ),
-          child: TextField(
-            controller: _searchController,
-            focusNode: widget.searchFocus,
-            onChanged: _onQueryChanged,
-            style: Theme.of(context).textTheme.bodyMedium,
-            cursorColor: TileColors.textBright,
-            decoration: InputDecoration(
-              // Roomy, not dense, and the same as the contact picker's: a thin
-              // field is hard to hit and to read.
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
-              hintText: Messages.searchApps,
-              hintStyle: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: TileColors.muted),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: TileColors.bezel),
+          // A `Row`, not `TextField.decoration.suffixIcon`: the decorator's
+          // own suffix slot crowded out the field's entered text in
+          // practice, leaving only the clear icon visible. An explicit
+          // sibling keeps the typed text and the icon each their own space,
+          // the icon always pinned to the far right.
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: widget.searchFocus,
+                  onChanged: _onQueryChanged,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  cursorColor: TileColors.textBright,
+                  decoration: InputDecoration(
+                    // Roomy, not dense, and the same as the contact picker's:
+                    // a thin field is hard to hit and to read.
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    hintText: Messages.searchApps,
+                    hintStyle: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: TileColors.muted),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: TileColors.bezel),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: TileColors.textBright),
+                    ),
+                  ),
+                ),
               ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: TileColors.textBright),
-              ),
-              suffixIcon: searching
-                  ? ClearFieldButton(
-                      key: appDrawerClearSearchKey,
-                      onTap: _clearQuery,
-                    )
-                  : null,
-            ),
+              if (searching)
+                ClearFieldButton(
+                  key: appDrawerClearSearchKey,
+                  onTap: _clearQuery,
+                ),
+            ],
           ),
         ),
         Expanded(

@@ -8,8 +8,17 @@
 /// height (1–6 rows) combination the user asked for by name in Phase 35
 /// ("1x1, 1x2, ... 2x1, 3x1, 4x1, and so on") is filled in alongside them
 /// under a systematic `sizeCxR` name, since none of them needs a word: the
-/// resize picker (`tile_inspector.dart`'s `_SizeButton`) already labels every
-/// size from its plain `columns`/`rows` numbers, not its enum name.
+/// resize picker (`ui/tile_size_grid_picker.dart`) already labels every size
+/// from its plain `columns`/`rows` numbers, not its enum name.
+///
+/// Phase 42 added a further 12: columns 5 and 6, still by 1–6 rows, once the
+/// user pointed out that a 6-column mosaic (`LauncherSettings.columnChoices`)
+/// could only ever reach its own two extra columns through `wide`/`large`
+/// stretching to fill them, never as an ordinary, non-stretched tile width —
+/// these are that. Only meaningful on a 6-column mosaic; on a 4-column one
+/// [spanIn] clamps them to 4, the same as any tile wider than the mosaic
+/// showing it, already true for these two columns before this phase existed
+/// to make a size that wide reachable in the first place.
 enum TileSize {
   small(columns: 1, rows: 1),
   flat(columns: 2, rows: 1),
@@ -35,7 +44,20 @@ enum TileSize {
   size4x1(columns: 4, rows: 1),
   size4x3(columns: 4, rows: 3),
   size4x5(columns: 4, rows: 5),
-  size4x6(columns: 4, rows: 6);
+  size4x6(columns: 4, rows: 6),
+
+  size5x1(columns: 5, rows: 1),
+  size5x2(columns: 5, rows: 2),
+  size5x3(columns: 5, rows: 3),
+  size5x4(columns: 5, rows: 4),
+  size5x5(columns: 5, rows: 5),
+  size5x6(columns: 5, rows: 6),
+  size6x1(columns: 6, rows: 1),
+  size6x2(columns: 6, rows: 2),
+  size6x3(columns: 6, rows: 3),
+  size6x4(columns: 6, rows: 4),
+  size6x5(columns: 6, rows: 5),
+  size6x6(columns: 6, rows: 6);
 
   const TileSize({
     required this.columns,
@@ -57,11 +79,12 @@ enum TileSize {
   int spanIn(int gridColumns) =>
       fullWidth ? gridColumns : (columns < gridColumns ? columns : gridColumns);
 
-  /// The size that is exactly [columns] by [rows] — every 1–4 by 1–6
-  /// combination has one, Phase 37's grid picker's whole premise, so this
-  /// never returns `null` for an in-range request. Out of range (a picker
-  /// bug, not a real tile) falls back to [small] rather than throwing, the
-  /// same never-crash-the-editor spirit as the rest of this app's UI code.
+  /// The size that is exactly [columns] by [rows] — every 1–6 by 1–6
+  /// combination has one, Phase 37's grid picker's whole premise (widened to
+  /// 6 columns in Phase 42), so this never returns `null` for an in-range
+  /// request. Out of range (a picker bug, not a real tile) falls back to
+  /// [small] rather than throwing, the same never-crash-the-editor spirit as
+  /// the rest of this app's UI code.
   static TileSize of(int columns, int rows) => values.firstWhere(
     (TileSize size) => size.columns == columns && size.rows == rows,
     orElse: () => small,

@@ -96,30 +96,43 @@ class _ContactPickerState extends State<_ContactPicker> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            TextField(
-              key: contactSearchKey,
-              controller: _searchController,
-              onChanged: (String value) => setState(() => _query = value),
-              style: text.bodyMedium,
-              cursorColor: TileColors.textBright,
-              decoration: InputDecoration(
-                // Roomy, not dense: a thin field is hard to hit and to read.
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                hintText: Messages.contactSearch,
-                hintStyle: text.bodyMedium?.copyWith(color: TileColors.muted),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: TileColors.bezel),
+            // A `Row`, not `TextField.decoration.suffixIcon`: the
+            // decorator's own suffix slot crowded out the field's entered
+            // text in practice, leaving only the clear icon visible. An
+            // explicit sibling keeps the typed text and the icon each their
+            // own space, the icon always pinned to the far right.
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    key: contactSearchKey,
+                    controller: _searchController,
+                    onChanged: (String value) => setState(() => _query = value),
+                    style: text.bodyMedium,
+                    cursorColor: TileColors.textBright,
+                    decoration: InputDecoration(
+                      // Roomy, not dense: a thin field is hard to hit and to
+                      // read.
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                      hintText: Messages.contactSearch,
+                      hintStyle: text.bodyMedium?.copyWith(
+                        color: TileColors.muted,
+                      ),
+                      enabledBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: TileColors.bezel),
+                      ),
+                      focusedBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: TileColors.textBright),
+                      ),
+                    ),
+                  ),
                 ),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: TileColors.textBright),
-                ),
-                suffixIcon: _query.isNotEmpty
-                    ? ClearFieldButton(
-                        key: contactClearSearchKey,
-                        onTap: _clearQuery,
-                      )
-                    : null,
-              ),
+                if (_query.isNotEmpty)
+                  ClearFieldButton(
+                    key: contactClearSearchKey,
+                    onTap: _clearQuery,
+                  ),
+              ],
             ),
             const SizedBox(height: TileMetrics.gutter),
             Expanded(

@@ -265,6 +265,17 @@ void main() {
 
   group('grid editor', () {
     Future<GridState> pinTwo(WidgetTester tester) async {
+      // A realistic phone-tall canvas, not the default (wider-than-tall)
+      // test surface: the inspector panel below the canvas grew genuinely
+      // taller once its size picker started filling the panel's own width
+      // (Phase 42), and a landscape-shaped surface left too little of it
+      // for the canvas above to still hold both pinned tiles on-screen at
+      // the coordinates these tests compute drag gestures against.
+      tester.view
+        ..physicalSize = const Size(400, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
       final GridState gridState = _gridState();
       await gridState.pin('pkg.clock');
       await gridState.pin('pkg.maps');
@@ -360,6 +371,48 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets('a 6-column mosaic offers a real 6-wide size, not just 4', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(400, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final GridState gridState = _gridState();
+      await gridState.pin('pkg.clock');
+      await gridState.pin('pkg.maps');
+      final SettingsState settingsState = SettingsState(
+        store: InMemoryLocalStore(),
+      );
+      await settingsState.update(const LauncherSettings(columns: 6));
+      await pumpShell(
+        tester,
+        FakeAppRepository(
+          apps: const [
+            AppInfo(label: 'Clock', packageName: 'pkg.clock'),
+            AppInfo(label: 'Maps', packageName: 'pkg.maps'),
+          ],
+        ),
+        gridState: gridState,
+        settingsState: settingsState,
+      );
+      await tester.pump();
+
+      await tester.longPress(_onHome(find.text('CLOCK')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(sizeGridCellKey(6, 1)), findsOneWidget);
+
+      await tester.tap(find.byKey(sizeGridCellKey(6, 3)));
+      await tester.pump();
+      await tester.tap(find.text(Messages.apply));
+      await tester.pumpAndSettle();
+
+      final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
+      expect(clock.size, TileSize.size6x3);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('FLIP swaps the columns and rows of a resized tile', (
       WidgetTester tester,

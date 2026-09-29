@@ -130,6 +130,24 @@ void main() {
     expect(find.text(Messages.noSearchResults), findsOneWidget);
   });
 
+  testWidgets('the typed text stays visible beside the clear key', (
+    WidgetTester tester,
+  ) async {
+    await _pump(tester);
+
+    await tester.enterText(find.byType(TextField), 'ma');
+    await tester.pump();
+
+    // Both the field's own text and the clear key, not one crowding out
+    // the other — a real bug the first version of this had (the field's
+    // `InputDecoration.suffixIcon` slot left only the icon visible).
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'ma',
+    );
+    expect(find.byKey(appDrawerClearSearchKey), findsOneWidget);
+  });
+
   testWidgets('a clear key appears only once there is something to clear', (
     WidgetTester tester,
   ) async {

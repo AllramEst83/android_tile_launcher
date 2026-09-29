@@ -13,26 +13,41 @@ Key sizeGridCellKey(int columns, int rows) =>
 /// size buttons (one per [TileSize]) with the shape itself, once that many
 /// stopped being a reasonable thing to lay out in a `Wrap`.
 ///
-/// [maxColumns]/[maxRows] are [TileSize]'s own bounds (4 and 6), not this
-/// mosaic's live column count — a tile's own footprint is capped there
-/// whatever the grid setting is, the same way it always has been.
+/// [maxColumns] is the *live* mosaic's own column count (4 or 6 —
+/// `LauncherSettings.columnChoices`), not a fixed constant: a tile picked at
+/// 6 wide only makes sense while the mosaic actually has 6 columns to put it
+/// in, the same reasoning `TileInspector` already applies by passing it in
+/// fresh from `SettingsScope` rather than this widget assuming one. [maxRows]
+/// stays fixed at [TileSize]'s own row cap (6) — nothing in Settings
+/// configures how tall a tile may be.
+///
+/// [cellSize] is normally left unset: the grid then fills whatever width its
+/// parent actually gives it (a `LayoutBuilder`, not a fixed 28px block off to
+/// one side of a much wider panel), clamped between [minCellSize] and
+/// [maxCellSize] so it neither shrinks unreadably small nor grows past a
+/// sensible size on a wide panel. A test that needs the exact pixel geometry
+/// of a tap or drag can still pin it to a known value.
 class TileSizeGridPicker extends StatefulWidget {
   const TileSizeGridPicker({
     super.key,
     required this.size,
     required this.onSizeSelected,
-    this.maxColumns = 4,
+    required this.maxColumns,
     this.maxRows = 6,
-    this.cellSize = 28,
+    this.cellSize,
     this.cellGap = 3,
+    this.minCellSize = 20,
+    this.maxCellSize = 36,
   });
 
   final TileSize size;
   final ValueChanged<TileSize> onSizeSelected;
   final int maxColumns;
   final int maxRows;
-  final double cellSize;
+  final double? cellSize;
   final double cellGap;
+  final double minCellSize;
+  final double maxCellSize;
 
   @override
   State<TileSizeGridPicker> createState() => _TileSizeGridPickerState();
@@ -43,18 +58,17 @@ class _TileSizeGridPickerState extends State<TileSizeGridPicker> {
   /// gestures, when [TileSizeGridPicker.size] is what is actually painted.
   (int, int)? _hover;
 
-  double get _step => widget.cellSize + widget.cellGap;
-
-  (int, int) _cellAt(Offset local) {
-    final int column = (local.dx / _step).floor().clamp(
+  (int, int) _cellAt(Offset local, double step) {
+    final int column = (local.dx / step).floor().clamp(
       0,
       widget.maxColumns - 1,
     );
-    final int row = (local.dy / _step).floor().clamp(0, widget.maxRows - 1);
+    final int row = (local.dy / step).floor().clamp(0, widget.maxRows - 1);
     return (column, row);
   }
 
-  void _updateHover(Offset local) => setState(() => _hover = _cellAt(local));
+  void _updateHover(Offset local, double step) =>
+      setState(() => _hover = _cellAt(local, step));
 
   void _commit() {
     final (int, int)? hover = _hover;
@@ -65,21 +79,39 @@ class _TileSizeGridPickerState extends State<TileSizeGridPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final double? fixed = widget.cellSize;
+    if (fixed != null) return _grid(fixed);
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double fromWidth =
+            (constraints.maxWidth - (widget.maxColumns - 1) * widget.cellGap) /
+            widget.maxColumns;
+        final double cell = fromWidth.clamp(
+          widget.minCellSize,
+          widget.maxCellSize,
+        );
+        return _grid(cell);
+      },
+    );
+  }
+
+  Widget _grid(double cellSize) {
+    final double step = cellSize + widget.cellGap;
     final (int, int) painted =
         _hover ?? (widget.size.columns - 1, widget.size.rows - 1);
-    final double width = widget.maxColumns * _step - widget.cellGap;
-    final double height = widget.maxRows * _step - widget.cellGap;
+    final double width = widget.maxColumns * step - widget.cellGap;
+    final double height = widget.maxRows * step - widget.cellGap;
     return GestureDetector(
       key: sizeGridPickerKey,
       behavior: HitTestBehavior.opaque,
       onPanStart: (DragStartDetails details) =>
-          _updateHover(details.localPosition),
+          _updateHover(details.localPosition, step),
       onPanUpdate: (DragUpdateDetails details) =>
-          _updateHover(details.localPosition),
+          _updateHover(details.localPosition, step),
       onPanEnd: (DragEndDetails _) => _commit(),
       onPanCancel: () => setState(() => _hover = null),
       onTapUp: (TapUpDetails details) {
-        _updateHover(details.localPosition);
+        _updateHover(details.localPosition, step);
         _commit();
       },
       child: SizedBox(
@@ -90,10 +122,10 @@ class _TileSizeGridPickerState extends State<TileSizeGridPicker> {
             for (int row = 0; row < widget.maxRows; row++)
               for (int column = 0; column < widget.maxColumns; column++)
                 Positioned(
-                  left: column * _step,
-                  top: row * _step,
-                  width: widget.cellSize,
-                  height: widget.cellSize,
+                  left: column * step,
+                  top: row * step,
+                  width: cellSize,
+                  height: cellSize,
                   child: _Cell(
                     key: sizeGridCellKey(column + 1, row + 1),
                     filled: column <= painted.$1 && row <= painted.$2,
