@@ -33,6 +33,8 @@ class AndroidDeviceRepository implements DeviceRepository {
       charging: raw['charging'] == true,
       storageFreeBytes: _int(raw['storageFreeBytes']),
       storageTotalBytes: _int(raw['storageTotalBytes']),
+      memoryAvailableBytes: _int(raw['memoryAvailableBytes']),
+      memoryTotalBytes: _int(raw['memoryTotalBytes']),
     );
   }
 

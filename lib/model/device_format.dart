@@ -15,6 +15,14 @@ String formatStorageFree(DeviceStatus status) {
   return '${_formatBytes(free)} FREE';
 }
 
+/// `2.1 GB FREE`, `--` when unknown — the same units and wording as
+/// [formatStorageFree], for the same reason: what is available right now.
+String formatMemoryAvailable(DeviceStatus status) {
+  final int? available = status.memoryAvailableBytes;
+  if (available == null) return '--';
+  return '${_formatBytes(available)} FREE';
+}
+
 String _formatBytes(int bytes) {
   const int mb = 1000 * 1000;
   const int gb = 1000 * mb;

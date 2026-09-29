@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/model/device_status.dart';
+import 'package:android_tile_launcher/ui/device_icons.dart';
 import 'package:android_tile_launcher/ui/device_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -21,7 +22,9 @@ Future<void> _pump(WidgetTester tester, DeviceStatus status, {Size? size}) =>
     );
 
 void main() {
-  testWidgets('shows battery and free storage', (WidgetTester tester) async {
+  testWidgets('shows battery, free storage and free memory', (
+    WidgetTester tester,
+  ) async {
     await _pump(
       tester,
       const DeviceStatus(
@@ -29,11 +32,17 @@ void main() {
         charging: true,
         storageFreeBytes: 42400000000,
         storageTotalBytes: 128000000000,
+        memoryAvailableBytes: 2100000000,
+        memoryTotalBytes: 6000000000,
       ),
     );
 
     expect(find.text('BATTERY  87% +'), findsOneWidget);
     expect(find.text('STORAGE  42.4 GB FREE'), findsOneWidget);
+    expect(find.text('MEMORY  2.1 GB FREE'), findsOneWidget);
+    expect(find.byType(BatteryIcon), findsOneWidget);
+    expect(find.byType(DiskIcon), findsOneWidget);
+    expect(find.byType(MemoryIcon), findsOneWidget);
   });
 
   testWidgets('shows dashes for what is unknown', (WidgetTester tester) async {
@@ -41,6 +50,7 @@ void main() {
 
     expect(find.text('BATTERY  --'), findsOneWidget);
     expect(find.text('STORAGE  --'), findsOneWidget);
+    expect(find.text('MEMORY  --'), findsOneWidget);
   });
 
   testWidgets('the battery bar is filled to the charge', (
@@ -62,6 +72,8 @@ void main() {
         batteryPercent: 100,
         storageFreeBytes: 123600000000,
         storageTotalBytes: 128000000000,
+        memoryAvailableBytes: 2100000000,
+        memoryTotalBytes: 6000000000,
       ),
       size: const Size(90, 90),
     );

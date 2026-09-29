@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/model/weather.dart';
+import 'package:android_tile_launcher/ui/pixel_icon.dart';
 import 'package:flutter/widgets.dart';
 
 /// A 12x12 pixel-block picture of the sky in one colour: a sun, a cloud, rain
@@ -17,44 +18,8 @@ class WeatherIcon extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: CustomPaint(painter: _PixelPainter(_bitmaps[kind]!, color)),
-      ),
-    );
-  }
-}
-
-class _PixelPainter extends CustomPainter {
-  const _PixelPainter(this.rows, this.color);
-
-  final List<String> rows;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double cell = size.shortestSide / _grid;
-    // No anti-aliasing: it would leave hairline seams between blocks.
-    final Paint paint = Paint()
-      ..color = color
-      ..isAntiAlias = false;
-    for (int y = 0; y < rows.length; y++) {
-      for (int x = 0; x < rows[y].length; x++) {
-        if (rows[y][x] != '#') continue;
-        canvas.drawRect(
-          Rect.fromLTWH(x * cell, y * cell, cell + 0.5, cell + 0.5),
-          paint,
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PixelPainter old) =>
-      old.rows != rows || old.color != color;
+  Widget build(BuildContext context) =>
+      PixelIcon(rows: _bitmaps[kind]!, size: size, color: color);
 }
 
 const int _grid = 12;

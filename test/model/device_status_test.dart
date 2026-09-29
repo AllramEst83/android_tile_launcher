@@ -33,6 +33,31 @@ void main() {
       );
     });
 
+    test('memory available fraction is available / total', () {
+      const status = DeviceStatus(
+        memoryAvailableBytes: 15,
+        memoryTotalBytes: 60,
+      );
+      expect(status.memoryAvailableFraction, 0.25);
+    });
+
+    test(
+      'memory available fraction is null when either side is unknown or 0',
+      () {
+        expect(
+          const DeviceStatus(memoryAvailableBytes: 5).memoryAvailableFraction,
+          isNull,
+        );
+        expect(
+          const DeviceStatus(
+            memoryAvailableBytes: 0,
+            memoryTotalBytes: 0,
+          ).memoryAvailableFraction,
+          isNull,
+        );
+      },
+    );
+
     test('equal statuses are equal', () {
       expect(
         const DeviceStatus(batteryPercent: 5, charging: true),
@@ -80,6 +105,21 @@ void main() {
 
     test('shows dashes when unknown', () {
       expect(formatStorageFree(const DeviceStatus()), '--');
+    });
+  });
+
+  group('formatMemoryAvailable', () {
+    test('the same units as storage', () {
+      expect(
+        formatMemoryAvailable(
+          const DeviceStatus(memoryAvailableBytes: 2100000000),
+        ),
+        '2.1 GB FREE',
+      );
+    });
+
+    test('shows dashes when unknown', () {
+      expect(formatMemoryAvailable(const DeviceStatus()), '--');
     });
   });
 }

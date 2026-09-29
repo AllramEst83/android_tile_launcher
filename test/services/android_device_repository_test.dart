@@ -31,6 +31,8 @@ void main() {
         'charging': true,
         'storageFreeBytes': 42400000000,
         'storageTotalBytes': 128000000000,
+        'memoryAvailableBytes': 2100000000,
+        'memoryTotalBytes': 6000000000,
       };
     });
 
@@ -44,6 +46,8 @@ void main() {
         charging: true,
         storageFreeBytes: 42400000000,
         storageTotalBytes: 128000000000,
+        memoryAvailableBytes: 2100000000,
+        memoryTotalBytes: 6000000000,
       ),
     );
   });

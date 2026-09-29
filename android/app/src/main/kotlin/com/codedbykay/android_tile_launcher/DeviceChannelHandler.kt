@@ -1,5 +1,6 @@
 package com.codedbykay.android_tile_launcher
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -11,12 +12,13 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Battery and storage for the Dart `AndroidDeviceRepository`.
+ * Battery, storage and memory for the Dart `AndroidDeviceRepository`.
  *
- * Both are cheap, permission-free reads (the battery from its sticky broadcast,
- * storage from a `StatFs` on the data partition), so they run on the calling
- * thread. Anything that can't be read is `null` in the reply rather than an
- * error; Dart shows it as dashes.
+ * All three are cheap, permission-free reads (the battery from its sticky
+ * broadcast, storage from a `StatFs` on the data partition, memory from
+ * `ActivityManager.getMemoryInfo`), so they run on the calling thread.
+ * Anything that can't be read is `null` in the reply rather than an error;
+ * Dart shows it as dashes.
  */
 class DeviceChannelHandler(
     private val context: Context,
@@ -56,6 +58,16 @@ class DeviceChannelHandler(
             // Storage could not be read; leave both null.
         }
 
+        var memAvailable: Long? = null
+        var memTotal: Long? = null
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        if (activityManager != null) {
+            val info = ActivityManager.MemoryInfo()
+            activityManager.getMemoryInfo(info)
+            memAvailable = info.availMem
+            memTotal = info.totalMem
+        }
+
         return mapOf(
             "batteryPercent" to if (level >= 0 && scale > 0) level * 100 / scale else null,
             "charging" to
@@ -63,6 +75,8 @@ class DeviceChannelHandler(
                     state == BatteryManager.BATTERY_STATUS_FULL),
             "storageFreeBytes" to free,
             "storageTotalBytes" to total,
+            "memoryAvailableBytes" to memAvailable,
+            "memoryTotalBytes" to memTotal,
         )
     }
 
