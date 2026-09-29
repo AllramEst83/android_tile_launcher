@@ -258,6 +258,8 @@ class _MailSheetState extends State<_MailSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            // So the button row is not flush against the sheet's own top edge.
+            const SizedBox(height: TileMetrics.gutter),
             Row(
               children: <Widget>[
                 if (open != null) ...<Widget>[
