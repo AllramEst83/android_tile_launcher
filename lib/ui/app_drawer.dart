@@ -4,10 +4,14 @@ import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/ui/app_icon.dart';
+import 'package:android_tile_launcher/ui/clear_field_button.dart';
 import 'package:android_tile_launcher/ui/grouped_list.dart';
 import 'package:android_tile_launcher/ui/quick_actions_sheet.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
+
+/// Keys so tests can find the parts.
+const Key appDrawerClearSearchKey = ValueKey<String>('app-drawer-clear-search');
 
 /// All Apps: every installed app, A to Z then Å Ä Ö (`GroupedList`, from
 /// `model/alpha_grouping.dart`) with a jump index down the right edge, or —
@@ -53,6 +57,11 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   void _onQueryChanged(String value) => setState(() => _query = value);
+
+  void _clearQuery() {
+    _searchController.clear();
+    setState(() => _query = '');
+  }
 
   void _openQuickActions(AppInfo app) {
     showQuickActions(
@@ -104,6 +113,12 @@ class _AppDrawerState extends State<AppDrawer> {
               focusedBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: TileColors.textBright),
               ),
+              suffixIcon: searching
+                  ? ClearFieldButton(
+                      key: appDrawerClearSearchKey,
+                      onTap: _clearQuery,
+                    )
+                  : null,
             ),
           ),
         ),

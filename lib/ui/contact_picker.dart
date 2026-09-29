@@ -8,12 +8,14 @@ import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/contacts_service.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
+import 'package:android_tile_launcher/ui/clear_field_button.dart';
 import 'package:android_tile_launcher/ui/grouped_list.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
 /// Keys so tests can find the parts.
 const Key contactSearchKey = ValueKey<String>('contact-search');
+const Key contactClearSearchKey = ValueKey<String>('contact-clear-search');
 Key contactRowKey(String key) => ValueKey<String>('contact-row-$key');
 
 /// The sheet behind "+ ADD TILE" > CONTACT: everyone in the phone book with a
@@ -70,7 +72,19 @@ class _ContactPicker extends StatefulWidget {
 
 class _ContactPickerState extends State<_ContactPicker> {
   late final Future<ContactsResult> _result = widget.contacts.all();
+  final TextEditingController _searchController = TextEditingController();
   String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _clearQuery() {
+    _searchController.clear();
+    setState(() => _query = '');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +98,7 @@ class _ContactPickerState extends State<_ContactPicker> {
           children: <Widget>[
             TextField(
               key: contactSearchKey,
+              controller: _searchController,
               onChanged: (String value) => setState(() => _query = value),
               style: text.bodyMedium,
               cursorColor: TileColors.textBright,
@@ -98,6 +113,12 @@ class _ContactPickerState extends State<_ContactPicker> {
                 focusedBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: TileColors.textBright),
                 ),
+                suffixIcon: _query.isNotEmpty
+                    ? ClearFieldButton(
+                        key: contactClearSearchKey,
+                        onTap: _clearQuery,
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: TileMetrics.gutter),

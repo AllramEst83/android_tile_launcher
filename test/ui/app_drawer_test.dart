@@ -130,6 +130,29 @@ void main() {
     expect(find.text(Messages.noSearchResults), findsOneWidget);
   });
 
+  testWidgets('a clear key appears only once there is something to clear', (
+    WidgetTester tester,
+  ) async {
+    await _pump(tester);
+    expect(find.byKey(appDrawerClearSearchKey), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'ma');
+    await tester.pump();
+    expect(find.byKey(appDrawerClearSearchKey), findsOneWidget);
+
+    await tester.tap(find.byKey(appDrawerClearSearchKey));
+    await tester.pump();
+
+    expect(find.byKey(appDrawerClearSearchKey), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      '',
+    );
+    // Back to the grouped list, not the (now empty) ranked one.
+    expect(find.text('CLOCK'), findsOneWidget);
+    expect(find.text('MAPS'), findsOneWidget);
+  });
+
   testWidgets('tapping a row launches its package', (tester) async {
     final List<String> launched = [];
     await _pump(tester, onLaunch: launched.add);

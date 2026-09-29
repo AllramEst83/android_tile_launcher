@@ -249,6 +249,27 @@ void main() {
     expect(find.text('ANNA ANDERSSON'), findsNothing);
   });
 
+  testWidgets('a clear key appears only once there is something to clear', (
+    WidgetTester tester,
+  ) async {
+    await _open(tester, FakeContactsRepository(book));
+    expect(find.byKey(contactClearSearchKey), findsNothing);
+
+    await tester.enterText(find.byKey(contactSearchKey), 'berg');
+    await tester.pump();
+    expect(find.byKey(contactClearSearchKey), findsOneWidget);
+
+    await tester.tap(find.byKey(contactClearSearchKey));
+    await tester.pump();
+
+    expect(find.byKey(contactClearSearchKey), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byKey(contactSearchKey)).controller!.text,
+      '',
+    );
+    expect(find.text('ANNA ANDERSSON'), findsOneWidget);
+  });
+
   testWidgets('a search that matches nobody says so', (
     WidgetTester tester,
   ) async {
