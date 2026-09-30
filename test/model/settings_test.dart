@@ -45,6 +45,7 @@ void main() {
         effects: false,
         appIcons: false,
         agendaWeekView: true,
+        agendaGridView: true,
       );
 
       expect(LauncherSettings.fromJson(settings.toJson()), settings);

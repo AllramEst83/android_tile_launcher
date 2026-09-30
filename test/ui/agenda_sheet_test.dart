@@ -4,6 +4,7 @@ import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/services/calendar_service.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
+import 'package:android_tile_launcher/ui/agenda_week_grid.dart';
 import 'package:android_tile_launcher/ui/event_detail_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -293,6 +294,89 @@ void main() {
 
     expect(repository.deleted, <int>[1]);
     expect(repository.betweenCalls, greaterThan(before));
+  });
+
+  group('week grid', () {
+    testWidgets('WEEK:GRID shows the week as a time grid', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, withEvents());
+
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(agendaGridKey), findsOneWidget);
+      // The list view's own day-group heading is gone; the grid draws days
+      // as columns, not headings.
+      expect(find.byKey(agendaWeekGridToggleKey), findsOneWidget);
+    });
+
+    testWidgets('an event in the grid opens its own details', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, withEvents());
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('DENTIST').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DENTIST').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.agendaEventTitle), findsOneWidget);
+      expect(find.byKey(eventDetailWhereKey), findsOneWidget);
+    });
+
+    testWidgets('the grid choice is remembered across sheets', (
+      WidgetTester tester,
+    ) async {
+      final SettingsState settings = SettingsState(store: InMemoryLocalStore());
+      await _open(tester, withEvents(), settings: settings);
+
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+
+      expect(settings.settings.agendaWeekView, isTrue);
+      expect(settings.settings.agendaGridView, isTrue);
+
+      Navigator.of(tester.element(find.byKey(agendaWeekGridToggleKey))).pop();
+      await tester.pumpAndSettle();
+      await _open(tester, withEvents(), settings: settings);
+
+      expect(find.byKey(agendaGridKey), findsOneWidget);
+    });
+
+    testWidgets('WEEK still shows the list after visiting the grid', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, withEvents());
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(agendaWeekToggleKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(agendaGridKey), findsNothing);
+      expect(find.text('TEAM LUNCH'), findsOneWidget);
+    });
+
+    testWidgets('the three-way toggle still fits a narrow phone', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(360 * 3, 780 * 3)
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await _open(tester, withEvents());
+
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(agendaGridKey), findsOneWidget);
+    });
   });
 
   testWidgets('says why when the calendar cannot be shown', (

@@ -80,6 +80,7 @@ class LauncherSettings {
     this.effects = true,
     this.appIcons = true,
     this.agendaWeekView = false,
+    this.agendaGridView = false,
   });
 
   final ThemeVariant theme;
@@ -109,6 +110,11 @@ class LauncherSettings {
   /// rather than inventing a second store for one bool.
   final bool agendaWeekView;
 
+  /// Whether the week tab last showed as the time-grid ("WEEK:GRID") rather
+  /// than the list. Meaningless while [agendaWeekView] is false; remembered
+  /// UI state the same way that is.
+  final bool agendaGridView;
+
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
 
@@ -136,6 +142,7 @@ class LauncherSettings {
     bool? effects,
     bool? appIcons,
     bool? agendaWeekView,
+    bool? agendaGridView,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -147,6 +154,7 @@ class LauncherSettings {
     effects: effects ?? this.effects,
     appIcons: appIcons ?? this.appIcons,
     agendaWeekView: agendaWeekView ?? this.agendaWeekView,
+    agendaGridView: agendaGridView ?? this.agendaGridView,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -160,6 +168,7 @@ class LauncherSettings {
     'effects': effects,
     'appIcons': appIcons,
     'agendaWeekView': agendaWeekView,
+    'agendaGridView': agendaGridView,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -207,6 +216,9 @@ class LauncherSettings {
       agendaWeekView: json['agendaWeekView'] is bool
           ? json['agendaWeekView']! as bool
           : defaults.agendaWeekView,
+      agendaGridView: json['agendaGridView'] is bool
+          ? json['agendaGridView']! as bool
+          : defaults.agendaGridView,
     );
   }
 
@@ -222,7 +234,8 @@ class LauncherSettings {
       other.haptics == haptics &&
       other.effects == effects &&
       other.appIcons == appIcons &&
-      other.agendaWeekView == agendaWeekView;
+      other.agendaWeekView == agendaWeekView &&
+      other.agendaGridView == agendaGridView;
 
   @override
   int get hashCode => Object.hash(
@@ -236,9 +249,10 @@ class LauncherSettings {
     effects,
     appIcons,
     agendaWeekView,
+    agendaGridView,
   );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView)';
 }

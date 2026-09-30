@@ -4,7 +4,9 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_format.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/services/agenda_repository.dart';
+import 'package:android_tile_launcher/ui/agenda_week_grid.dart';
 import 'package:android_tile_launcher/ui/event_detail_sheet.dart';
 import 'package:android_tile_launcher/ui/pad_key.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
@@ -14,6 +16,7 @@ import 'package:flutter/material.dart';
 /// Keys so tests can find the parts.
 const Key agendaDayToggleKey = ValueKey<String>('agenda-day');
 const Key agendaWeekToggleKey = ValueKey<String>('agenda-week');
+const Key agendaWeekGridToggleKey = ValueKey<String>('agenda-week-grid');
 const Key agendaNavBackKey = ValueKey<String>('agenda-nav-back');
 const Key agendaNavForwardKey = ValueKey<String>('agenda-nav-forward');
 const Key agendaNavLabelKey = ValueKey<String>('agenda-nav-label');
@@ -67,6 +70,10 @@ class _AgendaSheet extends StatefulWidget {
 
 class _AgendaSheetState extends State<_AgendaSheet> {
   bool _week = false;
+
+  /// Whether the week tab shows as a time grid rather than the list. Only
+  /// meaningful while [_week] is true.
+  bool _grid = false;
   bool _initialised = false;
 
   /// Steps of a day (Day view) or a week (Week view) from today; navigated
@@ -90,7 +97,9 @@ class _AgendaSheetState extends State<_AgendaSheet> {
     super.didChangeDependencies();
     if (!_initialised) {
       _initialised = true;
-      _week = SettingsScope.of(context).agendaWeekView;
+      final LauncherSettings settings = SettingsScope.of(context);
+      _week = settings.agendaWeekView;
+      _grid = settings.agendaGridView;
       _load();
     }
   }
@@ -113,14 +122,17 @@ class _AgendaSheetState extends State<_AgendaSheet> {
     });
   }
 
-  void _show({required bool week}) {
-    if (week != _week) {
-      SettingsScope.stateOf(context)
-          ?.update(SettingsScope.of(context).copyWith(agendaWeekView: week));
+  void _show({required bool week, bool grid = false}) {
+    if (week != _week || grid != _grid) {
+      SettingsScope.stateOf(context)?.update(
+        SettingsScope.of(context)
+            .copyWith(agendaWeekView: week, agendaGridView: grid),
+      );
     }
-    if (week == _week && _offset == 0) return;
+    if (week == _week && grid == _grid && _offset == 0) return;
     setState(() {
       _week = week;
+      _grid = grid;
       _offset = 0;
       _snapshot = null;
     });
@@ -159,25 +171,35 @@ class _AgendaSheetState extends State<_AgendaSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // So the DAY/WEEK toggle is not flush against the sheet's own
-            // top edge.
+            // So the title is not flush against the sheet's own top edge.
             const SizedBox(height: TileMetrics.gutter),
-            Row(
+            Text(Messages.agendaTitle, style: text.bodyMedium),
+            const SizedBox(height: TileMetrics.gutter),
+            // Its own row, under the title's: three toggles beside it would
+            // not fit a narrow phone (DAY, WEEK and WEEK:GRID together are
+            // wider than the title row has room for once the title itself
+            // is there too).
+            Wrap(
+              spacing: TileMetrics.gutter,
+              runSpacing: 4,
               children: <Widget>[
-                Text(Messages.agendaTitle, style: text.bodyMedium),
-                const Spacer(),
                 _Toggle(
                   key: agendaDayToggleKey,
                   label: Messages.agendaDay,
                   selected: !_week,
                   onTap: () => _show(week: false),
                 ),
-                const SizedBox(width: TileMetrics.gutter),
                 _Toggle(
                   key: agendaWeekToggleKey,
                   label: Messages.agendaWeek,
-                  selected: _week,
+                  selected: _week && !_grid,
                   onTap: () => _show(week: true),
+                ),
+                _Toggle(
+                  key: agendaWeekGridToggleKey,
+                  label: Messages.agendaWeekGrid,
+                  selected: _week && _grid,
+                  onTap: () => _show(week: true, grid: true),
                 ),
               ],
             ),
@@ -226,6 +248,10 @@ class _AgendaSheetState extends State<_AgendaSheet> {
             const SizedBox(height: TileMetrics.margin),
             if (snapshot == null)
               const SizedBox.shrink()
+            else if (_week && _grid)
+              // The grid wants to fill whatever room is left, not just what
+              // its own content needs (unlike the shrink-to-fit list below).
+              Expanded(child: _body(snapshot, text))
             else
               Flexible(child: _body(snapshot, text)),
           ],
@@ -237,6 +263,15 @@ class _AgendaSheetState extends State<_AgendaSheet> {
   Widget _body(AgendaSnapshot snapshot, TextTheme text) {
     switch (snapshot) {
       case AgendaReady(:final List<CalendarEvent> events):
+        if (_week && _grid) {
+          return AgendaWeekGrid(
+            events: events,
+            weekStart: _rangeStart,
+            now: _now,
+            repository: widget.repository,
+            onChanged: _load,
+          );
+        }
         final DateTime start = _rangeStart;
         final List<AgendaDay> days = groupByDay(
           events,
