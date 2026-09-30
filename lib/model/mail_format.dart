@@ -129,11 +129,33 @@ bool looksLikeHtml(String text) {
   ).hasMatch(sample);
 }
 
-/// [html] with every `<img>` tag removed. Pictures are counted, never shown
-/// ([MailBody.attachments]); an `<img>` left in a rich view would fetch a
-/// remote file behind the scenes just to render the message.
+/// [html] with every `<img>` tag removed, for the default view: an `<img>`
+/// left in would fetch a remote file (or reveal an inline one) behind the
+/// scenes just to render the message. SHOW IMAGES shows
+/// [MailBody.htmlWithImages] instead.
 String stripImagesFromHtml(String html) =>
     html.replaceAll(RegExp(r'<img\b[^>]*>', caseSensitive: false), '');
+
+/// [html] with every `cid:xxx` image source in [dataUriByCid] (keyed by the
+/// content id, lower-cased, angle brackets stripped) replaced by its data
+/// URI; a `cid:` this message never attached, and every remote
+/// `http(s)://` image, is left exactly as the sender wrote it — a remote one
+/// is fetched by whatever renders the html, once SHOW IMAGES is tapped.
+String resolveCidImages(String html, Map<String, String> dataUriByCid) {
+  if (dataUriByCid.isEmpty) return html;
+  return html.replaceAllMapped(RegExp('''cid:([^"'\\s>]+)'''), (Match m) {
+    final String id = m.group(1)!.toLowerCase();
+    return dataUriByCid[id] ?? m.group(0)!;
+  });
+}
+
+/// A file size for a person to read: bytes under a kilobyte as-is, otherwise
+/// KB or MB to one decimal place.
+String formatAttachmentSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
 
 /// The readable text of an HTML message: what is between the tags, with
 /// paragraphs, line breaks, list items and table rows kept as lines, and

@@ -13,6 +13,7 @@ import 'package:android_tile_launcher/services/agenda_tile_source.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/alarm_tile_source.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/services/bluetooth_service.dart';
 import 'package:android_tile_launcher/services/bluetooth_tile_source.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
@@ -295,7 +296,13 @@ Widget tileContent(
             ink: tile.colour.ink,
             onTap: interactive
                 ? () => unawaited(
-                    _mailTap(context, mail, mailContent.result, refreshNow),
+                    _mailTap(
+                      context,
+                      mail,
+                      mailContent.result,
+                      refreshNow,
+                      attachmentDownload: services.attachmentDownload,
+                    ),
                   )
                 : null,
           );
@@ -499,13 +506,18 @@ Future<void> _mailTap(
   BuildContext context,
   MailService mail,
   MailResult result,
-  VoidCallback refreshNow,
-) async {
+  VoidCallback refreshNow, {
+  required AttachmentDownloadService attachmentDownload,
+}) async {
   switch (result) {
     case MailNotSetUp():
       await showMailSetupSheet(context, mail: mail);
     case MailMessages():
-      await showMailSheet(context, mail: mail);
+      await showMailSheet(
+        context,
+        mail: mail,
+        attachmentDownload: attachmentDownload,
+      );
     case MailUnavailable():
       // A saved account that cannot be read (its key is gone) never will be:
       // set it up again. Anything else is worth another try.

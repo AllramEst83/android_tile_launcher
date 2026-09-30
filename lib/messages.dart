@@ -142,7 +142,12 @@ abstract final class Messages {
   static const String mailCutOff =
       '... CUT SHORT. OPEN IT IN YOUR MAIL APP FOR THE REST.';
   static String mailAttachments(int n) =>
-      '$n ${n == 1 ? 'ATTACHMENT' : 'ATTACHMENTS'} NOT SHOWN.';
+      '$n ${n == 1 ? 'ATTACHMENT' : 'ATTACHMENTS'}';
+  static const String mailDownload = 'DOWNLOAD';
+  static const String mailDownloading = 'SAVING...';
+  static const String mailDownloaded = 'SAVED TO DOWNLOADS.';
+  static const String mailDownloadFailed = 'COULD NOT SAVE IT.';
+  static const String mailShowImages = 'SHOW IMAGES';
   static const String mailTrashAsk = 'MOVE TO TRASH?';
   static const String mailYes = 'YES';
   static const String mailNo = 'NO';

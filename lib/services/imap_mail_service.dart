@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
@@ -9,6 +11,7 @@ import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:enough_mail/enough_mail.dart'
     show
         ContentDisposition,
+        ContentInfo,
         ImapClient,
         ImapException,
         MailAddress,
@@ -524,10 +527,15 @@ MailBody mailBodyFrom(
 }) {
   String raw = '';
   String? html;
+  String? htmlWithImages;
   try {
     final String? plainPart = message.decodeTextPlainPart();
     final String? htmlPart = message.decodeTextHtmlPart();
+    // The unstripped markup SHOW IMAGES is built from, whichever part it
+    // came from below.
+    String? richSource;
     if (htmlPart != null && htmlPart.trim().isNotEmpty) {
+      richSource = htmlPart;
       html = stripImagesFromHtml(htmlPart).trim();
     }
     if (plainPart != null &&
@@ -538,20 +546,21 @@ MailBody mailBodyFrom(
       raw = plainTextFromHtml(htmlPart);
     } else if (plainPart != null && plainPart.trim().isNotEmpty) {
       // The "plain" part is itself markup (a sloppy sender): show it rich too.
+      richSource = plainPart;
       html = stripImagesFromHtml(plainPart).trim();
       raw = plainTextFromHtml(plainPart);
+    }
+    if (richSource != null &&
+        RegExp(r'<img\b', caseSensitive: false).hasMatch(richSource)) {
+      htmlWithImages = resolveCidImages(
+        richSource,
+        _inlineImageDataUris(message),
+      ).trim();
     }
   } on Object {
     raw = '';
     html = null;
-  }
-  var attachments = 0;
-  try {
-    attachments = message
-        .findContentInfo(disposition: ContentDisposition.attachment)
-        .length;
-  } on Object {
-    attachments = 0;
+    htmlWithImages = null;
   }
   final tidy = tidyMailText(raw);
   return MailBody(
@@ -564,8 +573,75 @@ MailBody mailBodyFrom(
     date: entry.date,
     text: tidy.text,
     html: html,
+    htmlWithImages: htmlWithImages,
     truncated: tidy.truncated,
-    attachments: attachments,
+    attachments: _attachmentsFrom(message),
     markedRead: markedRead,
   );
+}
+
+/// A `cid` (lower-cased, angle brackets stripped) to a `data:` URI, for every
+/// inline part of [message] that has one and decodes to real bytes. Never
+/// throws: a part that fails to decode is left out, not fatal to the rest.
+Map<String, String> _inlineImageDataUris(MimeMessage message) {
+  final Map<String, String> result = <String, String>{};
+  try {
+    for (final ContentInfo info in message.findContentInfo(
+      disposition: ContentDisposition.inline,
+    )) {
+      final String id = (info.cid ?? '').replaceAll(RegExp('[<>]'), '');
+      if (id.isEmpty) continue;
+      try {
+        final Uint8List? bytes = message
+            .getPart(info.fetchId)
+            ?.decodeContentBinary();
+        if (bytes == null || bytes.isEmpty) continue;
+        final String mimeType =
+            info.mediaType?.text ?? 'application/octet-stream';
+        result[id] = 'data:$mimeType;base64,${base64Encode(bytes)}';
+      } on Object {
+        continue;
+      }
+    }
+  } on Object {
+    // Nothing usable; the html shown just has no images left to reveal.
+  }
+  return result;
+}
+
+/// [message]'s attachments, whole, in the order the server gave them. Never
+/// throws: an attachment that fails to decode is left out, not fatal to the
+/// rest of the message.
+List<MailAttachment> _attachmentsFrom(MimeMessage message) {
+  final List<MailAttachment> result = <MailAttachment>[];
+  try {
+    final List<ContentInfo> infos = message.findContentInfo(
+      disposition: ContentDisposition.attachment,
+    );
+    for (var i = 0; i < infos.length; i++) {
+      try {
+        final ContentInfo info = infos[i];
+        final Uint8List? bytes = message
+            .getPart(info.fetchId)
+            ?.decodeContentBinary();
+        if (bytes == null) continue;
+        final String? fileName = info.fileName?.trim();
+        result.add(
+          MailAttachment(
+            name: fileName != null && fileName.isNotEmpty
+                ? fileName
+                : 'attachment-${i + 1}',
+            sizeBytes: bytes.length,
+            mimeType: info.mediaType?.text ?? 'application/octet-stream',
+            bytes: bytes,
+          ),
+        );
+      } on Object {
+        continue;
+      }
+    }
+  } on Object {
+    // No attachments usable; an empty list is a perfectly good answer.
+  }
+  return result;
 }

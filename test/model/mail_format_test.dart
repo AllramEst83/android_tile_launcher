@@ -205,6 +205,53 @@ void main() {
     });
   });
 
+  group('resolveCidImages', () {
+    test('replaces a cid reference with its data URI', () {
+      expect(
+        resolveCidImages('<p>Hi</p><img src="cid:abc123">', <String, String>{
+          'abc123': 'data:image/png;base64,xyz',
+        }),
+        '<p>Hi</p><img src="data:image/png;base64,xyz">',
+      );
+    });
+
+    test('matches the cid case-insensitively', () {
+      expect(
+        resolveCidImages('<img src="cid:ABC123">', <String, String>{
+          'abc123': 'data:image/png;base64,xyz',
+        }),
+        '<img src="data:image/png;base64,xyz">',
+      );
+    });
+
+    test('a cid not in the map is left as-is, and so is a remote image', () {
+      const String html =
+          '<img src="cid:unknown"><img src="http://example.com/x.png">';
+      expect(resolveCidImages(html, <String, String>{}), html);
+    });
+
+    test('an empty map changes nothing', () {
+      const String html = '<img src="cid:abc123">';
+      expect(resolveCidImages(html, <String, String>{}), html);
+    });
+  });
+
+  group('formatAttachmentSize', () {
+    test('bytes under a kilobyte are shown as-is', () {
+      expect(formatAttachmentSize(0), '0 B');
+      expect(formatAttachmentSize(512), '512 B');
+    });
+
+    test('kilobytes to one decimal place', () {
+      expect(formatAttachmentSize(2048), '2.0 KB');
+      expect(formatAttachmentSize(1536), '1.5 KB');
+    });
+
+    test('megabytes to one decimal place', () {
+      expect(formatAttachmentSize(1024 * 1024 * 3), '3.0 MB');
+    });
+  });
+
   group('parseAddressList', () {
     test('splits on comma, semicolon or newline, trimmed', () {
       expect(parseAddressList('a@b.com, c@d.com;  e@f.com\ng@h.com'), <String>[

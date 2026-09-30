@@ -4,6 +4,7 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -38,6 +39,8 @@ const Key mailBulkReadKey = ValueKey<String>('mail-bulk-read');
 const Key mailBulkUnreadKey = ValueKey<String>('mail-bulk-unread');
 const Key mailBulkYesKey = ValueKey<String>('mail-bulk-yes');
 const Key mailBulkNoKey = ValueKey<String>('mail-bulk-no');
+const Key mailShowImagesKey = ValueKey<String>('mail-show-images');
+Key mailDownloadKey(String name) => ValueKey<String>('mail-download-$name');
 
 /// `RE: <subject>`, unless [subject] already reads as a reply.
 String _replySubject(String subject) {
@@ -82,6 +85,7 @@ DateTime _systemNow() => DateTime.now();
 Future<void> showMailSheet(
   BuildContext context, {
   required MailService mail,
+  required AttachmentDownloadService attachmentDownload,
   DateTime Function() clock = _systemNow,
 }) {
   return showModalBottomSheet<void>(
@@ -97,16 +101,25 @@ Future<void> showMailSheet(
           media.size.height * 0.85,
           media.size.height - media.padding.top - TileMetrics.margin,
         ),
-        child: _MailSheet(mail: mail, clock: clock),
+        child: _MailSheet(
+          mail: mail,
+          attachmentDownload: attachmentDownload,
+          clock: clock,
+        ),
       );
     },
   );
 }
 
 class _MailSheet extends StatefulWidget {
-  const _MailSheet({required this.mail, required this.clock});
+  const _MailSheet({
+    required this.mail,
+    required this.attachmentDownload,
+    required this.clock,
+  });
 
   final MailService mail;
+  final AttachmentDownloadService attachmentDownload;
   final DateTime Function() clock;
 
   @override
@@ -124,6 +137,11 @@ class _MailSheetState extends State<_MailSheet> {
   bool _reading = false;
   MailBody? _opened;
   String? _readError;
+
+  /// Whether the open message's pictures are revealed (SHOW IMAGES), and
+  /// which attachment names are mid-save.
+  bool _showImages = false;
+  final Set<String> _downloading = <String>{};
 
   int? _confirmingTrash;
   bool _confirmingForget = false;
@@ -196,6 +214,8 @@ class _MailSheetState extends State<_MailSheet> {
       _reading = true;
       _confirmingTrash = null;
       _status = null;
+      _showImages = false;
+      _downloading.clear();
     });
     final MailReadResult result = await widget.mail.read(
       m.uid,
@@ -230,6 +250,8 @@ class _MailSheetState extends State<_MailSheet> {
     _readError = null;
     _confirmingTrash = null;
     _status = null;
+    _showImages = false;
+    _downloading.clear();
   });
 
   /// Flips the open message between read and unread.
@@ -357,6 +379,30 @@ class _MailSheetState extends State<_MailSheet> {
     await widget.mail.forget();
     if (!mounted) return;
     Navigator.pop(context);
+  }
+
+  void _revealImages() => setState(() => _showImages = true);
+
+  /// Saves [attachment] to the phone's Downloads folder.
+  Future<void> _download(MailAttachment attachment) async {
+    setState(() {
+      _downloading.add(attachment.name);
+      _status = null;
+    });
+    final AttachmentSaveResult result = await widget.attachmentDownload.save(
+      attachment.bytes,
+      fileName: attachment.name,
+      mimeType: attachment.mimeType,
+    );
+    if (!mounted) return;
+    setState(() {
+      _downloading.remove(attachment.name);
+      _status = switch (result) {
+        AttachmentSaveResult.saved => Messages.mailDownloaded,
+        AttachmentSaveResult.refused || AttachmentSaveResult.failed =>
+          '${Messages.failedPrefix}${Messages.mailDownloadFailed}',
+      };
+    });
   }
 
   Future<void> _compose() => showComposeSheet(context, mail: widget.mail);
@@ -721,14 +767,33 @@ class _MailSheetState extends State<_MailSheet> {
           const SizedBox(height: 8),
           Container(height: 2, color: TileColors.bezel),
           const SizedBox(height: TileMetrics.gutter),
+          if (body.htmlWithImages != null && !_showImages) ...<Widget>[
+            _Button(
+              key: mailShowImagesKey,
+              label: Messages.mailShowImages,
+              onTap: _revealImages,
+            ),
+            const SizedBox(height: TileMetrics.gutter),
+          ],
           _bodyContent(body, text),
           if (body.truncated) ...<Widget>[
             const SizedBox(height: 8),
             Text(Messages.mailCutOff, style: label),
           ],
-          if (body.attachments > 0) ...<Widget>[
+          if (body.attachments.isNotEmpty) ...<Widget>[
+            const SizedBox(height: TileMetrics.gutter),
+            Container(height: 2, color: TileColors.bezel),
             const SizedBox(height: 8),
-            Text(Messages.mailAttachments(body.attachments), style: label),
+            Text(
+              Messages.mailAttachments(body.attachments.length),
+              style: label,
+            ),
+            for (final MailAttachment attachment in body.attachments)
+              _AttachmentRow(
+                attachment: attachment,
+                saving: _downloading.contains(attachment.name),
+                onDownload: _busy ? null : () => _download(attachment),
+              ),
           ],
         ],
       ),
@@ -736,9 +801,11 @@ class _MailSheetState extends State<_MailSheet> {
   }
 
   /// The whole message: rendered rich when it has real markup ([MailBody.html]),
-  /// else its plain text as-is.
+  /// else its plain text as-is. SHOW IMAGES swaps in [MailBody.htmlWithImages].
   Widget _bodyContent(MailBody body, TextTheme text) {
-    final String? html = body.html;
+    final String? html = _showImages
+        ? body.htmlWithImages ?? body.html
+        : body.html;
     if (html != null && html.trim().isNotEmpty) {
       return HtmlWidget(
         html,
@@ -1012,6 +1079,60 @@ class _AddressChipRow extends StatelessWidget {
             onTap: onTap == null ? null : () => onTap!(p.address),
           ),
       ],
+    );
+  }
+}
+
+/// One attachment: its name and size, with its own DOWNLOAD button.
+class _AttachmentRow extends StatelessWidget {
+  const _AttachmentRow({
+    required this.attachment,
+    required this.saving,
+    required this.onDownload,
+  });
+
+  final MailAttachment attachment;
+  final bool saving;
+  final VoidCallback? onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  attachment.name.toUpperCase(),
+                  style: text.bodySmall?.copyWith(
+                    fontSize: 12,
+                    color: TileColors.textBright,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  formatAttachmentSize(attachment.sizeBytes),
+                  style: text.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: TileColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _Button(
+            key: mailDownloadKey(attachment.name),
+            label: saving ? Messages.mailDownloading : Messages.mailDownload,
+            onTap: saving ? null : onDownload,
+          ),
+        ],
+      ),
     );
   }
 }

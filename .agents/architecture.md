@@ -89,6 +89,8 @@ lib/
     imap_mail_service.dart   # ImapMailService on enough_mail (the only file that knows it): envelope-only listing, move to Trash, never a delete
     cached_mail_service.dart # CachedMailService: reuses a good inbox listing for 3 min; setUp / forget / moveToTrash drop it
     mail_tile_source.dart    # MailTileSource: the newest ten + the moment they were read
+    attachment_download_service.dart  # abstract: save(bytes, fileName, mimeType) -> AttachmentSaveResult (saved / refused / failed); never throws
+    android_attachment_download_service.dart  # MethodChannel implementation (AttachmentChannelHandler.kt)
     contacts_service.dart    # abstract read-only: all() -> ContactsRead / ContactsNoAccess / ContactsDenied / ContactsUnavailable
     android_contacts_service.dart  # MethodChannel implementation: rows grouped per lookup key, same number written two ways merged
     contacts_repository.dart # abstract: all() — asks for READ_CONTACTS itself when there is no access (only called from a tap)
@@ -159,6 +161,7 @@ android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   PermissionsChannelHandler.kt  # runtime permission requests; MainActivity forwards onRequestPermissionsResult
   DeviceChannelHandler.kt    # battery (sticky broadcast) and storage (StatFs); no permissions
   SystemControlChannelHandler.kt  # ringer mode, torch
+  AttachmentChannelHandler.kt  # saves a mail attachment's bytes to MediaStore.Downloads (API 29+); no permission needed
 test/  # mirrors lib/; fakes/ holds FakeAppRepository
 ```
 

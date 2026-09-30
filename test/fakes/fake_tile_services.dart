@@ -1,6 +1,7 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/services/bluetooth_service.dart';
 import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
@@ -21,6 +22,7 @@ import 'package:android_tile_launcher/services/whatsapp_service.dart';
 
 import 'fake_agenda_repository.dart';
 import 'fake_alarm_service.dart';
+import 'fake_attachment_download_service.dart';
 import 'fake_bluetooth_service.dart';
 import 'fake_clipboard_service.dart';
 import 'fake_contacts.dart';
@@ -57,6 +59,7 @@ TileServices fakeTileServices({
   AppIconLoader? icons,
   FilesService? files,
   BluetoothService? bluetooth,
+  AttachmentDownloadService? attachmentDownload,
 }) => TileServices(
   systemControl: systemControl ?? FakeSystemControlService(),
   device: device ?? FakeDeviceRepository(),
@@ -77,4 +80,5 @@ TileServices fakeTileServices({
   icons: icons ?? (String _) async => null,
   files: files ?? FakeFilesService(),
   bluetooth: bluetooth ?? FakeBluetoothService(),
+  attachmentDownload: attachmentDownload ?? FakeAttachmentDownloadService(),
 );

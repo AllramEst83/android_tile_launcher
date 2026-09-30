@@ -469,7 +469,7 @@ void main() {
       expect(opened.body.date, DateTime.utc(2026, 9, 25, 10).toLocal());
       expect(opened.body.text, 'Hi!\n\nShall we meet at noon?\n\n/Anna');
       expect(opened.body.truncated, isFalse);
-      expect(opened.body.attachments, 0);
+      expect(opened.body.attachments, isEmpty);
     });
 
     test('reads To and Cc from the message headers', () async {
@@ -608,6 +608,52 @@ void main() {
       expect(opened.body.html, '<p>Rich <b>news</b></p>');
     });
 
+    test('an inline image is resolved to a data URI for SHOW IMAGES', () async {
+      await boot([
+        FakeImapMessage(
+          uid: 15,
+          subject: '"Photo"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          raw:
+              'From: a@example.com\r\nTo: kay@example.com\r\nSubject: Photo\r\n'
+              'Date: Fri, 25 Sep 2026 10:00:00 +0000\r\nMIME-Version: 1.0\r\n'
+              'Content-Type: multipart/related; boundary="m1"\r\n\r\n'
+              '--m1\r\nContent-Type: text/html; charset=utf-8\r\n\r\n'
+              '<p>Look</p><img src="cid:img1">\r\n'
+              '--m1\r\nContent-Type: image/png\r\nContent-ID: <img1>\r\n'
+              'Content-Disposition: inline\r\n'
+              'Content-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n'
+              '--m1--\r\n',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(15) as MailOpened;
+
+      expect(opened.body.html, '<p>Look</p>');
+      expect(opened.body.htmlWithImages, startsWith('<p>Look</p><img src='));
+      expect(opened.body.htmlWithImages, contains('data:image/png;base64,'));
+      expect(opened.body.htmlWithImages, isNot(contains('cid:')));
+    });
+
+    test('html with no img tag at all has nothing for SHOW IMAGES', () async {
+      await boot([
+        FakeImapMessage(
+          uid: 16,
+          subject: '"No pictures"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          html: '<p>No pictures here</p>',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(16) as MailOpened;
+
+      expect(opened.body.htmlWithImages, isNull);
+    });
+
     test('a "plain" part that is really markup is shown rich too', () async {
       await boot(const [
         FakeImapMessage(
@@ -644,7 +690,7 @@ void main() {
       expect(opened.body.text, 'Just a normal note.');
     });
 
-    test('counts attachments without showing them', () async {
+    test('reads attachments whole, name, size and bytes', () async {
       await boot([
         FakeImapMessage(
           uid: 9,
@@ -670,7 +716,16 @@ void main() {
       final opened = await mail.read(9) as MailOpened;
 
       expect(opened.body.text, 'See attached.');
-      expect(opened.body.attachments, 2);
+      expect(opened.body.attachments, hasLength(2));
+      final png = opened.body.attachments[0];
+      expect(png.name, 'a.png');
+      expect(png.mimeType, 'image/png');
+      expect(png.bytes, isNotEmpty);
+      expect(png.sizeBytes, png.bytes.length);
+      final pdf = opened.body.attachments[1];
+      expect(pdf.name, 'b.pdf');
+      expect(pdf.mimeType, 'application/pdf');
+      expect(pdf.bytes, isNotEmpty);
     });
 
     test('cuts a very long message', () async {

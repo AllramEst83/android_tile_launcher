@@ -1,13 +1,17 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 
+import '../fakes/fake_attachment_download_service.dart';
 import '../fakes/fake_mail_service.dart';
 
 // Monday 28 September 2026, half past ten.
@@ -52,8 +56,10 @@ MailOpened _opened(
   List<MailParticipant> cc = const <MailParticipant>[],
   String text = 'Hello, this is the whole message.',
   String? html,
+  String? htmlWithImages,
   bool truncated = false,
   int attachments = 0,
+  List<MailAttachment>? attachmentList,
   bool markedRead = true,
   DateTime? date,
 }) => MailOpened(
@@ -66,8 +72,19 @@ MailOpened _opened(
     subject: subject,
     text: text,
     html: html,
+    htmlWithImages: htmlWithImages,
     truncated: truncated,
-    attachments: attachments,
+    attachments:
+        attachmentList ??
+        List<MailAttachment>.generate(
+          attachments,
+          (int i) => MailAttachment(
+            name: 'file-${i + 1}.bin',
+            sizeBytes: 1024,
+            mimeType: 'application/octet-stream',
+            bytes: Uint8List(0),
+          ),
+        ),
     markedRead: markedRead,
     date: date,
   ),
@@ -97,14 +114,23 @@ Future<void> _read(WidgetTester tester, int uid) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _open(WidgetTester tester, FakeMailService mail) async {
+Future<void> _open(
+  WidgetTester tester,
+  FakeMailService mail, {
+  FakeAttachmentDownloadService? attachmentDownload,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: tileLauncherTheme(),
       home: Builder(
         builder: (BuildContext context) => TextButton(
-          onPressed: () =>
-              showMailSheet(context, mail: mail, clock: () => _now),
+          onPressed: () => showMailSheet(
+            context,
+            mail: mail,
+            attachmentDownload:
+                attachmentDownload ?? FakeAttachmentDownloadService(),
+            clock: () => _now,
+          ),
           child: const Text('open'),
         ),
       ),
@@ -271,7 +297,7 @@ void main() {
 
       await _read(tester, 11);
 
-      expect(find.text('1 ATTACHMENT NOT SHOWN.'), findsOneWidget);
+      expect(find.text('1 ATTACHMENT'), findsOneWidget);
     });
 
     testWidgets('a long message scrolls', (WidgetTester tester) async {
@@ -1097,6 +1123,124 @@ void main() {
 
       expect(find.byKey(mailBodyKey), findsOneWidget);
       expect(tester.widget(find.byKey(mailBodyKey)), isA<SelectableText>());
+    });
+  });
+
+  group('attachments and images', () {
+    testWidgets('lists each attachment with its size, and downloads it', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      final Uint8List bytes = Uint8List.fromList(List<int>.filled(2048, 1));
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        attachmentList: <MailAttachment>[
+          MailAttachment(
+            name: 'menu.pdf',
+            sizeBytes: bytes.length,
+            mimeType: 'application/pdf',
+            bytes: bytes,
+          ),
+        ],
+      );
+      final FakeAttachmentDownloadService downloads =
+          FakeAttachmentDownloadService();
+      await _open(tester, mail, attachmentDownload: downloads);
+      await _read(tester, 12);
+
+      expect(find.text('1 ATTACHMENT'), findsOneWidget);
+      expect(find.text('MENU.PDF'), findsOneWidget);
+      expect(find.text('2.0 KB'), findsOneWidget);
+
+      await tester.tap(find.byKey(mailDownloadKey('menu.pdf')));
+      await tester.pumpAndSettle();
+
+      expect(downloads.saves, <(int, String, String)>[
+        (2048, 'menu.pdf', 'application/pdf'),
+      ]);
+      expect(find.text(Messages.mailDownloaded), findsOneWidget);
+    });
+
+    testWidgets('a failed download says so', (WidgetTester tester) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        attachmentList: <MailAttachment>[
+          MailAttachment(
+            name: 'menu.pdf',
+            sizeBytes: 10,
+            mimeType: 'application/pdf',
+            bytes: Uint8List(10),
+          ),
+        ],
+      );
+      await _open(
+        tester,
+        mail,
+        attachmentDownload: FakeAttachmentDownloadService(
+          AttachmentSaveResult.failed,
+        ),
+      );
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailDownloadKey('menu.pdf')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('${Messages.failedPrefix}${Messages.mailDownloadFailed}'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('SHOW IMAGES reveals pictures, hidden until then', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        html: '<p>See the menu</p>',
+        htmlWithImages:
+            '<p>See the menu</p><img src="data:image/png;base64,x">',
+      );
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      expect(find.byKey(mailShowImagesKey), findsOneWidget);
+      final HtmlWidget before = tester.widget(find.byKey(mailBodyKey));
+      expect(before.html, '<p>See the menu</p>');
+
+      await tester.tap(find.byKey(mailShowImagesKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailShowImagesKey), findsNothing);
+      final HtmlWidget after = tester.widget(find.byKey(mailBodyKey));
+      expect(
+        after.html,
+        '<p>See the menu</p><img src="data:image/png;base64,x">',
+      );
+    });
+
+    testWidgets('no pictures to reveal: no SHOW IMAGES button', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        html: '<p>No pictures here</p>',
+      );
+      await _open(tester, mail);
+
+      await _read(tester, 12);
+
+      expect(find.byKey(mailShowImagesKey), findsNothing);
     });
   });
 

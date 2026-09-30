@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// One message in the inbox, as far as a list needs it: no body.
 class MailMessage {
   const MailMessage({
@@ -117,9 +119,30 @@ class MailParticipant {
   String get label => name.isNotEmpty ? name : address;
 }
 
+/// One file attached to a message, held whole: this launcher fetches a
+/// message's full body to read it at all, so the bytes are already at hand
+/// once the reader is open — a DOWNLOAD button costs no extra trip to the
+/// server.
+class MailAttachment {
+  const MailAttachment({
+    required this.name,
+    required this.sizeBytes,
+    required this.mimeType,
+    required this.bytes,
+  });
+
+  /// Never empty: an attachment with no name from the sender is given one.
+  final String name;
+  final int sizeBytes;
+
+  /// What to save it as, e.g. `image/png`; `application/octet-stream` when
+  /// the message did not say.
+  final String mimeType;
+  final Uint8List bytes;
+}
+
 /// One message in full, as far as this launcher shows one: who, when, what,
 /// and its text (plain text, or the readable part of an HTML-only message).
-/// Attachments and pictures are counted, never downloaded to the screen.
 class MailBody {
   const MailBody({
     required this.uid,
@@ -130,9 +153,10 @@ class MailBody {
     required this.subject,
     required this.text,
     this.html,
+    this.htmlWithImages,
     this.date,
     this.truncated = false,
-    this.attachments = 0,
+    this.attachments = const <MailAttachment>[],
     this.markedRead = true,
   });
 
@@ -161,11 +185,17 @@ class MailBody {
   /// the message was plain text to begin with (then [text] is shown as-is).
   final String? html;
 
+  /// [html] with its pictures put back — inline ones as data URIs, remote
+  /// ones left as the `<img>` tag the sender wrote — for SHOW IMAGES. Null
+  /// when [html] is null or had no pictures to begin with (then there is
+  /// nothing for the button to reveal).
+  final String? htmlWithImages;
+
   /// Whether [text] was cut short because the message is very long.
   final bool truncated;
 
-  /// How many attachments the message carries.
-  final int attachments;
+  /// The message's attachments, whole (see [MailAttachment]).
+  final List<MailAttachment> attachments;
 
   /// Whether opening it marked it read on the server (it should; when that one
   /// step failed the message is still shown, and this is false).

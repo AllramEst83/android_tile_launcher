@@ -1,6 +1,7 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/services/bluetooth_service.dart';
 import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
@@ -42,6 +43,7 @@ class TileServices {
     required this.icons,
     required this.files,
     required this.bluetooth,
+    required this.attachmentDownload,
   });
 
   final SystemControlService systemControl;
@@ -72,4 +74,7 @@ class TileServices {
 
   final FilesService files;
   final BluetoothService bluetooth;
+
+  /// Where a mail attachment's DOWNLOAD button saves it.
+  final AttachmentDownloadService attachmentDownload;
 }
