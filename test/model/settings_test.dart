@@ -46,9 +46,22 @@ void main() {
         appIcons: false,
         agendaWeekView: true,
         agendaGridView: true,
+        lastUsedCalendarId: 7,
       );
 
       expect(LauncherSettings.fromJson(settings.toJson()), settings);
+    });
+
+    test('lastUsedCalendarId defaults to null, unset', () {
+      expect(const LauncherSettings().lastUsedCalendarId, isNull);
+    });
+
+    test('a lastUsedCalendarId of the wrong type is ignored, not fatal', () {
+      final LauncherSettings settings = LauncherSettings.fromJson(
+        <String, Object?>{'lastUsedCalendarId': '7'},
+      );
+
+      expect(settings.lastUsedCalendarId, isNull);
     });
 
     test('anything that is not an object is the defaults', () {

@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_format.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/model/clock_format.dart';
+import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/calendar_service.dart';
 import 'package:android_tile_launcher/ui/pad_key.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
@@ -178,13 +182,19 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
   }
 
   /// The event's own calendar, if it is still one Android will accept an
-  /// insert for; otherwise (and always when adding) the account's primary
-  /// calendar, or just the first one on offer.
+  /// insert for; otherwise (adding) the calendar an event was last saved to,
+  /// if that is still on offer; otherwise the account's primary calendar, or
+  /// just the first one on offer.
   int? _defaultCalendarId(List<CalendarInfo> calendars) {
     if (calendars.isEmpty) return null;
     final int? current = widget.event?.calendarId;
     if (current != null && calendars.any((CalendarInfo c) => c.id == current)) {
       return current;
+    }
+    final int? lastUsed = SettingsScope.of(context).lastUsedCalendarId;
+    if (lastUsed != null &&
+        calendars.any((CalendarInfo c) => c.id == lastUsed)) {
+      return lastUsed;
     }
     return (calendars.where((CalendarInfo c) => c.primary).firstOrNull ??
             calendars.first)
@@ -341,6 +351,13 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
     if (!mounted) return;
     switch (result) {
       case CalendarEventSaved():
+        final LauncherSettings settings = SettingsScope.of(context);
+        if (settings.lastUsedCalendarId != calendarId) {
+          unawaited(
+            SettingsScope.stateOf(context)
+                ?.update(settings.copyWith(lastUsedCalendarId: calendarId)),
+          );
+        }
         Navigator.of(context).pop(true);
       case CalendarWriteDenied(:final bool permanent):
         setState(() {

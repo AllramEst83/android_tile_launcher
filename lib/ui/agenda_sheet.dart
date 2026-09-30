@@ -21,6 +21,7 @@ const Key agendaNavBackKey = ValueKey<String>('agenda-nav-back');
 const Key agendaNavForwardKey = ValueKey<String>('agenda-nav-forward');
 const Key agendaNavLabelKey = ValueKey<String>('agenda-nav-label');
 const Key agendaAddEventKey = ValueKey<String>('agenda-add-event');
+const Key agendaTodayKey = ValueKey<String>('agenda-today');
 
 DateTime _systemNow() => DateTime.now();
 
@@ -147,6 +148,15 @@ class _AgendaSheetState extends State<_AgendaSheet> {
     _load();
   }
 
+  void _goToday() {
+    if (_offset == 0) return;
+    setState(() {
+      _offset = 0;
+      _snapshot = null;
+    });
+    _load();
+  }
+
   Future<void> _addEvent() async {
     final bool changed = await showEventDetailSheet(
       context,
@@ -241,9 +251,22 @@ class _AgendaSheetState extends State<_AgendaSheet> {
               ],
             ),
             const SizedBox(height: TileMetrics.gutter),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: _AddEventButton(key: agendaAddEventKey, onTap: _addEvent),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                _AddEventButton(key: agendaAddEventKey, onTap: _addEvent),
+                PadKey(
+                  key: agendaTodayKey,
+                  label: Messages.agendaToday,
+                  height: 28,
+                  fontSize: 11,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  onTap: _offset == 0 ? null : _goToday,
+                ),
+              ],
             ),
             const SizedBox(height: TileMetrics.margin),
             if (snapshot == null)

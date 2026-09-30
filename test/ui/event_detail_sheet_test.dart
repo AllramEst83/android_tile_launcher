@@ -1,12 +1,16 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/services/calendar_service.dart';
+import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/event_detail_sheet.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_agenda_repository.dart';
+import '../fakes/in_memory_local_store.dart';
 
 /// Holds what `showEventDetailSheet` eventually completes with — a plain
 /// nullable field, not a `Future`, so a test can open the sheet, interact
@@ -22,43 +26,53 @@ Future<_Opened> _open(
   FakeAgendaRepository repository, {
   CalendarEvent? event,
   DateTime? day,
+  SettingsState? settings,
 }) async {
   final _Opened opened = _Opened();
-  await tester.pumpWidget(
-    MaterialApp(
-      theme: tileLauncherTheme(),
-      // Forces a plain hour/minute entry in the time picker (no AM/PM
-      // segment), so tests can drive it without locale surprises.
-      builder: (BuildContext context, Widget? child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
-      home: Builder(
-        builder: (BuildContext context) => TextButton(
-          onPressed: () async {
-            opened.changed = await showEventDetailSheet(
-              context,
-              repository: repository,
-              event: event,
-              day:
-                  day ??
-                  (event == null
-                      ? DateTime(2026, 9, 28)
-                      : DateTime(
-                          event.start.year,
-                          event.start.month,
-                          event.start.day,
-                        )),
-            );
-          },
-          child: const Text('open'),
-        ),
+  final Widget app = MaterialApp(
+    theme: tileLauncherTheme(),
+    // Forces a plain hour/minute entry in the time picker (no AM/PM
+    // segment), so tests can drive it without locale surprises.
+    builder: (BuildContext context, Widget? child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+      child: child!,
+    ),
+    home: Builder(
+      builder: (BuildContext context) => TextButton(
+        onPressed: () async {
+          opened.changed = await showEventDetailSheet(
+            context,
+            repository: repository,
+            event: event,
+            day:
+                day ??
+                (event == null
+                    ? DateTime(2026, 9, 28)
+                    : DateTime(
+                        event.start.year,
+                        event.start.month,
+                        event.start.day,
+                      )),
+          );
+        },
+        child: const Text('open'),
       ),
     ),
+  );
+  await tester.pumpWidget(
+    settings == null ? app : SettingsScope(state: settings, child: app),
   );
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
   return opened;
+}
+
+/// A [SettingsState] already holding [lastUsedCalendarId], for a test that
+/// wants `+ ADD EVENT` to default to it.
+SettingsState _settingsWithLastUsedCalendar(int lastUsedCalendarId) {
+  final SettingsState settings = SettingsState(store: InMemoryLocalStore());
+  settings.update(LauncherSettings(lastUsedCalendarId: lastUsedCalendarId));
+  return settings;
 }
 
 CalendarEvent _dentist({bool allDay = false}) => CalendarEvent(
@@ -469,6 +483,73 @@ void main() {
         expect(result.changed, isFalse);
       },
     );
+
+    testWidgets('defaults to the calendar last saved to, if still on offer', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = FakeAgendaRepository()
+        ..listResult = const CalendarList(<CalendarInfo>[
+          CalendarInfo(id: 2, name: 'Home', primary: true),
+          CalendarInfo(id: 3, name: 'Work'),
+        ]);
+
+      await _open(
+        tester,
+        repository,
+        day: DateTime(2026, 9, 28),
+        settings: _settingsWithLastUsedCalendar(3),
+      );
+
+      expect(find.text('WORK'), findsOneWidget);
+      expect(find.text('HOME'), findsNothing);
+    });
+
+    testWidgets(
+      'falls back to the primary calendar once the last-used one is gone',
+      (WidgetTester tester) async {
+        final FakeAgendaRepository repository = _withOneCalendar();
+
+        await _open(
+          tester,
+          repository,
+          day: DateTime(2026, 9, 28),
+          settings: _settingsWithLastUsedCalendar(99),
+        );
+
+        expect(find.text('HOME'), findsOneWidget);
+      },
+    );
+
+    testWidgets('saving remembers the calendar chosen, for next time', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = FakeAgendaRepository()
+        ..listResult = const CalendarList(<CalendarInfo>[
+          CalendarInfo(id: 2, name: 'Home', primary: true),
+          CalendarInfo(id: 3, name: 'Work'),
+        ]);
+      final SettingsState settings = SettingsState(store: InMemoryLocalStore());
+
+      await _open(
+        tester,
+        repository,
+        day: DateTime(2026, 9, 28),
+        settings: settings,
+      );
+      await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Gym');
+      await tester.tap(find.byKey(eventDetailCalendarFieldKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('WORK').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(eventDetailStartTimeFieldKey));
+      await _pickTime(tester, 9, 0);
+      await tester.tap(find.byKey(eventDetailEndTimeFieldKey));
+      await _pickTime(tester, 10, 0);
+      await tester.tap(find.byKey(eventDetailSaveKey));
+      await tester.pumpAndSettle();
+
+      expect(settings.settings.lastUsedCalendarId, 3);
+    });
 
     testWidgets('a start time is required to save', (
       WidgetTester tester,

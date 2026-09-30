@@ -81,6 +81,7 @@ class LauncherSettings {
     this.appIcons = true,
     this.agendaWeekView = false,
     this.agendaGridView = false,
+    this.lastUsedCalendarId,
   });
 
   final ThemeVariant theme;
@@ -115,6 +116,13 @@ class LauncherSettings {
   /// UI state the same way that is.
   final bool agendaGridView;
 
+  /// The calendar last saved an event to, so `+ ADD EVENT`'s own calendar
+  /// field defaults to it rather than always the account's primary — `null`
+  /// until an event has ever been saved. Remembered UI state, the same as
+  /// [agendaWeekView] and [agendaGridView]; not offered on the settings
+  /// screen.
+  final int? lastUsedCalendarId;
+
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
 
@@ -143,6 +151,7 @@ class LauncherSettings {
     bool? appIcons,
     bool? agendaWeekView,
     bool? agendaGridView,
+    int? lastUsedCalendarId,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -155,6 +164,7 @@ class LauncherSettings {
     appIcons: appIcons ?? this.appIcons,
     agendaWeekView: agendaWeekView ?? this.agendaWeekView,
     agendaGridView: agendaGridView ?? this.agendaGridView,
+    lastUsedCalendarId: lastUsedCalendarId ?? this.lastUsedCalendarId,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -169,6 +179,7 @@ class LauncherSettings {
     'appIcons': appIcons,
     'agendaWeekView': agendaWeekView,
     'agendaGridView': agendaGridView,
+    'lastUsedCalendarId': lastUsedCalendarId,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -219,6 +230,9 @@ class LauncherSettings {
       agendaGridView: json['agendaGridView'] is bool
           ? json['agendaGridView']! as bool
           : defaults.agendaGridView,
+      lastUsedCalendarId: json['lastUsedCalendarId'] is int
+          ? json['lastUsedCalendarId']! as int
+          : defaults.lastUsedCalendarId,
     );
   }
 
@@ -235,7 +249,8 @@ class LauncherSettings {
       other.effects == effects &&
       other.appIcons == appIcons &&
       other.agendaWeekView == agendaWeekView &&
-      other.agendaGridView == agendaGridView;
+      other.agendaGridView == agendaGridView &&
+      other.lastUsedCalendarId == lastUsedCalendarId;
 
   @override
   int get hashCode => Object.hash(
@@ -250,9 +265,10 @@ class LauncherSettings {
     appIcons,
     agendaWeekView,
     agendaGridView,
+    lastUsedCalendarId,
   );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, lastUsedCalendarId: $lastUsedCalendarId)';
 }

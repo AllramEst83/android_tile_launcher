@@ -54,6 +54,7 @@ abstract final class Messages {
   static const String agendaDay = 'DAY';
   static const String agendaWeek = 'WEEK';
   static const String agendaWeekGrid = 'WEEK:GRID';
+  static const String agendaToday = 'TODAY';
   static const String agendaUntitled = '(NO TITLE)';
   static const String agendaEventTitle = 'EVENT';
   static const String agendaEventWhen = 'WHEN';

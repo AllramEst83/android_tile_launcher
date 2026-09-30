@@ -8,6 +8,7 @@ import 'package:android_tile_launcher/ui/agenda_week_grid.dart';
 import 'package:android_tile_launcher/ui/event_detail_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
+import 'package:calendar_view/calendar_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -109,7 +110,12 @@ void main() {
 
     expect(repository.lastFrom, DateTime(2026, 9, 28));
     expect(repository.lastTo, DateTime(2026, 10, 5));
-    expect(find.text('TODAY'), findsOneWidget);
+    // Scoped to the day list itself: the TODAY button above it is also this
+    // exact text, in its own bordered box rather than a day's own heading.
+    expect(
+      find.descendant(of: find.byType(ListView), matching: find.text('TODAY')),
+      findsOneWidget,
+    );
     expect(find.text('TOMORROW'), findsOneWidget);
     expect(find.text('DENTIST'), findsOneWidget);
     expect(find.text('TEAM LUNCH'), findsOneWidget);
@@ -173,6 +179,52 @@ void main() {
       tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
       'NEXT WEEK',
     );
+  });
+
+  testWidgets('TODAY is greyed out on today, and returns a navigated day', (
+    WidgetTester tester,
+  ) async {
+    final FakeAgendaRepository repository = withEvents();
+    await _open(tester, repository);
+
+    // Disabled: nothing to go back to yet.
+    await tester.tap(find.byKey(agendaTodayKey));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(agendaNavLabelKey)).data, 'TODAY');
+
+    await tester.tap(find.byKey(agendaNavForwardKey));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(agendaNavLabelKey)).data, 'TOMORROW');
+
+    await tester.tap(find.byKey(agendaTodayKey));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.byKey(agendaNavLabelKey)).data, 'TODAY');
+    expect(repository.lastFrom, DateTime(2026, 9, 28));
+  });
+
+  testWidgets('TODAY returns a navigated week to this week, too', (
+    WidgetTester tester,
+  ) async {
+    final FakeAgendaRepository repository = withEvents();
+    await _open(tester, repository);
+    await tester.tap(find.byKey(agendaWeekToggleKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(agendaNavForwardKey));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+      'NEXT WEEK',
+    );
+
+    await tester.tap(find.byKey(agendaTodayKey));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+      'THIS WEEK',
+    );
+    expect(repository.lastFrom, DateTime(2026, 9, 28));
   });
 
   testWidgets('switching tabs resets navigation back to today', (
@@ -376,6 +428,60 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byKey(agendaGridKey), findsOneWidget);
+    });
+
+    testWidgets('a two-finger pinch zooms the grid taller', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, withEvents());
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+
+      final double before = tester
+          .widget<WeekView<CalendarEvent>>(find.byType(WeekView<CalendarEvent>))
+          .heightPerMinute;
+
+      final Offset center = tester.getCenter(find.byKey(agendaGridKey));
+      final TestGesture finger1 = await tester.startGesture(
+        center + const Offset(0, -20),
+      );
+      final TestGesture finger2 = await tester.startGesture(
+        center + const Offset(0, 20),
+      );
+      await tester.pump();
+      await finger1.moveBy(const Offset(0, -40));
+      await tester.pump();
+      await finger2.moveBy(const Offset(0, 40));
+      await tester.pump();
+
+      final double after = tester
+          .widget<WeekView<CalendarEvent>>(find.byType(WeekView<CalendarEvent>))
+          .heightPerMinute;
+      expect(after, greaterThan(before));
+
+      await finger1.up();
+      await finger2.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('one-finger drag still scrolls; it does not zoom', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, withEvents());
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+
+      final double before = tester
+          .widget<WeekView<CalendarEvent>>(find.byType(WeekView<CalendarEvent>))
+          .heightPerMinute;
+
+      await tester.drag(find.byKey(agendaGridKey), const Offset(0, -100));
+      await tester.pumpAndSettle();
+
+      final double after = tester
+          .widget<WeekView<CalendarEvent>>(find.byType(WeekView<CalendarEvent>))
+          .heightPerMinute;
+      expect(after, before);
     });
   });
 

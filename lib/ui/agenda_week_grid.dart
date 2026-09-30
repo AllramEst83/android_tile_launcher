@@ -22,7 +22,8 @@ Key agendaGridEventKey(int id) => ValueKey<String>('agenda-grid-event-$id');
 /// [weekStart]'s week — the agenda sheet's PREV/NEXT chevrons drive
 /// navigation, not a second, redundant control inside the grid. All-day
 /// events have no time to place on a grid, so (as in the week list) they are
-/// left out here.
+/// left out here. A two-finger pinch anywhere on it zooms: shrinks or grows
+/// how tall an hour is drawn, so more or fewer of them fit at once.
 class AgendaWeekGrid extends StatefulWidget {
   const AgendaWeekGrid({
     super.key,
@@ -54,6 +55,23 @@ class AgendaWeekGrid extends StatefulWidget {
 class _AgendaWeekGridState extends State<AgendaWeekGrid> {
   late final EventController<CalendarEvent> _controller =
       EventController<CalendarEvent>();
+
+  /// How tall an hour is drawn, as `WeekView`'s own `heightPerMinute` (its
+  /// height for one minute; an hour is 60 of them) — `1` is the package's
+  /// own default (a 60px hour). Pinch to zoom changes this, clamped so an
+  /// hour never shrinks to where its own indicator lines would not fit, nor
+  /// grows past showing only a couple of hours at once.
+  double _heightPerMinute = 1;
+  static const double _minHeightPerMinute = 0.4;
+  static const double _maxHeightPerMinute = 2.5;
+
+  /// Two-finger pinch tracking: raw pointers, not `GestureDetector.onScale*`,
+  /// which would contend with the grid's own one-finger vertical scroll for
+  /// every drag, pinch or not — a `Listener` never claims the gesture arena,
+  /// so the grid's own scrolling is untouched.
+  final Map<int, Offset> _pointers = <int, Offset>{};
+  double? _pinchStartDistance;
+  double? _pinchStartHeightPerMinute;
 
   @override
   void initState() {
@@ -109,53 +127,93 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
     if (changed) widget.onChanged();
   }
 
+  void _onPointerDown(PointerEvent event) {
+    _pointers[event.pointer] = event.position;
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (!_pointers.containsKey(event.pointer)) return;
+    _pointers[event.pointer] = event.position;
+    if (_pointers.length != 2) return;
+    final List<Offset> positions = _pointers.values.toList();
+    final double distance = (positions[0] - positions[1]).distance;
+    final double? start = _pinchStartDistance;
+    if (start == null) {
+      _pinchStartDistance = distance;
+      _pinchStartHeightPerMinute = _heightPerMinute;
+      return;
+    }
+    if (start <= 0) return;
+    final double next = (_pinchStartHeightPerMinute! * distance / start).clamp(
+      _minHeightPerMinute,
+      _maxHeightPerMinute,
+    );
+    if (next != _heightPerMinute) setState(() => _heightPerMinute = next);
+  }
+
+  void _onPointerUp(PointerEvent event) {
+    _pointers.remove(event.pointer);
+    if (_pointers.length < 2) {
+      _pinchStartDistance = null;
+      _pinchStartHeightPerMinute = null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
-    return SizedBox(
-      key: agendaGridKey,
-      // WeekView measures its own width from the nearest bounded ancestor;
-      // it does not stretch to fill a loose one.
-      width: double.infinity,
-      child: WeekView<CalendarEvent>(
-        controller: _controller,
-        initialDay: widget.weekStart,
-        minDay: widget.weekStart,
-        maxDay: widget.weekStart,
-        startDay: WeekDays.values[widget.weekStart.weekday - 1],
-        scrollOffset: 7 * 60,
-        backgroundColor: TileColors.canvas,
-        weekTitleBackgroundColor: TileColors.canvas,
-        weekTitleHeight: 40,
-        showVerticalLines: true,
-        hourIndicatorSettings: HourIndicatorSettings(
-          color: TileColors.bezel,
-          height: TileMetrics.bevel,
+    return Listener(
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: _onPointerUp,
+      onPointerCancel: _onPointerUp,
+      child: SizedBox(
+        key: agendaGridKey,
+        // WeekView measures its own width from the nearest bounded ancestor;
+        // it does not stretch to fill a loose one.
+        width: double.infinity,
+        child: WeekView<CalendarEvent>(
+          controller: _controller,
+          initialDay: widget.weekStart,
+          minDay: widget.weekStart,
+          maxDay: widget.weekStart,
+          startDay: WeekDays.values[widget.weekStart.weekday - 1],
+          scrollOffset: 7 * 60,
+          heightPerMinute: _heightPerMinute,
+          backgroundColor: TileColors.canvas,
+          weekTitleBackgroundColor: TileColors.canvas,
+          weekTitleHeight: 40,
+          showVerticalLines: true,
+          hourIndicatorSettings: HourIndicatorSettings(
+            color: TileColors.bezel,
+            height: TileMetrics.bevel,
+          ),
+          liveTimeIndicatorSettings: LiveTimeIndicatorSettings(
+            color: TileColors.accent,
+            height: TileMetrics.bevel,
+            showBullet: false,
+          ),
+          // The sheet's own PREV/NEXT chevrons and heading do this job already.
+          weekPageHeaderBuilder: (DateTime start, DateTime end) =>
+              const SizedBox.shrink(),
+          weekDayBuilder: (DateTime date) =>
+              _DayHeader(date: date, now: widget.now, text: text),
+          timeLineBuilder: (DateTime time) =>
+              _HourLabel(time: time, text: text),
+          eventTileBuilder: (
+            DateTime date,
+            List<CalendarEventData<CalendarEvent>> events,
+            Rect boundary,
+            DateTime start,
+            DateTime end,
+          ) => _EventBlock(events: events, text: text),
+          onDateTap: (DateTime date) => unawaited(_addAt(date)),
+          onEventTap:
+              (List<CalendarEventData<CalendarEvent>> events, DateTime date) {
+                final CalendarEvent? event = events.firstOrNull?.event;
+                if (event != null) unawaited(_openEvent(event, date));
+              },
         ),
-        liveTimeIndicatorSettings: LiveTimeIndicatorSettings(
-          color: TileColors.accent,
-          height: TileMetrics.bevel,
-          showBullet: false,
-        ),
-        // The sheet's own PREV/NEXT chevrons and heading do this job already.
-        weekPageHeaderBuilder: (DateTime start, DateTime end) =>
-            const SizedBox.shrink(),
-        weekDayBuilder: (DateTime date) =>
-            _DayHeader(date: date, now: widget.now, text: text),
-        timeLineBuilder: (DateTime time) => _HourLabel(time: time, text: text),
-        eventTileBuilder: (
-          DateTime date,
-          List<CalendarEventData<CalendarEvent>> events,
-          Rect boundary,
-          DateTime start,
-          DateTime end,
-        ) => _EventBlock(events: events, text: text),
-        onDateTap: (DateTime date) => unawaited(_addAt(date)),
-        onEventTap:
-            (List<CalendarEventData<CalendarEvent>> events, DateTime date) {
-              final CalendarEvent? event = events.firstOrNull?.event;
-              if (event != null) unawaited(_openEvent(event, date));
-            },
       ),
     );
   }
