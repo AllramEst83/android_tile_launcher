@@ -116,7 +116,7 @@ void main() {
       expect(find.text(Messages.bluetoothNotConnected), findsOneWidget);
     });
 
-    testWidgets('MANAGE DEVICES and a device row both open settings', (
+    testWidgets('a device row opens Android\'s own settings', (
       WidgetTester tester,
     ) async {
       final bluetooth = FakeBluetoothService()
@@ -129,25 +129,23 @@ void main() {
       await tester.tap(find.byKey(bluetoothDeviceKey('AA:BB')));
       await tester.pumpAndSettle();
       expect(bluetooth.openSettingsCalls, 1);
-
-      await tester.tap(find.byKey(bluetoothManageKey));
-      await tester.pumpAndSettle();
-      expect(bluetooth.openSettingsCalls, 2);
     });
 
-    testWidgets('TURN ON / OFF opens the toggle panel', (
-      WidgetTester tester,
-    ) async {
-      final bluetooth = FakeBluetoothService()
-        ..statusResult = const BluetoothOn(<PairedDevice>[]);
+    testWidgets(
+      'no TURN ON/OFF or MANAGE DEVICES: the device list is the whole pane',
+      (WidgetTester tester) async {
+        final bluetooth = FakeBluetoothService()
+          ..statusResult = const BluetoothOn(<PairedDevice>[
+            PairedDevice(name: 'Speaker', address: 'AA:BB', connected: true),
+          ]);
 
-      await _open(tester, bluetooth);
+        await _open(tester, bluetooth);
 
-      await tester.tap(find.byKey(bluetoothToggleKey));
-      await tester.pumpAndSettle();
-
-      expect(bluetooth.openPanelCalls, 1);
-    });
+        expect(find.text(Messages.bluetoothToggle), findsNothing);
+        expect(find.text(Messages.bluetoothManage), findsNothing);
+        expect(find.byKey(bluetoothDeviceKey('AA:BB')), findsOneWidget);
+      },
+    );
   });
 
   testWidgets('the close key closes the sheet', (WidgetTester tester) async {

@@ -11,15 +11,15 @@ import 'package:flutter/material.dart';
 const Key bluetoothCloseKey = ValueKey<String>('bluetooth-close');
 const Key bluetoothAllowKey = ValueKey<String>('bluetooth-allow');
 const Key bluetoothToggleKey = ValueKey<String>('bluetooth-toggle');
-const Key bluetoothManageKey = ValueKey<String>('bluetooth-manage');
 Key bluetoothDeviceKey(String address) =>
     ValueKey<String>('bluetooth-device-$address');
 
-/// What a tap on the Bluetooth tile opens: the adapter's state, its paired
-/// devices, and the two things this app can actually do about either — see
-/// `BluetoothService`'s own doc comment for why turning it on/off and
-/// connecting a device both hand off to Android's own screens rather than
-/// happening in place.
+/// What a tap on the Bluetooth tile opens: the adapter's state and, once it
+/// is on, its paired devices filling the whole pane — a tap on one opens
+/// Android's own device screen, since connecting or disconnecting a specific
+/// device has no public API this app can call (see `BluetoothService`'s own
+/// doc comment). While the adapter is off, the only thing on offer is a
+/// button to Android's own toggle panel, for the same reason.
 Future<void> showBluetoothSheet(
   BuildContext context, {
   required BluetoothService bluetooth,
@@ -163,40 +163,14 @@ class _BluetoothSheetState extends State<_BluetoothSheet>
           ),
         ],
       ),
-      BluetoothOn(:final List<PairedDevice> devices) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: PadKey(
-                  key: bluetoothToggleKey,
-                  label: Messages.bluetoothToggle,
-                  height: 44,
-                  fontSize: 10,
-                  onTap: widget.bluetooth.openPanel,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: PadKey(
-                  key: bluetoothManageKey,
-                  label: Messages.bluetoothManage,
-                  height: 44,
-                  fontSize: 10,
-                  onTap: widget.bluetooth.openSettings,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: TileMetrics.margin),
-          if (devices.isEmpty)
-            Text(Messages.bluetoothNoDevices, style: text.bodyMedium)
-          else
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
+      // No TURN ON/OFF or MANAGE DEVICES row here any more: the paired list
+      // is the whole pane, filling whatever the sheet's own `Flexible` gives
+      // it. Android's own device screen is still reachable — a tap on a
+      // device opens it, the same place MANAGE DEVICES used to.
+      BluetoothOn(:final List<PairedDevice> devices) =>
+        devices.isEmpty
+            ? Text(Messages.bluetoothNoDevices, style: text.bodyMedium)
+            : ListView(
                 children: <Widget>[
                   for (final PairedDevice device in devices)
                     _DeviceRow(
@@ -204,14 +178,11 @@ class _BluetoothSheetState extends State<_BluetoothSheet>
                       // Connecting or disconnecting a specific device has no
                       // public API this app can call (see `BluetoothService`'s
                       // own doc comment) — Android's own device list is the
-                      // actual destination, the same one MANAGE DEVICES opens.
+                      // actual destination.
                       onTap: widget.bluetooth.openSettings,
                     ),
                 ],
               ),
-            ),
-        ],
-      ),
     };
   }
 }
