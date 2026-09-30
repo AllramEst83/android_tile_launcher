@@ -121,16 +121,7 @@ class _TetrisScreenState extends State<TetrisScreen> {
                 onPanEnd: _onPanEnd,
                 child: Stack(
                   children: <Widget>[
-                    Positioned.fill(
-                      // Not Flame's default (a repaint boundary of its own):
-                      // rendering here is driven entirely by our own manual
-                      // Canvas drawing inside a game loop, not Flutter
-                      // widget rebuilds, and an extra boundary between the
-                      // two has been known to go stale on some Android
-                      // renderers — simplest to let it repaint with its
-                      // ancestors instead.
-                      child: GameWidget(game: _game, addRepaintBoundary: false),
-                    ),
+                    Positioned.fill(child: GameWidget(game: _game)),
                     ValueListenableBuilder<TetrisHudState>(
                       valueListenable: _game.hud,
                       builder: (BuildContext context, TetrisHudState hud, _) {

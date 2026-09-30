@@ -5,6 +5,7 @@ import 'package:android_tile_launcher/model/tetris_board.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 /// The board's score/lines/level/next/game-over, republished after every
 /// change so the Flutter HUD can rebuild from a `ValueListenableBuilder`
@@ -83,10 +84,6 @@ class TetrisGame extends FlameGame {
   @override
   void update(double dt) {
     super.update(dt);
-    // Flame's own engine pause (set by togglePause) stops its game loop from
-    // calling update at all in the real app, but this guard doesn't rely on
-    // that — it also keeps a directly-driven `update` call (as a test would
-    // make) from ticking gravity while paused.
     if (board.gameOver || paused) return;
     _sinceTick += dt;
     final double interval = board.tickInterval.inMilliseconds / 1000;
@@ -109,7 +106,7 @@ class TetrisGame extends FlameGame {
   }
 
   void _publish() {
-    hud.value = TetrisHudState(
+    final TetrisHudState next = TetrisHudState(
       score: board.score,
       lines: board.lines,
       level: board.level,
@@ -117,6 +114,19 @@ class TetrisGame extends FlameGame {
       paused: paused,
       next: board.next ?? TetrominoType.i,
     );
+    // GameWidget itself calls update() directly from inside its own
+    // LayoutBuilder on the first build and on every resize (not just from
+    // this game's own per-frame ticker, which runs at a safe point in the
+    // frame). Notifying hud's listeners synchronously from inside that
+    // layout pass would hit Flutter's "setState called during build" — so
+    // when caught there, the update is applied right after this frame
+    // instead of during it.
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) => hud.value = next);
+    } else {
+      hud.value = next;
+    }
   }
 
   @override

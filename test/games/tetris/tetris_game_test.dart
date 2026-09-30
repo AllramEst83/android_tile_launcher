@@ -6,6 +6,11 @@ import 'package:android_tile_launcher/model/tetris_board.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // TetrisGame reads SchedulerBinding.instance (to keep hud publishes safe
+  // if they ever land during a build/layout pass) even in these plain,
+  // non-widget tests.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('tetrominoColour', () {
     test('every type gets its own colour, none of them black or white', () {
       final colours = {
