@@ -66,18 +66,6 @@ class GridState extends ChangeNotifier {
     () => PinnedTile.contact(key: key, name: name, index: _pinned.length),
   );
 
-  /// Pins the game module [moduleId], remembering [label] to draw it with,
-  /// and saves. One tile per game module; pinning one already pinned changes
-  /// nothing. Same failure contract as [pin].
-  Future<void> pinGame({required String moduleId, required String label}) =>
-      _add(
-        () => PinnedTile.game(
-          moduleId: moduleId,
-          label: label,
-          index: _pinned.length,
-        ),
-      );
-
   Future<void> _add(PinnedTile Function() tile) {
     final PinnedTile next = tile();
     if (isPinned(next.id)) return Future<void>.value();

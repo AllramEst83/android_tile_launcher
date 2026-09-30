@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:android_tile_launcher/games/game_module.dart';
-import 'package:android_tile_launcher/games/game_registry.dart';
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
@@ -18,10 +16,8 @@ typedef AppSuggestion = ({String id, String label});
 /// pinned (there is at most one of each — a second clock would show the same
 /// time). Tapping one pins it via [GridState.pinSystemTile] and closes.
 /// CONTACT is always offered (one tile per person) and opens the contact
-/// picker instead of pinning at once. Every game in `gameModules` not
-/// already pinned is offered too, one tile per game, via
-/// [GridState.pinGame]. [suggestions] are apps the user opens often and has
-/// not pinned, offered first under MOST USED; tapping one pins it.
+/// picker instead of pinning at once. [suggestions] are apps the user opens
+/// often and has not pinned, offered first under MOST USED; tapping one pins it.
 Future<void> showAddTileSheet(
   BuildContext context, {
   required GridState gridState,
@@ -43,19 +39,14 @@ Future<void> showAddTileSheet(
       final List<TileKind> available = <TileKind>[
         for (final TileKind kind in TileKind.values)
           if (kind != TileKind.app &&
-              kind != TileKind.game &&
               (kind == TileKind.contact || !gridState.isPinned(kind.name)))
             kind,
-      ];
-      final List<GameModule> games = <GameModule>[
-        for (final GameModule module in gameModules)
-          if (!gridState.isPinned(gameTileId(module.id))) module,
       ];
       final List<AppSuggestion> offered = <AppSuggestion>[
         for (final AppSuggestion s in suggestions)
           if (!gridState.isPinned(s.id)) s,
       ];
-      if (available.isEmpty && games.isEmpty && offered.isEmpty) {
+      if (available.isEmpty && offered.isEmpty) {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(TileMetrics.margin),
@@ -104,20 +95,6 @@ Future<void> showAddTileSheet(
                     // save to disk is still pending (see GridState's failure
                     // contract) and there is no error surface here for it.
                     unawaited(gridState.pinSystemTile(kind));
-                  },
-                ),
-              for (final GameModule module in games)
-                _AddTileOption(
-                  key: ValueKey<String>('game-${module.id}'),
-                  label: module.label,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    unawaited(
-                      gridState.pinGame(
-                        moduleId: module.id,
-                        label: module.label,
-                      ),
-                    );
                   },
                 ),
             ],

@@ -22,7 +22,6 @@ enum TileKind {
   files,
   bluetooth,
   orientationLock,
-  game,
 }
 
 /// The app package [tile] launches when tapped, or `null` for a tile with no
@@ -50,7 +49,6 @@ String displayNameOf(TileKind kind) => switch (kind) {
   TileKind.files => 'FILES',
   TileKind.bluetooth => 'BLUETOOTH',
   TileKind.orientationLock => 'ROTATION',
-  TileKind.game => 'GAME',
 };
 
 /// The id of the tile for the contact with lookup [key]. Unlike a system kind
@@ -65,21 +63,6 @@ const String contactIdPrefix = 'contact:';
 String? contactKeyOf(Tile tile) =>
     tile.kind == TileKind.contact && tile.id.startsWith(contactIdPrefix)
     ? tile.id.substring(contactIdPrefix.length)
-    : null;
-
-/// The id of the tile for the game module with this [moduleId]. Like a
-/// contact (one per person, not one per kind), there is one per game module
-/// in `games/game_registry.dart`, and it may not be pinned at all.
-String gameTileId(String moduleId) => '$gameIdPrefix$moduleId';
-
-/// The start of every game tile's id.
-const String gameIdPrefix = 'game:';
-
-/// The game module id a game tile's id carries, or `null` for any other
-/// tile.
-String? gameModuleIdOf(Tile tile) =>
-    tile.kind == TileKind.game && tile.id.startsWith(gameIdPrefix)
-    ? tile.id.substring(gameIdPrefix.length)
     : null;
 
 /// The kind named [id] (a system tile's id is always its kind's own name), or

@@ -13,7 +13,7 @@ lib/
   messages.dart              # user-facing strings
   model/                     # pure Dart: no Flutter, no platform
     c64_colour.dart          # C64Colour: selects a VIC-II colour without importing Flutter
-    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, contact, mail, textTv, soundMode, flashlight, ..., game); launchTargetOf, displayNameOf, tileKindNamed, contactTileId/contactKeyOf, gameTileId/gameModuleIdOf; Tile.label
+    tile.dart                # Tile: id, kind, size, colour; TileKind (app, clock, device, weather, agenda, contact, mail, textTv, soundMode, flashlight); launchTargetOf, displayNameOf, tileKindNamed, contactTileId/contactKeyOf; Tile.label
     tile_size.dart           # small 1x1, flat 2x1, tall 1x2, medium 2x2, broad 3x2, wide 4x2, tower 2x4, large 4x4; spanIn(columns) gives the width on a 4- or 6-column grid (fullWidth sizes span it entirely; others clamp to it)
     tile_layout.dart         # packTiles(tiles, columns:): ordered tiles -> PlacedTile (column, row, span); skyline algorithm
     settings.dart            # LauncherSettings (theme, columns, gap, font scale, swipe down, swipe up) + ThemeVariant, GridGap, FontScale, GestureAction; tolerant fromJson
@@ -144,16 +144,9 @@ lib/
     state_tile_view.dart     # StateTileContentView: label + a state string ([ON], [VIBRATE]...), nullable onTap
     editable_tile_grid.dart  # the grid editor's canvas: Draggable/DragTarget per tile, tap to select, delete badge
     tile_inspector.dart      # the editor's panel: label + Apply always, size/colour pickers while a tile is selected
-    add_tile_sheet.dart      # "+ ADD TILE": every system kind not already pinned, one instance each; every unpinned game module too
+    add_tile_sheet.dart      # "+ ADD TILE": every system kind not already pinned, one instance each
     app_drawer.dart          # All Apps: alphabetical + jump index, or a ranked flat list while searching
     quick_actions_sheet.dart # long-press sheet: pin/unpin, app details, uninstall
-  games/                    # a game's own module + Flame layer; needs BuildContext (unlike model/) and isn't a platform abstraction (unlike services/)
-    game_module.dart         # GameModule: id, label, play(context) — the one interface a game implements
-    game_registry.dart       # gameModules (the const list every game is added to), gameModuleById
-    tetris/
-      tetris_module.dart       # TetrisModule implements GameModule; play() calls showTetris
-      tetris_game.dart         # TetrisGame extends FlameGame: drives gravity, paints the board/piece each frame from model/tetris_board.dart, republishes state as a ValueNotifier<TetrisHudState> hud
-      tetris_screen.dart       # showTetris / TetrisScreen: fullscreen (immersiveSticky, restored on exit), HUD, on-screen buttons + swipe/tap gestures
 android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   MainActivity.kt            # wires channel handlers into the Flutter engine
   AppsChannelHandler.kt      # list/launch/uninstall/openAppDetails; listing runs off the main thread
@@ -187,13 +180,6 @@ test/  # mirrors lib/; fakes/ holds FakeAppRepository
 4. If it can be pinned by the user (not every kind has to be — nothing stops a future kind that's always present), add a `PinnedTile` factory for it and a case in `GridState`/`add_tile_sheet.dart`.
 5. Unit tests for the source and the content shape; a widget test for the view at each size it supports.
 No changes to `TileGrid`, `EditableTileGrid`, `packTiles` or `HomeShell` should be needed — they all dispatch through `tileContent`/`launchTargetOf`/`PinnedTile`, never on `kind` directly. If a change there turns out to be needed, the abstraction is leaking; fix that first.
-
-### Adding a game
-Every game shares one `TileKind.game`, id-prefixed like a contact (`game:<moduleId>`, since there can be more than one, unlike a system kind) — so a new game needs no new `TileKind`, no new `tile_view.dart` case and no new `add_tile_sheet.dart` case. Instead:
-1. Implement `GameModule` (`games/game_module.dart`): `id`, `label`, `play(context)`.
-2. Add it to `gameModules` in `games/game_registry.dart`. `add_tile_sheet.dart` (offering it), `tile_view.dart`'s `TileKind.game` case (drawing its tile face and opening it) and `GridState.pinGame` (pinning it) all read that list generically.
-3. `play(context)` opens the game itself, structured however it needs — Tetris's own `tetris_module.dart`/`tetris_game.dart`/`tetris_screen.dart` split (pure-Dart rules engine in `model/`, a Flame layer bridging it to a `ValueNotifier` HUD, a fullscreen `Navigator.push` screen) is a pattern, not a contract; a simpler game might not need Flame at all.
-4. A pure-Dart rules engine belongs in `model/` like everything else there (no Flutter import) if the game has one worth unit-testing independently of its rendering.
 
 ## The look
 The reference is `design/reference/`: the C64 screen (light blue on blue), beige-and-brown hardware, the rainbow stripe, chunky bevels, pixel type.

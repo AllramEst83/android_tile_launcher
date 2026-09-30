@@ -39,22 +39,6 @@ class PinnedTile {
     label: name,
   );
 
-  /// A freshly-pinned game tile: wide, like a system tile's, carrying the
-  /// game module's own [label] so it can be drawn without consulting the
-  /// game registry again. One tile per game module; cycles colour the same
-  /// way.
-  factory PinnedTile.game({
-    required String moduleId,
-    required String label,
-    required int index,
-  }) => PinnedTile(
-    id: gameTileId(moduleId),
-    kind: TileKind.game,
-    size: TileSize.wide,
-    colour: pinnableColours[index % pinnableColours.length],
-    label: label,
-  );
-
   /// A freshly-pinned system tile (anything but [TileKind.app]): wide, so an
   /// oversized numeral has room, cycling colour the same way an app tile
   /// does.

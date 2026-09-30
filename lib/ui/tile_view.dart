@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:android_tile_launcher/games/game_module.dart';
-import 'package:android_tile_launcher/games/game_registry.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/bluetooth_status.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
@@ -432,25 +430,6 @@ Widget tileContent(
                 : null,
           );
         },
-      );
-    case TileKind.game:
-      final Widget face = AppTileContent(
-        label: labelFor(tile),
-        ink: tile.colour.ink,
-      );
-      final String? moduleId = gameModuleIdOf(tile);
-      final GameModule? module = moduleId == null
-          ? null
-          : gameModuleById(moduleId);
-      if (!interactive || module == null) return face;
-      // Opens the game fullscreen; nothing is polled here, a game has no
-      // ambient state to show on the tile face between plays.
-      return Builder(
-        builder: (context) => GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => unawaited(module.play(context)),
-          child: SizedBox.expand(child: face),
-        ),
       );
   }
 }

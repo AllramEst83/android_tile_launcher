@@ -46,7 +46,6 @@ void main() {
     expect(find.text('WEATHER'), findsOneWidget);
     expect(find.text('SOUND'), findsOneWidget);
     expect(find.text('FLASHLIGHT'), findsOneWidget);
-    expect(find.text('TETRIS'), findsOneWidget);
   });
 
   testWidgets('tapping a kind pins it and closes the sheet', (
@@ -67,21 +66,17 @@ void main() {
   ) async {
     final GridState gridState = _gridState();
     for (final TileKind kind in TileKind.values) {
-      if (kind != TileKind.app &&
-          kind != TileKind.contact &&
-          kind != TileKind.game) {
+      if (kind != TileKind.app && kind != TileKind.contact) {
         await gridState.pinSystemTile(kind);
       }
     }
 
     await _open(tester, gridState);
 
-    // Every system tile is pinned; CONTACT and TETRIS (no game is pinned
-    // yet) are still on offer.
+    // Every system tile is pinned; only CONTACT is still on offer.
     expect(find.text('CLOCK'), findsNothing);
     expect(find.text('SOUND'), findsNothing);
     expect(find.text('CONTACT'), findsOneWidget);
-    expect(find.text('TETRIS'), findsOneWidget);
   });
 
   testWidgets('the list stays clear of a camera cutout at the top', (
@@ -114,31 +109,5 @@ void main() {
     expect(find.byKey(contactSearchKey), findsOneWidget);
     // Nothing was pinned by choosing the kind itself.
     expect(gridState.pinned, hasLength(1));
-  });
-
-  testWidgets('tapping a game pins it and closes the sheet', (
-    WidgetTester tester,
-  ) async {
-    final GridState gridState = _gridState();
-
-    await _open(tester, gridState);
-    await tester.ensureVisible(find.text('TETRIS'));
-    await tester.tap(find.text('TETRIS'));
-    await tester.pumpAndSettle();
-
-    expect(gridState.isPinned('game:tetris'), isTrue);
-    expect(find.text('TETRIS'), findsNothing);
-  });
-
-  testWidgets('a pinned game is not offered again', (
-    WidgetTester tester,
-  ) async {
-    final GridState gridState = _gridState();
-    await gridState.pinGame(moduleId: 'tetris', label: 'TETRIS');
-
-    await _open(tester, gridState);
-
-    expect(find.text('TETRIS'), findsNothing);
-    expect(find.text('CLOCK'), findsOneWidget);
   });
 }
