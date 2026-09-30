@@ -313,6 +313,7 @@ abstract final class Messages {
   static const String bluetoothToggle = 'TURN ON / OFF';
   static const String bluetoothManage = 'MANAGE DEVICES';
   static const String bluetoothNoDevices = 'NO PAIRED DEVICES.';
+  static const String bluetoothNoneConnected = 'NONE CONNECTED';
   static const String bluetoothConnected = 'CONNECTED';
   static const String bluetoothNotConnected = 'NOT CONNECTED';
 

@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/app.dart';
 import 'package:android_tile_launcher/messages.dart';
+import 'package:android_tile_launcher/model/bluetooth_status.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/settings.dart';
@@ -8,10 +9,12 @@ import 'package:android_tile_launcher/model/tile_size.dart';
 import 'package:android_tile_launcher/services/app_info.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
+import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_app_repository.dart';
+import 'fakes/fake_bluetooth_service.dart';
 import 'fakes/fake_tile_services.dart';
 import 'fakes/in_memory_local_store.dart';
 
@@ -61,6 +64,7 @@ Future<void> _pumpApp(
   WidgetTester tester, {
   required FontScale fontScale,
   List<PinnedTile>? tiles,
+  TileServices? services,
 }) async {
   // A phone-width canvas: on the default (much wider) test surface, an
   // overflow that would show up on a real 360-400dp phone can go unnoticed.
@@ -82,7 +86,7 @@ Future<void> _pumpApp(
       appRepository: FakeAppRepository(apps: const <AppInfo>[]),
       gridState: gridState,
       settingsState: settingsState,
-      services: fakeTileServices(),
+      services: services ?? fakeTileServices(),
     ),
   );
   await tester.pumpAndSettle();
@@ -119,10 +123,22 @@ void main() {
   testWidgets('every kind fits at every size, at EXTRA LARGE', (
     WidgetTester tester,
   ) async {
+    // Connected devices, not just the bare ON/OFF state, so the Bluetooth
+    // tile's own device-list layout is exercised at every size here too.
+    final FakeBluetoothService bluetooth = FakeBluetoothService()
+      ..statusResult = BluetoothOn(<PairedDevice>[
+        for (int i = 0; i < 5; i++)
+          PairedDevice(
+            name: 'Device $i with a fairly long name',
+            address: '$i',
+            connected: true,
+          ),
+      ]);
     await _pumpApp(
       tester,
       fontScale: FontScale.extraLarge,
       tiles: _oneOfEachKindAndSize(),
+      services: fakeTileServices(bluetooth: bluetooth),
     );
 
     expect(tester.takeException(), isNull);

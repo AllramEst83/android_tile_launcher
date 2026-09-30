@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/bluetooth_status.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
@@ -34,6 +33,7 @@ import 'package:android_tile_launcher/ui/alarm_sheet.dart';
 import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_icon.dart';
 import 'package:android_tile_launcher/ui/bluetooth_sheet.dart';
+import 'package:android_tile_launcher/ui/bluetooth_tile_view.dart';
 import 'package:android_tile_launcher/ui/calc_sheet.dart';
 import 'package:android_tile_launcher/ui/calc_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
@@ -414,9 +414,8 @@ Widget tileContent(
         builder: (context, content, refreshNow) {
           final BluetoothStatus status =
               (content as BluetoothTileContent).status;
-          return StateTileContentView(
-            label: displayNameOf(tile.kind),
-            state: _bluetoothStateLabel(status),
+          return BluetoothTileContentView(
+            status: status,
             ink: tile.colour.ink,
             // Turning it on/off and managing a device both happen inside the
             // sheet (or the system screens it opens), never here directly, so
@@ -440,14 +439,6 @@ Widget tileContent(
 String _toggleStateOf(TileKind kind, bool on) => switch (kind) {
   TileKind.orientationLock => on ? '[LOCKED]' : '[AUTO]',
   _ => on ? '[ON]' : '[OFF]',
-};
-
-String _bluetoothStateLabel(BluetoothStatus status) => switch (status) {
-  BluetoothOn() => Messages.bluetoothOn,
-  BluetoothOff() => Messages.bluetoothOff,
-  BluetoothUnsupported() => Messages.bluetoothUnsupported,
-  BluetoothUnavailable() => Messages.bluetoothUnsupported,
-  BluetoothNeedsPermission() => Messages.bluetoothOff,
 };
 
 /// Runs a state-changing [action], then re-reads the tile so it shows the

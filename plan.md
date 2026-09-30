@@ -47,7 +47,7 @@ Each phase gets designed in detail only when it's reached; this is an outline so
 54. **Tile-list breathing room.** The "+ ADD TILE" sheet's tile list can run
     under the status bar/camera cutout when full; give it the same top
     clearance the other sheets have.
-55. **Flutter Game** (Make sure you commit and push before starting this phase) I would like you to build a small Tetris game in the C64 style we have established. The first decision is: do we need a framework like Flutter Flame, can you build this yourself, or are there other frameworks or libraries out there that better suit our needs? When the tile is tapped, I want the game to launch into fullscreen mode, and when exiting, return to the launcher. Lets discuss before starting. 
+55. **Flutter Game** (Pause here and make sure you commit and push before starting this phase) I would like you to build a small Tetris game in the C64 style we have established. The first decision is: do we need a framework like Flutter Flame, can you build this yourself, or are there other frameworks or libraries out there that better suit our needs? When the tile is tapped, I want the game to launch into fullscreen mode, and when exiting, return to the launcher. I want touce/swipe controls as well as on screen touch controls. Sliders, buttons and joystick. Let's discuss this before starting. I plan for us to build more games like this, so getting the structure right from the beginning is key. Basically, I want the games to be loaded as modules into the class or service responsible for running them, making it easy to add and remove games.
 
 ## Deliberately different from the terminal launcher
 
