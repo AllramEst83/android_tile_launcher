@@ -35,6 +35,7 @@ Future<void> _open(
   WidgetTester tester,
   FakeAgendaRepository repository, {
   SettingsState? settings,
+  DateTime? now,
 }) async {
   final Widget app = MaterialApp(
     theme: tileLauncherTheme(),
@@ -46,8 +47,11 @@ Future<void> _open(
     ),
     home: Builder(
       builder: (BuildContext context) => TextButton(
-        onPressed: () =>
-            showAgendaSheet(context, repository: repository, clock: () => _now),
+        onPressed: () => showAgendaSheet(
+          context,
+          repository: repository,
+          clock: () => now ?? _now,
+        ),
         child: const Text('open'),
       ),
     ),
@@ -99,6 +103,20 @@ void main() {
     expect(find.text('TEAM LUNCH'), findsNothing);
   });
 
+  testWidgets('DAY, AGENDA and GRID spread evenly across the row', (
+    WidgetTester tester,
+  ) async {
+    await _open(tester, withEvents());
+
+    final double dayX = tester.getCenter(find.byKey(agendaDayToggleKey)).dx;
+    final double weekX = tester.getCenter(find.byKey(agendaWeekToggleKey)).dx;
+    final double gridX = tester
+        .getCenter(find.byKey(agendaWeekGridToggleKey))
+        .dx;
+
+    expect(weekX - dayX, closeTo(gridX - weekX, 1));
+  });
+
   testWidgets('WEEK reads seven days and puts a heading over each day', (
     WidgetTester tester,
   ) async {
@@ -119,6 +137,25 @@ void main() {
     expect(find.text('TOMORROW'), findsOneWidget);
     expect(find.text('DENTIST'), findsOneWidget);
     expect(find.text('TEAM LUNCH'), findsOneWidget);
+  });
+
+  testWidgets('WEEK always starts on Monday, whatever day it is opened on', (
+    WidgetTester tester,
+  ) async {
+    // Thursday 1 October 2026: opening WEEK from here must still read from
+    // this week's own Monday (28 Sep), not a rolling seven days from today.
+    final FakeAgendaRepository repository = withEvents();
+    await _open(tester, repository, now: DateTime(2026, 10, 1, 8));
+
+    await tester.tap(find.byKey(agendaWeekToggleKey));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastFrom, DateTime(2026, 9, 28));
+    expect(repository.lastTo, DateTime(2026, 10, 5));
+    expect(
+      tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+      'THIS WEEK',
+    );
   });
 
   testWidgets('DAY goes back to today', (WidgetTester tester) async {
@@ -362,6 +399,27 @@ void main() {
       // as columns, not headings.
       expect(find.byKey(agendaWeekGridToggleKey), findsOneWidget);
     });
+
+    testWidgets(
+      'the grid also starts on Monday, whatever day it is opened on',
+      (WidgetTester tester) async {
+        await _open(
+          tester,
+          withEvents(),
+          now: DateTime(2026, 10, 1, 8), // Thursday.
+        );
+
+        await tester.tap(find.byKey(agendaWeekGridToggleKey));
+        await tester.pumpAndSettle();
+
+        final WeekView<CalendarEvent> grid = tester
+            .widget<WeekView<CalendarEvent>>(
+              find.byType(WeekView<CalendarEvent>),
+            );
+        expect(grid.minDay, DateTime(2026, 9, 28));
+        expect(grid.startDay, WeekDays.monday);
+      },
+    );
 
     testWidgets('an event in the grid opens its own details', (
       WidgetTester tester,

@@ -167,6 +167,35 @@ void main() {
     test('a range that crosses a month end', () {
       expect(formatWeekHeading(DateTime(2026, 9, 29), _now), '29 SEP-5 OCT');
     });
+
+    test(
+      '"this week" is measured from Monday, not from whatever day it is',
+      () {
+        // Thursday 1 October 2026: this week's own Monday is still 28 Sep.
+        final DateTime thursday = DateTime(2026, 10, 1, 8);
+        expect(formatWeekHeading(DateTime(2026, 9, 28), thursday), 'THIS WEEK');
+        expect(formatWeekHeading(DateTime(2026, 10, 5), thursday), 'NEXT WEEK');
+      },
+    );
+  });
+
+  group('mondayOf', () {
+    test('a Monday is its own Monday', () {
+      expect(mondayOf(DateTime(2026, 9, 28, 10, 30)), DateTime(2026, 9, 28));
+    });
+
+    test('every other day of the week rolls back to the same Monday', () {
+      for (var day = 29; day <= 30; day++) {
+        expect(mondayOf(DateTime(2026, 9, day)), DateTime(2026, 9, 28));
+      }
+      for (var day = 1; day <= 4; day++) {
+        expect(mondayOf(DateTime(2026, 10, day)), DateTime(2026, 9, 28));
+      }
+    });
+
+    test('crosses a month, and a year, boundary', () {
+      expect(mondayOf(DateTime(2027, 1, 1)), DateTime(2026, 12, 28));
+    });
   });
 
   group('formatWhen', () {

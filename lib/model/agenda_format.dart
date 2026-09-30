@@ -10,6 +10,11 @@ DateTime startOfDay(DateTime t) => DateTime(t.year, t.month, t.day);
 DateTime addDays(DateTime day, int days) =>
     DateTime(day.year, day.month, day.day + days);
 
+/// The Monday, at midnight, of the week [t] falls in — the agenda's week
+/// runs Monday to Sunday, not a rolling seven days from whatever day it was
+/// opened on.
+DateTime mondayOf(DateTime t) => addDays(startOfDay(t), -(t.weekday - 1));
+
 /// Whether [event] takes up any of the day starting at [day].
 bool occursOn(CalendarEvent event, DateTime day) {
   final DateTime next = addDays(day, 1);
@@ -68,12 +73,12 @@ String formatDayHeading(DateTime day, DateTime now) {
   return formatClockDate(day);
 }
 
-/// `THIS WEEK`, `NEXT WEEK`, `LAST WEEK`, else the rolling seven-day window's
+/// `THIS WEEK`, `NEXT WEEK`, `LAST WEEK`, else the Monday-to-Sunday week's
 /// first and last day, `29 SEP-5 OCT` (the agenda's week is never far enough
-/// out to need a year). [weekStart] is the window's first day, the same one
+/// out to need a year). [weekStart] is the week's own Monday, the same one
 /// [groupByDay]'s own `from` would be given.
 String formatWeekHeading(DateTime weekStart, DateTime now) {
-  final DateTime thisWeek = startOfDay(now);
+  final DateTime thisWeek = mondayOf(now);
   if (weekStart == thisWeek) return 'THIS WEEK';
   if (weekStart == addDays(thisWeek, 7)) return 'NEXT WEEK';
   if (weekStart == addDays(thisWeek, -7)) return 'LAST WEEK';

@@ -25,12 +25,13 @@ const Key agendaTodayKey = ValueKey<String>('agenda-today');
 
 DateTime _systemNow() => DateTime.now();
 
-/// The sheet a tap on a ready agenda tile opens: today, or the next seven days
-/// (the toggle at the top, remembered as the `agendaWeekView` setting so the
-/// sheet reopens on whichever the user looked at last), with chevrons either
-/// side of a heading to step a day or a week at a time — the navigated offset
-/// itself is not remembered, so the sheet always opens back on today's own
-/// day or week. Every event under its day.
+/// The sheet a tap on a ready agenda tile opens: today, or its own
+/// Monday-to-Sunday week (the toggle at the top, remembered as the
+/// `agendaWeekView` setting so the sheet reopens on whichever the user
+/// looked at last), with chevrons either side of a heading to step a day or
+/// a week at a time — the navigated offset itself is not remembered, so the
+/// sheet always opens back on today's own day or week. Every event under its
+/// day.
 Future<void> showAgendaSheet(
   BuildContext context, {
   required AgendaRepository repository,
@@ -107,11 +108,15 @@ class _AgendaSheetState extends State<_AgendaSheet> {
 
   int get _span => _week ? 7 : 1;
 
-  DateTime get _rangeStart => addDays(startOfDay(_now), _offset * _span);
+  DateTime _startFor(DateTime now) => _week
+      ? addDays(mondayOf(now), _offset * 7)
+      : addDays(startOfDay(now), _offset);
+
+  DateTime get _rangeStart => _startFor(_now);
 
   Future<void> _load() async {
     final DateTime now = widget.clock();
-    final DateTime start = addDays(startOfDay(now), _offset * _span);
+    final DateTime start = _startFor(now);
     final AgendaSnapshot snapshot = await widget.repository.between(
       start,
       addDays(start, _span),
@@ -185,32 +190,37 @@ class _AgendaSheetState extends State<_AgendaSheet> {
             const SizedBox(height: TileMetrics.gutter),
             Text(Messages.agendaTitle, style: text.bodyMedium),
             const SizedBox(height: TileMetrics.gutter),
-            // Its own row, under the title's: three toggles beside it would
-            // not fit a narrow phone (DAY, WEEK and WEEK:GRID together are
-            // wider than the title row has room for once the title itself
-            // is there too).
-            Wrap(
-              spacing: TileMetrics.gutter,
-              runSpacing: 4,
+            // Its own row, under the title's (three toggles beside it would
+            // not fit a narrow phone), split into equal thirds so DAY,
+            // AGENDA and GRID always spread evenly across whatever width the
+            // sheet has, rather than clustering to one side of it.
+            Row(
               children: <Widget>[
-                _Toggle(
-                  key: agendaDayToggleKey,
-                  label: Messages.agendaDay,
-                  selected: !_week,
-                  onTap: () => _show(week: false),
-                ),
-                _Toggle(
-                  key: agendaWeekToggleKey,
-                  label: Messages.agendaWeek,
-                  selected: _week && !_grid,
-                  onTap: () => _show(week: true),
-                ),
-                _Toggle(
-                  key: agendaWeekGridToggleKey,
-                  label: Messages.agendaWeekGrid,
-                  selected: _week && _grid,
-                  onTap: () => _show(week: true, grid: true),
-                ),
+                for (final Widget toggle in <Widget>[
+                  _Toggle(
+                    key: agendaDayToggleKey,
+                    label: Messages.agendaDay,
+                    selected: !_week,
+                    onTap: () => _show(week: false),
+                  ),
+                  _Toggle(
+                    key: agendaWeekToggleKey,
+                    label: Messages.agendaWeek,
+                    selected: _week && !_grid,
+                    onTap: () => _show(week: true),
+                  ),
+                  _Toggle(
+                    key: agendaWeekGridToggleKey,
+                    label: Messages.agendaWeekGrid,
+                    selected: _week && _grid,
+                    onTap: () => _show(week: true, grid: true),
+                  ),
+                ])
+                  Expanded(
+                    child: Center(
+                      child: FittedBox(fit: BoxFit.scaleDown, child: toggle),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: TileMetrics.gutter),
