@@ -9,10 +9,12 @@ import 'services/android_app_repository.dart';
 import 'services/android_attachment_download_service.dart';
 import 'services/android_bluetooth_service.dart';
 import 'services/android_calendar_service.dart';
+import 'services/android_camera_service.dart';
 import 'services/android_contacts_service.dart';
 import 'services/android_device_repository.dart';
 import 'services/android_files_service.dart';
 import 'services/android_home_role_service.dart';
+import 'services/android_link_service.dart';
 import 'services/android_location_service.dart';
 import 'services/android_permission_service.dart';
 import 'services/android_phone_service.dart';
@@ -102,6 +104,10 @@ Future<void> main() async {
           permissions: const AndroidPermissionService(),
         ),
         attachmentDownload: const AndroidAttachmentDownloadService(),
+        camera: AndroidCameraService(
+          permissions: const AndroidPermissionService(),
+        ),
+        link: const AndroidLinkService(),
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

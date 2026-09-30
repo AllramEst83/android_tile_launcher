@@ -5,7 +5,8 @@
 /// is adding, changing or removing an event; `phone` is placing a call and
 /// `sms` sending a text; `bluetooth` is reading the adapter's paired devices
 /// (Android 12+'s `BLUETOOTH_CONNECT` — a normal, install-time permission on
-/// older Android, so this grants at once there).
+/// older Android, so this grants at once there); `camera` is reading a frame
+/// to decode a QR code, never recording or taking a picture.
 enum AppPermission {
   location,
   calendar,
@@ -14,6 +15,7 @@ enum AppPermission {
   phone,
   sms,
   bluetooth,
+  camera,
 }
 
 enum PermissionStatus {

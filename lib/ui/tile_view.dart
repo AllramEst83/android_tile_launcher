@@ -48,6 +48,8 @@ import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
 import 'package:android_tile_launcher/ui/press_listener.dart';
+import 'package:android_tile_launcher/ui/qr_scanner_screen.dart';
+import 'package:android_tile_launcher/ui/qr_scanner_tile_view.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/text_tv_screen.dart';
@@ -350,6 +352,24 @@ Widget tileContent(
           onTap: interactive
               ? () =>
                     unawaited(showFilesSheet(context, service: services.files))
+              : null,
+        ),
+      );
+    case TileKind.qrScanner:
+      // Nothing to read from outside either: it opens the scanner, and that
+      // is all it does.
+      return Builder(
+        builder: (context) => QrScannerTileContentView(
+          ink: tile.colour.ink,
+          onTap: interactive
+              ? () => unawaited(
+                  showQrScannerScreen(
+                    context,
+                    camera: services.camera,
+                    link: services.link,
+                    clipboard: services.clipboard,
+                  ),
+                )
               : null,
         ),
       );

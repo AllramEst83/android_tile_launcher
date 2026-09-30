@@ -35,7 +35,8 @@ List<PinnedTile> _oneOfEachSize() => <PinnedTile>[
     ),
 ];
 
-/// Every kind at every size — 13 kinds by 24 sizes, one flat list rather than
+/// Every kind at every size — every [TileKind] by 24 sizes, one flat list
+/// rather than
 /// one pump per combination, the same trick [_oneOfEachSize] already uses.
 /// Phase 35's new one-row-tall widths ([TileSize.size3x1], [TileSize.size4x1])
 /// prompted the question for the clock specifically; this checks every other

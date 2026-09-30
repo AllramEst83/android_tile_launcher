@@ -67,6 +67,12 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- The QR scanner tile: reads a frame from the camera to decode a QR
+         code, never records or takes a picture. Asked for only when the tile
+         opens the scanner. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <!-- No auto-backup: the mail account is kept encrypted with a key that
          lives only in this phone's Keystore, so a restored copy of the
          encrypted file could never be read. -->

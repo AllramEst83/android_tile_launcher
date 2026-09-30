@@ -21,6 +21,7 @@ class MainActivity : FlutterActivity() {
     private var filesChannel: FilesChannelHandler? = null
     private var bluetoothChannel: BluetoothChannelHandler? = null
     private var attachmentChannel: AttachmentChannelHandler? = null
+    private var linkChannel: LinkChannelHandler? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -44,6 +45,7 @@ class MainActivity : FlutterActivity() {
         filesChannel = FilesChannelHandler(applicationContext, messenger)
         bluetoothChannel = BluetoothChannelHandler(applicationContext, messenger)
         attachmentChannel = AttachmentChannelHandler(applicationContext, messenger)
+        linkChannel = LinkChannelHandler(applicationContext, messenger)
     }
 
     override fun onRequestPermissionsResult(
@@ -93,6 +95,8 @@ class MainActivity : FlutterActivity() {
         bluetoothChannel = null
         attachmentChannel?.dispose()
         attachmentChannel = null
+        linkChannel?.dispose()
+        linkChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }

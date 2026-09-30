@@ -348,6 +348,18 @@ abstract final class Messages {
   static const String bluetoothConnected = 'CONNECTED';
   static const String bluetoothNotConnected = 'NOT CONNECTED';
 
+  static const String qrScannerTitle = 'QR SCANNER';
+  static const String qrScannerSubtitle = 'SCAN A CODE';
+  static const String qrScannerTapToAllow = 'TAP TO ALLOW CAMERA ACCESS';
+  static const String qrScannerAllowInSettings =
+      'ALLOW CAMERA ACCESS IN ANDROID SETTINGS.';
+  static const String qrScannerAim = 'AIM AT A QR CODE.';
+  static const String qrScannerOpen = 'OPEN';
+  static const String qrScannerCopy = 'COPY';
+  static const String qrScannerCopied = 'COPIED.';
+  static const String qrScannerScanAgain = 'SCAN AGAIN';
+  static const String qrScannerOpenFailed = 'COULD NOT OPEN THAT LINK.';
+
   static const String helpTitle = 'HELP';
 
   static const String helpGettingAroundTitle = 'GETTING AROUND';
