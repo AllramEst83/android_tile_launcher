@@ -104,4 +104,49 @@ void main() {
       expect(jumpFraction(groups, -1), jumpFraction(groups, 0));
     });
   });
+
+  group('groupIndexForFraction', () {
+    test('an empty list is always group 0', () {
+      expect(groupIndexForFraction(<InitialGroup<String>>[], 0), 0);
+      expect(groupIndexForFraction(<InitialGroup<String>>[], 0.5), 0);
+    });
+
+    test('0 is always the first group', () {
+      final groups = groupByInitial(['Apple', 'Banana'], (s) => s);
+
+      expect(groupIndexForFraction(groups, 0), 0);
+    });
+
+    test('is the exact inverse of jumpFraction, for equal-sized groups', () {
+      final groups = groupByInitial(['A1', 'B1', 'C1'], (s) => s);
+
+      for (var i = 0; i < groups.length; i++) {
+        expect(groupIndexForFraction(groups, jumpFraction(groups, i)), i);
+      }
+    });
+
+    test('a heavy group is found throughout its own weighted range', () {
+      // A: fifty names (weight 51 of 55), B: one (weight 2), C: one (weight 2).
+      final groups = groupByInitial([
+        for (var i = 0; i < 50; i++) 'A$i',
+        'B1',
+        'C1',
+      ], (s) => s);
+
+      expect(groupIndexForFraction(groups, 0.0), 0);
+      expect(groupIndexForFraction(groups, 0.5), 0);
+      // A's own weighted range ends at 51/55 ≈ 0.927.
+      expect(groupIndexForFraction(groups, 0.9), 0);
+      expect(groupIndexForFraction(groups, 0.95), 1);
+      expect(groupIndexForFraction(groups, 0.99), 2);
+    });
+
+    test('a fraction past the end is clamped to the last group', () {
+      final groups = groupByInitial(['Apple', 'Banana'], (s) => s);
+
+      expect(groupIndexForFraction(groups, 1.0), 1);
+      expect(groupIndexForFraction(groups, 5.0), 1);
+      expect(groupIndexForFraction(groups, -1.0), 0);
+    });
+  });
 }

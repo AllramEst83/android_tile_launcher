@@ -97,6 +97,29 @@ double jumpFraction<T>(List<InitialGroup<T>> groups, int index) {
   return total == 0 ? 0 : before / total;
 }
 
+/// The inverse of [jumpFraction]: which group is at the very top of the list
+/// once it has been scrolled so that [fraction] (0 at the very top, up to
+/// just under 1 at the very end) of the whole list's weighted content sits
+/// above the viewport — for the jump index's own persistent marker, so it
+/// tracks where the list actually is on an ordinary scroll, not only where a
+/// drag on the index last sent it.
+int groupIndexForFraction<T>(List<InitialGroup<T>> groups, double fraction) {
+  if (groups.isEmpty) return 0;
+  int total = 0;
+  for (final InitialGroup<T> group in groups) {
+    total += 1 + group.items.length;
+  }
+  if (total == 0) return 0;
+  final double target = fraction.clamp(0.0, 1.0) * total;
+  double before = 0;
+  for (final (int i, InitialGroup<T> group) in groups.indexed) {
+    final int weight = 1 + group.items.length;
+    if (target < before + weight) return i;
+    before += weight;
+  }
+  return groups.length - 1;
+}
+
 /// Buckets [items] the way a Swedish phone book does: A to Z, then Å, Ä, Ö,
 /// with a name starting on a digit, a symbol, or nothing filed under `#` last.
 /// [label] names each item; two items with the same key keep their original

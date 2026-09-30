@@ -6,6 +6,10 @@ import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+/// The jump index's own persistent "you are here" marker (see [JumpIndex]'s
+/// `activeIndex`), so a test can find and measure it.
+const Key jumpIndexActiveMarkerKey = ValueKey<String>('jump-index-active');
+
 /// [items] filed under their initial the way a Swedish phone book does (A to Z,
 /// then Å Ä Ö, `#` last: `model/alpha_grouping.dart`), a big letter above each
 /// group and a jump index down the right edge. Shared by the app drawer and
@@ -31,26 +35,61 @@ class GroupedList<T> extends StatefulWidget {
 class _GroupedListState<T> extends State<GroupedList<T>> {
   final ScrollController _scrollController = ScrollController();
 
+  /// The group currently at the top of the list, from an ordinary scroll
+  /// (not just a drag on the index itself) — drives the index's own
+  /// persistent marker. `0` until the first scroll notification, the same
+  /// group a fresh list opens on.
+  int _activeIndex = 0;
+
+  /// The groups as of the last build, for [_onScroll] to weigh scroll
+  /// position against — a scroll notification can arrive between builds.
+  List<InitialGroup<T>> _groups = <InitialGroup<T>>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final ScrollPosition position = _scrollController.position;
+    final double totalContent =
+        position.maxScrollExtent + position.viewportDimension;
+    if (totalContent <= 0) return;
+    final int index = groupIndexForFraction(
+      _groups,
+      position.pixels / totalContent,
+    );
+    if (index != _activeIndex) setState(() => _activeIndex = index);
   }
 
   // Proportional, not a scroll-to-widget: with a long list most letters
   // haven't been built yet (ListView only builds what's near the viewport),
   // so there's no GlobalKey/context to scroll to. jumpFraction weighs each
   // group by how much of the list it actually holds, so a heavy letter (many
-  // items) does not land the list on some other, lighter one.
+  // items) does not land the list on some other, lighter one. The fraction is
+  // of the list's whole content height, not of the scrollable *range*
+  // (`maxScrollExtent`, which is shorter by a viewport's worth) — multiplying
+  // by `maxScrollExtent` instead, as an earlier version of this did, undershot
+  // every jump by an amount that grew with how far down the list the target
+  // letter actually was, which read as the marker drifting out of sync with
+  // the list the further down the alphabet a scrub went.
   void _jumpToIndex(int index, List<InitialGroup<T>> groups) {
     if (!_scrollController.hasClients) return;
     final ScrollPosition position = _scrollController.position;
     final double fraction = jumpFraction(groups, index);
+    final double totalContent =
+        position.maxScrollExtent + position.viewportDimension;
     position.jumpTo(
-      (position.maxScrollExtent * fraction).clamp(
-        0.0,
-        position.maxScrollExtent,
-      ),
+      (totalContent * fraction).clamp(0.0, position.maxScrollExtent),
     );
   }
 
@@ -60,6 +99,7 @@ class _GroupedListState<T> extends State<GroupedList<T>> {
       widget.items,
       widget.label,
     );
+    _groups = groups;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -78,6 +118,7 @@ class _GroupedListState<T> extends State<GroupedList<T>> {
         JumpIndex(
           key: const Key('jump-index'),
           initials: <String>[for (final InitialGroup<T> g in groups) g.initial],
+          activeIndex: groups.isEmpty ? null : _activeIndex,
           onTap: (int index) => _jumpToIndex(index, groups),
         ),
       ],
@@ -123,8 +164,18 @@ class SectionHeader extends StatelessWidget {
 /// At rest the letters keep [edgeMargin] clear of the screen's edge. While a
 /// finger is down the whole strip slides [pushOut] to the left, out from under
 /// the finger, and back when it lifts.
+///
+/// [activeIndex], when given, draws a second, persistent bordered marker
+/// around that letter — where the list actually is right now, from an
+/// ordinary scroll, not only the last letter a drag on the strip landed on
+/// (the thin underline above, which only appears while touched).
 class JumpIndex extends StatefulWidget {
-  const JumpIndex({super.key, required this.initials, required this.onTap});
+  const JumpIndex({
+    super.key,
+    required this.initials,
+    required this.onTap,
+    this.activeIndex,
+  });
 
   /// The tallest a letter's row is, however much room there is.
   static const double maxRowHeight = 44;
@@ -158,6 +209,7 @@ class JumpIndex extends StatefulWidget {
 
   final List<String> initials;
   final ValueChanged<int> onTap;
+  final int? activeIndex;
 
   @override
   State<JumpIndex> createState() => _JumpIndexState();
@@ -295,6 +347,31 @@ class _JumpIndexState extends State<JumpIndex>
                         ],
                       ),
                     ),
+                    if (widget.activeIndex != null &&
+                        widget.activeIndex! >= 0 &&
+                        widget.activeIndex! < count)
+                      Positioned(
+                        key: jumpIndexActiveMarkerKey,
+                        left:
+                            -JumpIndex.pushOut *
+                            Curves.easeOut.transform(_wave.value),
+                        right:
+                            JumpIndex.pushOut *
+                                Curves.easeOut.transform(_wave.value) +
+                            JumpIndex.edgeMargin,
+                        top: top + widget.activeIndex! * rowHeight,
+                        child: IgnorePointer(
+                          child: Container(
+                            height: rowHeight,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: TileColors.textBright,
+                                width: TileMetrics.bevel,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     if (_active != null)
                       Positioned(
                         left:

@@ -51,6 +51,7 @@ Future<List<int>> _pump(
   List<String>? initials,
   double height = _height,
   bool haptics = true,
+  int? activeIndex,
 }) async {
   tester.view
     ..physicalSize = const Size(400, 1000)
@@ -72,6 +73,7 @@ Future<List<int>> _pump(
                 key: _strip,
                 initials: initials ?? _alphabet,
                 onTap: jumps.add,
+                activeIndex: activeIndex,
               ),
             ),
           ),
@@ -492,5 +494,72 @@ void main() {
     await tester.pump();
 
     expect(jumps, isEmpty);
+  });
+
+  group('the persistent marker', () {
+    testWidgets('is not drawn when there is no active index', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester);
+
+      expect(find.byKey(jumpIndexActiveMarkerKey), findsNothing);
+    });
+
+    testWidgets('sits around the letter at the active index', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, activeIndex: 7);
+
+      final Rect marker = tester.getRect(find.byKey(jumpIndexActiveMarkerKey));
+      final Rect letter = tester.getRect(find.text('H'));
+      expect(marker.top, closeTo(letter.top, _row / 2 + 1));
+      expect(marker.height, closeTo(_row, 0.5));
+    });
+
+    testWidgets('moves when the active index changes', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, activeIndex: 0);
+      final double first = tester
+          .getRect(find.byKey(jumpIndexActiveMarkerKey))
+          .top;
+
+      await _pump(tester, activeIndex: 10);
+      final double later = tester
+          .getRect(find.byKey(jumpIndexActiveMarkerKey))
+          .top;
+
+      expect(later, greaterThan(first));
+    });
+
+    testWidgets('does not appear for an out-of-range active index', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, initials: <String>['A', 'B'], activeIndex: 5);
+
+      expect(find.byKey(jumpIndexActiveMarkerKey), findsNothing);
+    });
+
+    testWidgets('still slides with the strip while a finger is down', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, activeIndex: 0);
+      final double restLeft = tester
+          .getRect(find.byKey(jumpIndexActiveMarkerKey))
+          .left;
+      final Offset top = tester.getTopLeft(find.byKey(_strip));
+
+      final TestGesture finger = await tester.startGesture(
+        Offset(top.dx + 12, top.dy + _at(12)),
+      );
+      await _settleWave(tester);
+
+      final double touchedLeft = tester
+          .getRect(find.byKey(jumpIndexActiveMarkerKey))
+          .left;
+      expect(touchedLeft, lessThan(restLeft));
+      await finger.up();
+      await tester.pumpAndSettle();
+    });
   });
 }

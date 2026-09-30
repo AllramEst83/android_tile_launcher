@@ -4,6 +4,7 @@ import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_icon.dart';
+import 'package:android_tile_launcher/ui/grouped_list.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -100,6 +101,51 @@ void main() {
     final double after = scrollable.position.pixels;
     expect(after, greaterThan(before));
   });
+
+  testWidgets(
+    'an ordinary scroll moves the jump index\'s own persistent marker',
+    (WidgetTester tester) async {
+      final List<AppInfo> manyApps = [
+        for (final String label in [
+          'Apple',
+          'Banana',
+          'Cherry',
+          'Date',
+          'Elder',
+          'Fig',
+          'Grape',
+          'Honey',
+          'Iris',
+          'Jam',
+          'Kiwi',
+          'Lime',
+          'Mango',
+          'Nut',
+          'Olive',
+        ])
+          AppInfo(label: label, packageName: 'pkg.${label.toLowerCase()}'),
+      ];
+      await _pump(tester, apps: manyApps);
+
+      final double topAtStart = tester
+          .getRect(find.byKey(jumpIndexActiveMarkerKey))
+          .top;
+
+      final ScrollableState scrollable = tester.state<ScrollableState>(
+        find.descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+      await tester.pump();
+
+      final double topAtEnd = tester
+          .getRect(find.byKey(jumpIndexActiveMarkerKey))
+          .top;
+      expect(topAtEnd, greaterThan(topAtStart));
+    },
+  );
 
   testWidgets('typing switches to a ranked flat list with no jump index', (
     tester,
