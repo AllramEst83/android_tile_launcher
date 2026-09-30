@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/games/tetris/tetris_screen.dart';
 import 'package:android_tile_launcher/messages.dart';
+import 'package:android_tile_launcher/ui/pad_key.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -64,6 +65,42 @@ void main() {
     expect(find.byKey(tetrisCloseKey), findsOneWidget);
   });
 
+  testWidgets('PAUSE freezes the game and shows PAUSED; PLAY resumes it', (
+    WidgetTester tester,
+  ) async {
+    await _open(tester);
+
+    await tester.tap(find.byKey(tetrisPauseKey));
+    await tester.pump();
+
+    expect(find.byKey(tetrisPausedKey), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(tetrisPauseKey),
+        matching: find.text(Messages.tetrisResume),
+      ),
+      findsOneWidget,
+    );
+
+    // Actions are no-ops while paused: SLAM would otherwise always change
+    // the score/board at once.
+    await tester.tap(find.byKey(tetrisHardDropKey));
+    await tester.pump();
+    expect(find.textContaining('SCORE 0'), findsOneWidget);
+
+    await tester.tap(find.byKey(tetrisPauseKey));
+    await tester.pump();
+
+    expect(find.byKey(tetrisPausedKey), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(tetrisPauseKey),
+        matching: find.text(Messages.tetrisPause),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'hard-dropping until it tops out shows GAME OVER, and RESTART works',
     (WidgetTester tester) async {
@@ -80,6 +117,10 @@ void main() {
 
       expect(find.byKey(tetrisGameOverKey), findsOneWidget);
       expect(find.text(Messages.tetrisGameOver), findsOneWidget);
+
+      // Nothing left to pause once the game is over.
+      final PadKey pauseKey = tester.widget(find.byKey(tetrisPauseKey));
+      expect(pauseKey.onTap, isNull);
 
       await tester.tap(find.byKey(tetrisRestartKey));
       await tester.pump();

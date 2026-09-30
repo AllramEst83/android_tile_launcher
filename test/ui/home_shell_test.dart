@@ -279,12 +279,8 @@ void main() {
         AppInfo(label: 'Clock', packageName: 'pkg.clock'),
         AppInfo(label: 'Maps', packageName: 'pkg.maps'),
       ];
-      tester.binding.handleAppLifecycleStateChanged(
-        AppLifecycleState.inactive,
-      );
-      tester.binding.handleAppLifecycleStateChanged(
-        AppLifecycleState.resumed,
-      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
 
       expect(repository.refreshCalls, 1);

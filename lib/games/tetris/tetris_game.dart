@@ -16,6 +16,7 @@ class TetrisHudState {
     required this.lines,
     required this.level,
     required this.gameOver,
+    required this.paused,
     required this.next,
   });
 
@@ -23,6 +24,7 @@ class TetrisHudState {
   final int lines;
   final int level;
   final bool gameOver;
+  final bool paused;
   final TetrominoType next;
 }
 
@@ -56,16 +58,36 @@ class TetrisGame extends FlameGame {
       lines: 0,
       level: 1,
       gameOver: false,
+      paused: false,
       next: TetrominoType.i,
     ),
   );
 
   double _sinceTick = 0;
 
+  // Drawn ourselves in [render] (a flat board colour, not the default
+  // backdrop a still-loading GameWidget would otherwise cover it with) —
+  // transparent so nothing is left to hide a rendering problem behind.
+  @override
+  Color backgroundColor() => const Color(0x00000000);
+
+  /// Pauses/resumes the whole game: gravity (via Flame's own engine pause,
+  /// which stops the game loop outright) and manual moves alike (guarded in
+  /// [_act]). A no-op once the game is over — nothing left to pause.
+  void togglePause() {
+    if (board.gameOver) return;
+    paused = !paused;
+    _publish();
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
-    if (board.gameOver) return;
+    // Flame's own engine pause (set by togglePause) stops its game loop from
+    // calling update at all in the real app, but this guard doesn't rely on
+    // that — it also keeps a directly-driven `update` call (as a test would
+    // make) from ticking gravity while paused.
+    if (board.gameOver || paused) return;
     _sinceTick += dt;
     final double interval = board.tickInterval.inMilliseconds / 1000;
     if (_sinceTick < interval) return;
@@ -81,7 +103,7 @@ class TetrisGame extends FlameGame {
   void rotate() => _act(board.rotate);
 
   void _act(void Function() action) {
-    if (board.gameOver) return;
+    if (board.gameOver || paused) return;
     action();
     _publish();
   }
@@ -92,6 +114,7 @@ class TetrisGame extends FlameGame {
       lines: board.lines,
       level: board.level,
       gameOver: board.gameOver,
+      paused: paused,
       next: board.next ?? TetrominoType.i,
     );
   }
@@ -99,7 +122,12 @@ class TetrisGame extends FlameGame {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    if (size.x <= 0 || size.y <= 0) return;
+    // Guards against an unbounded/NaN size during a transient layout pass
+    // too, not just a literal zero — either would otherwise draw the whole
+    // board off in nowhere without ever throwing.
+    if (!size.x.isFinite || !size.y.isFinite || size.x <= 0 || size.y <= 0) {
+      return;
+    }
     final double cell = (size.x / TetrisBoard.width).clamp(
       0.0,
       size.y / TetrisBoard.height,

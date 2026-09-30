@@ -391,6 +391,9 @@ abstract final class Messages {
   static const String tetrisRotate = 'ROTATE';
   static const String tetrisDrop = 'DROP';
   static const String tetrisHardDrop = 'SLAM';
+  static const String tetrisPause = 'PAUSE';
+  static const String tetrisResume = 'PLAY';
+  static const String tetrisPaused = 'PAUSED';
 
   // Why an expression could not be worked out: lower case, as they are said;
   // the pad shows them in capitals.

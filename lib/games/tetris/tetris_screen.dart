@@ -11,6 +11,8 @@ import 'package:flutter/services.dart';
 
 /// Keys so tests can find the parts.
 const Key tetrisCloseKey = ValueKey<String>('tetris-close');
+const Key tetrisPauseKey = ValueKey<String>('tetris-pause');
+const Key tetrisPausedKey = ValueKey<String>('tetris-paused');
 const Key tetrisScoreKey = ValueKey<String>('tetris-score');
 const Key tetrisLinesKey = ValueKey<String>('tetris-lines');
 const Key tetrisLevelKey = ValueKey<String>('tetris-level');
@@ -119,16 +121,28 @@ class _TetrisScreenState extends State<TetrisScreen> {
                 onPanEnd: _onPanEnd,
                 child: Stack(
                   children: <Widget>[
-                    Positioned.fill(child: GameWidget(game: _game)),
+                    Positioned.fill(
+                      // Not Flame's default (a repaint boundary of its own):
+                      // rendering here is driven entirely by our own manual
+                      // Canvas drawing inside a game loop, not Flutter
+                      // widget rebuilds, and an extra boundary between the
+                      // two has been known to go stale on some Android
+                      // renderers — simplest to let it repaint with its
+                      // ancestors instead.
+                      child: GameWidget(game: _game, addRepaintBoundary: false),
+                    ),
                     ValueListenableBuilder<TetrisHudState>(
                       valueListenable: _game.hud,
-                      builder: (BuildContext context, TetrisHudState hud, _) =>
-                          hud.gameOver
-                          ? _GameOverOverlay(
-                              score: hud.score,
-                              onRestart: _restart,
-                            )
-                          : const SizedBox.shrink(),
+                      builder: (BuildContext context, TetrisHudState hud, _) {
+                        if (hud.gameOver) {
+                          return _GameOverOverlay(
+                            score: hud.score,
+                            onRestart: _restart,
+                          );
+                        }
+                        if (hud.paused) return const _PausedOverlay();
+                        return const SizedBox.shrink();
+                      },
                     ),
                   ],
                 ),
@@ -157,23 +171,36 @@ class _HudRow extends StatelessWidget {
     );
     return Padding(
       padding: const EdgeInsets.all(TileMetrics.margin),
-      child: Row(
-        children: <Widget>[
-          SizedBox(
-            width: 40,
-            child: PadKey(
-              key: tetrisCloseKey,
-              label: 'X',
-              height: 32,
-              fontSize: 12,
-              onTap: onClose,
+      child: ValueListenableBuilder<TetrisHudState>(
+        valueListenable: game.hud,
+        builder: (BuildContext context, TetrisHudState hud, _) => Row(
+          children: <Widget>[
+            SizedBox(
+              width: 40,
+              child: PadKey(
+                key: tetrisCloseKey,
+                label: 'X',
+                height: 32,
+                fontSize: 12,
+                onTap: onClose,
+              ),
             ),
-          ),
-          const SizedBox(width: TileMetrics.margin),
-          Expanded(
-            child: ValueListenableBuilder<TetrisHudState>(
-              valueListenable: game.hud,
-              builder: (BuildContext context, TetrisHudState hud, _) => Row(
+            const SizedBox(width: TileMetrics.gutter),
+            SizedBox(
+              width: 56,
+              child: PadKey(
+                key: tetrisPauseKey,
+                label: hud.paused
+                    ? Messages.tetrisResume
+                    : Messages.tetrisPause,
+                height: 32,
+                fontSize: 10,
+                onTap: hud.gameOver ? null : game.togglePause,
+              ),
+            ),
+            const SizedBox(width: TileMetrics.margin),
+            Expanded(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
                   Text(
@@ -195,8 +222,8 @@ class _HudRow extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -280,6 +307,30 @@ class _GameOverOverlay extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PausedOverlay extends StatelessWidget {
+  const _PausedOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      key: tetrisPausedKey,
+      child: ColoredBox(
+        color: TileColors.canvas.withValues(alpha: 0.85),
+        child: Center(
+          child: Text(
+            Messages.tetrisPaused,
+            style: TextStyle(
+              fontFamily: kPixelFontFamily,
+              fontSize: 18,
+              color: TileColors.textBright,
+            ),
           ),
         ),
       ),

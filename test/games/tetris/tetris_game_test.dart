@@ -86,5 +86,71 @@ void main() {
       expect(game.hud.value.gameOver, isTrue);
       expect(game.hud.value.score, before.score);
     });
+
+    test('togglePause flips hud.paused and Flame\'s own paused flag', () {
+      final game = TetrisGame(board: TetrisBoard(random: Random(1)));
+
+      expect(game.hud.value.paused, isFalse);
+      expect(game.paused, isFalse);
+
+      game.togglePause();
+      expect(game.hud.value.paused, isTrue);
+      expect(game.paused, isTrue);
+
+      game.togglePause();
+      expect(game.hud.value.paused, isFalse);
+      expect(game.paused, isFalse);
+    });
+
+    test('moves and drops are no-ops while paused', () {
+      final game = TetrisGame(board: TetrisBoard(random: Random(1)));
+      final int startCol = game.board.active!.col;
+      game.togglePause();
+
+      game.moveRight();
+      game.rotate();
+      game.hardDrop();
+
+      expect(game.board.active!.col, startCol);
+      expect(game.hud.value.score, 0);
+    });
+
+    test('gravity does not tick while paused', () {
+      final game = TetrisGame(board: TetrisBoard(random: Random(1)));
+      final int startRow = game.board.active!.row;
+      final double intervalSeconds =
+          game.board.tickInterval.inMilliseconds / 1000;
+      game.togglePause();
+
+      game.update(intervalSeconds + 1);
+
+      expect(game.board.active!.row, startRow);
+    });
+
+    test('togglePause does nothing once the game is over', () {
+      final board = TetrisBoard(random: Random(1));
+      int guard = 0;
+      while (!board.gameOver && guard < 400) {
+        for (int i = 0; i < 20; i++) {
+          board.moveLeft();
+        }
+        board.hardDrop();
+        guard++;
+      }
+      final game = TetrisGame(board: board);
+
+      game.togglePause();
+
+      expect(game.hud.value.paused, isFalse);
+    });
+
+    test(
+      'backgroundColor is transparent: the board paints its own backdrop',
+      () {
+        final game = TetrisGame(board: TetrisBoard(random: Random(1)));
+
+        expect(game.backgroundColor().a, 0);
+      },
+    );
   });
 }
