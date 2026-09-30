@@ -45,6 +45,15 @@ class _GroupedListState<T> extends State<GroupedList<T>> {
   /// position against — a scroll notification can arrive between builds.
   List<InitialGroup<T>> _groups = <InitialGroup<T>>[];
 
+  /// How tall a [SectionHeader] and a row actually render, as of the last
+  /// build — [jumpFraction] and [groupIndexForFraction]'s weights, so the
+  /// fraction they compute tracks real scroll position rather than counting
+  /// every row the same regardless of how much of the list it actually
+  /// takes. Measured, not guessed, so it still holds under a font-scale
+  /// setting that changes both, and by a different amount.
+  double _headerWeight = 1;
+  double _itemWeight = 1;
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +76,8 @@ class _GroupedListState<T> extends State<GroupedList<T>> {
     final int index = groupIndexForFraction(
       _groups,
       position.pixels / totalContent,
+      headerWeight: _headerWeight,
+      itemWeight: _itemWeight,
     );
     if (index != _activeIndex) setState(() => _activeIndex = index);
   }
@@ -85,11 +96,43 @@ class _GroupedListState<T> extends State<GroupedList<T>> {
   void _jumpToIndex(int index, List<InitialGroup<T>> groups) {
     if (!_scrollController.hasClients) return;
     final ScrollPosition position = _scrollController.position;
-    final double fraction = jumpFraction(groups, index);
+    final double fraction = jumpFraction(
+      groups,
+      index,
+      headerWeight: _headerWeight,
+      itemWeight: _itemWeight,
+    );
     final double totalContent =
         position.maxScrollExtent + position.viewportDimension;
     position.jumpTo(
       (totalContent * fraction).clamp(0.0, position.maxScrollExtent),
+    );
+  }
+
+  /// A single character's rendered height in [style], at the current
+  /// font-scale setting — [_headerWeight] and [_itemWeight]'s unit.
+  static double _lineHeight(BuildContext context, TextStyle? style) {
+    final TextPainter painter = TextPainter(
+      text: TextSpan(text: 'M', style: style),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final double height = painter.height;
+    painter.dispose();
+    return height;
+  }
+
+  void _measureWeights(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    // Mirrors SectionHeader's own padding: gutter*2 above, gutter below.
+    _headerWeight =
+        TileMetrics.gutter * 3 + _lineHeight(context, text.headlineMedium);
+    // Mirrors an app/contact row's own padding (gutter above and below) and
+    // its `minHeight: 48` floor, which is what actually renders while the
+    // row's own text stays shorter than that floor.
+    _itemWeight = math.max(
+      48.0,
+      _lineHeight(context, text.bodyMedium) + TileMetrics.gutter * 2,
     );
   }
 
@@ -100,6 +143,7 @@ class _GroupedListState<T> extends State<GroupedList<T>> {
       widget.label,
     );
     _groups = groups;
+    _measureWeights(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -168,7 +212,9 @@ class SectionHeader extends StatelessWidget {
 /// [activeIndex], when given, draws a second, persistent bordered marker
 /// around that letter — where the list actually is right now, from an
 /// ordinary scroll, not only the last letter a drag on the strip landed on
-/// (the thin underline above, which only appears while touched).
+/// (the thin underline above, which only appears while touched). Hidden while
+/// a finger is down: the touched letters themselves swing out and grow, so a
+/// box drawn at their untransformed row would no longer sit around them.
 class JumpIndex extends StatefulWidget {
   const JumpIndex({
     super.key,
@@ -349,7 +395,8 @@ class _JumpIndexState extends State<JumpIndex>
                     ),
                     if (widget.activeIndex != null &&
                         widget.activeIndex! >= 0 &&
-                        widget.activeIndex! < count)
+                        widget.activeIndex! < count &&
+                        _active == null)
                       Positioned(
                         key: jumpIndexActiveMarkerKey,
                         left:

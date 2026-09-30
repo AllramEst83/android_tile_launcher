@@ -103,6 +103,29 @@ void main() {
       expect(jumpFraction(groups, 99), jumpFraction(groups, 1));
       expect(jumpFraction(groups, -1), jumpFraction(groups, 0));
     });
+
+    test(
+      'a different header weight changes the fraction for unequal groups',
+      () {
+        // A ten-item group followed by a one-item one: how much of the whole
+        // A's header is worth relative to its own ten rows changes where B
+        // actually starts, once a header is not simply "as tall as a row".
+        final groups = groupByInitial([
+          for (var i = 0; i < 10; i++) 'A$i',
+          'B1',
+        ], (s) => s);
+
+        final double evenWeighted = jumpFraction(groups, 1);
+        final double headerHeavy = jumpFraction(
+          groups,
+          1,
+          headerWeight: 3,
+          itemWeight: 1,
+        );
+
+        expect(headerHeavy, isNot(closeTo(evenWeighted, 1e-9)));
+      },
+    );
   });
 
   group('groupIndexForFraction', () {
@@ -147,6 +170,28 @@ void main() {
       expect(groupIndexForFraction(groups, 1.0), 1);
       expect(groupIndexForFraction(groups, 5.0), 1);
       expect(groupIndexForFraction(groups, -1.0), 0);
+    });
+
+    test('stays the exact inverse of jumpFraction with a heavier header', () {
+      final groups = groupByInitial(['A1', 'B1', 'C1'], (s) => s);
+
+      for (var i = 0; i < groups.length; i++) {
+        final double fraction = jumpFraction(
+          groups,
+          i,
+          headerWeight: 3.5,
+          itemWeight: 1,
+        );
+        expect(
+          groupIndexForFraction(
+            groups,
+            fraction,
+            headerWeight: 3.5,
+            itemWeight: 1,
+          ),
+          i,
+        );
+      }
     });
   });
 }

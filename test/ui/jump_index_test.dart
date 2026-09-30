@@ -540,26 +540,25 @@ void main() {
       expect(find.byKey(jumpIndexActiveMarkerKey), findsNothing);
     });
 
-    testWidgets('still slides with the strip while a finger is down', (
+    testWidgets('hidden while a finger is down, back once it lifts', (
       WidgetTester tester,
     ) async {
       await _pump(tester, activeIndex: 0);
-      final double restLeft = tester
-          .getRect(find.byKey(jumpIndexActiveMarkerKey))
-          .left;
+      expect(find.byKey(jumpIndexActiveMarkerKey), findsOneWidget);
       final Offset top = tester.getTopLeft(find.byKey(_strip));
 
+      // The touched letters swing out and grow; a box drawn at their
+      // untransformed row would no longer sit around them, so it is hidden
+      // for as long as a finger is down, whatever letter it lands on.
       final TestGesture finger = await tester.startGesture(
-        Offset(top.dx + 12, top.dy + _at(12)),
+        Offset(top.dx + 12, top.dy + _at(0)),
       );
       await _settleWave(tester);
+      expect(find.byKey(jumpIndexActiveMarkerKey), findsNothing);
 
-      final double touchedLeft = tester
-          .getRect(find.byKey(jumpIndexActiveMarkerKey))
-          .left;
-      expect(touchedLeft, lessThan(restLeft));
       await finger.up();
       await tester.pumpAndSettle();
+      expect(find.byKey(jumpIndexActiveMarkerKey), findsOneWidget);
     });
   });
 }

@@ -82,15 +82,25 @@ class InitialGroup<T> {
 /// actually scrolls to, not just where the letter sits among the others.
 /// Scroll distance tracks content, not letter count: a group of fifty names
 /// takes far more of it than one with a single name, so each group is
-/// weighted by its own header (one row's worth) plus one per item, and
-/// [index] counts for as much of the whole as the groups before it do.
-double jumpFraction<T>(List<InitialGroup<T>> groups, int index) {
+/// weighted by its own header (worth [headerWeight]) plus [itemWeight] per
+/// item, and [index] counts for as much of the whole as the groups before it
+/// do. The defaults (both `1`) treat a header and an item as the same size;
+/// callers that know better — a header row is taller on screen than an item
+/// row — pass the real measured heights instead, so the fraction tracks
+/// actual scroll position rather than a naive per-row count that would
+/// undercount every header passed, worse the more of them there are.
+double jumpFraction<T>(
+  List<InitialGroup<T>> groups,
+  int index, {
+  double headerWeight = 1,
+  double itemWeight = 1,
+}) {
   if (groups.isEmpty) return 0;
   final int target = index.clamp(0, groups.length - 1);
-  int before = 0;
-  int total = 0;
+  double before = 0;
+  double total = 0;
   for (final (int i, InitialGroup<T> group) in groups.indexed) {
-    final int weight = 1 + group.items.length;
+    final double weight = headerWeight + group.items.length * itemWeight;
     if (i < target) before += weight;
     total += weight;
   }
@@ -102,18 +112,24 @@ double jumpFraction<T>(List<InitialGroup<T>> groups, int index) {
 /// just under 1 at the very end) of the whole list's weighted content sits
 /// above the viewport — for the jump index's own persistent marker, so it
 /// tracks where the list actually is on an ordinary scroll, not only where a
-/// drag on the index last sent it.
-int groupIndexForFraction<T>(List<InitialGroup<T>> groups, double fraction) {
+/// drag on the index last sent it. [headerWeight] and [itemWeight] must match
+/// whatever [jumpFraction] was called with, or the two drift apart.
+int groupIndexForFraction<T>(
+  List<InitialGroup<T>> groups,
+  double fraction, {
+  double headerWeight = 1,
+  double itemWeight = 1,
+}) {
   if (groups.isEmpty) return 0;
-  int total = 0;
+  double total = 0;
   for (final InitialGroup<T> group in groups) {
-    total += 1 + group.items.length;
+    total += headerWeight + group.items.length * itemWeight;
   }
   if (total == 0) return 0;
   final double target = fraction.clamp(0.0, 1.0) * total;
   double before = 0;
   for (final (int i, InitialGroup<T> group) in groups.indexed) {
-    final int weight = 1 + group.items.length;
+    final double weight = headerWeight + group.items.length * itemWeight;
     if (target < before + weight) return i;
     before += weight;
   }
