@@ -35,6 +35,89 @@ class MailMessage {
   );
 }
 
+/// A unit "older than" counts in.
+enum MailAgeUnit {
+  days('DAYS'),
+  weeks('WEEKS'),
+  months('MONTHS'),
+  years('YEARS');
+
+  const MailAgeUnit(this.label);
+
+  final String label;
+}
+
+/// How far back an "older than" filter reaches, e.g. 3 weeks.
+class MailOlderThan {
+  const MailOlderThan(this.amount, this.unit);
+
+  final int amount;
+  final MailAgeUnit unit;
+
+  /// The cutoff date, given [now]: a message sent before this passes the
+  /// filter.
+  DateTime before(DateTime now) => switch (unit) {
+    MailAgeUnit.days => now.subtract(Duration(days: amount)),
+    MailAgeUnit.weeks => now.subtract(Duration(days: amount * 7)),
+    MailAgeUnit.months => DateTime(now.year, now.month - amount, now.day),
+    MailAgeUnit.years => DateTime(now.year - amount, now.month, now.day),
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is MailOlderThan && other.amount == amount && other.unit == unit;
+
+  @override
+  int get hashCode => Object.hash(amount, unit);
+
+  @override
+  String toString() => 'MailOlderThan($amount ${unit.label})';
+}
+
+/// A filter over the inbox listing: free text (matches the subject or the
+/// body), the sender's address, the recipient's address, and/or an "older
+/// than" cutoff. Every field that is set narrows the results further (AND);
+/// [isEmpty] means no filtering — the plain inbox listing.
+class MailFilter {
+  const MailFilter({
+    this.text = '',
+    this.from = '',
+    this.to = '',
+    this.olderThan,
+  });
+
+  final String text;
+  final String from;
+  final String to;
+  final MailOlderThan? olderThan;
+
+  bool get isEmpty =>
+      text.isEmpty && from.isEmpty && to.isEmpty && olderThan == null;
+
+  MailFilter withoutText() =>
+      MailFilter(from: from, to: to, olderThan: olderThan);
+  MailFilter withoutFrom() =>
+      MailFilter(text: text, to: to, olderThan: olderThan);
+  MailFilter withoutTo() =>
+      MailFilter(text: text, from: from, olderThan: olderThan);
+  MailFilter withoutOlderThan() => MailFilter(text: text, from: from, to: to);
+
+  @override
+  bool operator ==(Object other) =>
+      other is MailFilter &&
+      other.text == text &&
+      other.from == from &&
+      other.to == to &&
+      other.olderThan == olderThan;
+
+  @override
+  int get hashCode => Object.hash(text, from, to, olderThan);
+
+  @override
+  String toString() =>
+      'MailFilter(text: $text, from: $from, to: $to, olderThan: $olderThan)';
+}
+
 sealed class MailResult {
   const MailResult();
 }

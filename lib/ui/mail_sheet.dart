@@ -8,6 +8,7 @@ import 'package:android_tile_launcher/services/attachment_download_service.dart'
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_filter_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +44,9 @@ const Key mailBulkUnreadKey = ValueKey<String>('mail-bulk-unread');
 const Key mailBulkYesKey = ValueKey<String>('mail-bulk-yes');
 const Key mailBulkNoKey = ValueKey<String>('mail-bulk-no');
 const Key mailShowImagesKey = ValueKey<String>('mail-show-images');
+const Key mailFilterKey = ValueKey<String>('mail-filter');
+Key mailFilterChipKey(String field) =>
+    ValueKey<String>('mail-filter-chip-$field');
 Key mailDownloadKey(String name) => ValueKey<String>('mail-download-$name');
 
 /// `RE: <subject>`, unless [subject] already reads as a reply.
@@ -165,6 +169,9 @@ class _MailSheetState extends State<_MailSheet> {
   int _bulkDone = 0;
   int _bulkTotal = 0;
 
+  /// What FILTER narrowed the list to; empty is no filtering at all.
+  MailFilter _filter = const MailFilter();
+
   @override
   void initState() {
     super.initState();
@@ -183,7 +190,9 @@ class _MailSheetState extends State<_MailSheet> {
     });
     final MailAccountInfo? account = await widget.mail.account();
     // Always from the server: the sheet is for looking at what is there now.
-    final MailResult result = await widget.mail.latest(count: 20, fresh: true);
+    final MailResult result = _filter.isEmpty
+        ? await widget.mail.latest(count: 20, fresh: true)
+        : await widget.mail.search(_filter, count: 20);
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -193,6 +202,21 @@ class _MailSheetState extends State<_MailSheet> {
           ? List<MailMessage>.of(result.messages)
           : <MailMessage>[];
     });
+  }
+
+  Future<void> _openFilter() async {
+    final MailFilter? next = await showMailFilterSheet(
+      context,
+      initial: _filter,
+    );
+    if (next == null || next == _filter) return;
+    setState(() => _filter = next);
+    await _load();
+  }
+
+  void _clearFilterField(MailFilter Function(MailFilter) without) {
+    setState(() => _filter = without(_filter));
+    _load();
   }
 
   int? get _validity {
@@ -630,12 +654,22 @@ class _MailSheetState extends State<_MailSheet> {
                   else
                     const Spacer(),
                   _Button(
+                    key: mailFilterKey,
+                    label: Messages.mailFilter,
+                    onTap: _busy || _loading ? null : _openFilter,
+                  ),
+                  const SizedBox(width: 8),
+                  _Button(
                     key: mailComposeKey,
                     label: Messages.mailCompose,
                     onTap: _busy ? null : _compose,
                   ),
                 ],
               ),
+              if (!_filter.isEmpty) ...<Widget>[
+                const SizedBox(height: TileMetrics.gutter),
+                _filterChips(),
+              ],
             ],
             // READ/UNREAD/DELETE wrap onto a second line on a narrow phone,
             // rather than a fixed row that would overflow.
@@ -933,6 +967,44 @@ class _MailSheetState extends State<_MailSheet> {
     );
   }
 
+  /// One removable chip per filter field that is set, above the list and
+  /// below the account/COMPOSE row.
+  Widget _filterChips() {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: <Widget>[
+        if (_filter.text.isNotEmpty)
+          _FilterChip(
+            key: mailFilterChipKey('text'),
+            label: Messages.mailFilterTextChip(_filter.text),
+            onRemove: () => _clearFilterField((f) => f.withoutText()),
+          ),
+        if (_filter.from.isNotEmpty)
+          _FilterChip(
+            key: mailFilterChipKey('from'),
+            label: Messages.mailFilterFromChip(_filter.from),
+            onRemove: () => _clearFilterField((f) => f.withoutFrom()),
+          ),
+        if (_filter.to.isNotEmpty)
+          _FilterChip(
+            key: mailFilterChipKey('to'),
+            label: Messages.mailFilterToChip(_filter.to),
+            onRemove: () => _clearFilterField((f) => f.withoutTo()),
+          ),
+        if (_filter.olderThan != null)
+          _FilterChip(
+            key: mailFilterChipKey('olderThan'),
+            label: Messages.mailFilterOlderThanChip(
+              _filter.olderThan!.amount,
+              _filter.olderThan!.unit.label,
+            ),
+            onRemove: () => _clearFilterField((f) => f.withoutOlderThan()),
+          ),
+      ],
+    );
+  }
+
   Widget _body(TextTheme text, MailResult? result) {
     if (_loading) {
       return Text(Messages.contactsLoading, style: text.bodyMedium);
@@ -940,7 +1012,10 @@ class _MailSheetState extends State<_MailSheet> {
     switch (result) {
       case MailMessages():
         if (_messages.isEmpty) {
-          return Text(Messages.mailInboxEmpty, style: text.bodyMedium);
+          return Text(
+            _filter.isEmpty ? Messages.mailInboxEmpty : Messages.mailNoMatches,
+            style: text.bodyMedium,
+          );
         }
         final DateTime now = widget.clock();
         return ListView(
@@ -1092,6 +1167,37 @@ class _AddressChip extends StatelessWidget {
           style: Theme.of(context).textTheme.bodySmall
               ?.copyWith(fontSize: 13, color: TileColors.accent),
         ),
+      ),
+    );
+  }
+}
+
+/// One applied filter, with its own X to clear just that one.
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({super.key, required this.label, required this.onRemove});
+
+  final String label;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextStyle? style = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(fontSize: 11, color: TileColors.accent);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: TileColors.accent, width: TileMetrics.bevel),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(label, style: style),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: onRemove,
+            child: Text('X', style: style),
+          ),
+        ],
       ),
     );
   }

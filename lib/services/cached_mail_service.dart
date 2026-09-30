@@ -72,6 +72,13 @@ class CachedMailService implements MailService {
   }
 
   @override
+  Future<MailResult> search(MailFilter filter, {int count = 20}) =>
+      // A filtered search always asks the server fresh; caching it would need
+      // one cache slot per filter for a feature used far less than a plain
+      // read of the inbox.
+      inner.search(filter, count: count);
+
+  @override
   Future<MailMoveResult> moveToTrash(int uid, {int? validity}) async {
     // The inbox has changed, or is about to be.
     _drop();

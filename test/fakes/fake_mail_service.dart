@@ -68,6 +68,16 @@ class FakeMailService implements MailService {
     return result;
   }
 
+  /// What `search` answers, and every filter it was given, in order.
+  MailResult? searchResult;
+  final List<MailFilter> searches = <MailFilter>[];
+
+  @override
+  Future<MailResult> search(MailFilter filter, {int count = 20}) async {
+    searches.add(filter);
+    return searchResult ?? result;
+  }
+
   /// What `read` answers, and every `(uid, validity)` it was given.
   MailReadResult readResult = const MailReadGone();
 

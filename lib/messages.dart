@@ -183,6 +183,23 @@ abstract final class Messages {
   static const String mailSendNeedsTo = 'GIVE IT A RECIPIENT.';
   static const String mailSendNeedsText = 'GIVE IT SOMETHING TO SAY.';
 
+  static const String mailFilter = 'FILTER';
+  static const String mailFilterTitle = 'FILTER MAIL';
+  static const String mailFilterText = 'TEXT (SUBJECT OR BODY)';
+  static const String mailFilterFrom = 'FROM ADDRESS';
+  static const String mailFilterTo = 'TO ADDRESS';
+  static const String mailFilterOlderThan = 'OLDER THAN';
+  static const String mailFilterApply = 'APPLY';
+  static const String mailFilterClear = 'CLEAR ALL';
+  static String mailFilterTextChip(String text) =>
+      'TEXT: ${text.toUpperCase()}';
+  static String mailFilterFromChip(String from) =>
+      'FROM: ${from.toUpperCase()}';
+  static String mailFilterToChip(String to) => 'TO: ${to.toUpperCase()}';
+  static String mailFilterOlderThanChip(int amount, String unit) =>
+      'OLDER THAN $amount $unit';
+  static const String mailNoMatches = 'NOTHING MATCHES THESE FILTERS.';
+
   static const String calcTitle = 'CALC';
   static const String calcTabCalc = 'CALC';
   static const String calcTabConvert = 'CONVERT';

@@ -252,6 +252,148 @@ void main() {
     });
   });
 
+  group('search', () {
+    tearDown(() => server.stop());
+
+    const inbox = [
+      FakeImapMessage(
+        uid: 101,
+        subject: '"Lunch tomorrow?"',
+        date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+        address: 'anna@example.com',
+        name: 'Anna Berg',
+        seen: true,
+      ),
+      FakeImapMessage(
+        uid: 102,
+        subject: '"Invoice"',
+        date: 'Sat, 26 Sep 2026 08:30:00 +0200',
+        address: 'noreply@shop.example',
+      ),
+    ];
+
+    test('without an account is not set up, and never connects', () async {
+      await boot(inbox);
+
+      expect(
+        await mail.search(const MailFilter(text: 'x')),
+        isA<MailNotSetUp>(),
+      );
+      expect(server.connections, 0);
+    });
+
+    test('an empty filter searches ALL', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {101, 102};
+
+      await mail.search(const MailFilter());
+
+      expect(server.received, contains(contains('UID SEARCH ALL')));
+    });
+
+    test('free text searches subject or body', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {};
+
+      await mail.search(const MailFilter(text: 'lunch'));
+
+      expect(
+        server.received,
+        contains(contains('OR SUBJECT "lunch" BODY "lunch"')),
+      );
+    });
+
+    test('from and to narrow it further', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {};
+
+      await mail.search(
+        const MailFilter(from: 'anna@example.com', to: 'kay@example.com'),
+      );
+
+      final sent = server.received.firstWhere((c) => c.contains('UID SEARCH'));
+      expect(sent, contains('FROM "anna@example.com"'));
+      expect(sent, contains('TO "kay@example.com"'));
+    });
+
+    test('older than sends a BEFORE cutoff from the injected clock', () async {
+      await boot(inbox);
+      final searchMail = ImapMailService(
+        accounts: MailAccountStore(secrets),
+        secure: false,
+        timeout: const Duration(seconds: 5),
+        clock: () => DateTime(2026, 9, 30),
+      );
+      await searchMail.setUp(
+        email: 'kay@example.com',
+        host: '127.0.0.1:${server.port}',
+        password: _password,
+      );
+      server.searchResults = {};
+
+      await searchMail.search(
+        const MailFilter(olderThan: MailOlderThan(3, MailAgeUnit.days)),
+      );
+
+      expect(server.received, contains(contains('BEFORE "27-Sep-2026"')));
+    });
+
+    test('every set field combines into one query', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {};
+
+      await mail.search(
+        const MailFilter(text: 'x', from: 'a@b.com', to: 'c@d.com'),
+      );
+
+      final sent = server.received.firstWhere((c) => c.contains('UID SEARCH'));
+      expect(sent, contains('OR SUBJECT "x" BODY "x"'));
+      expect(sent, contains('FROM "a@b.com"'));
+      expect(sent, contains('TO "c@d.com"'));
+    });
+
+    test('the matching messages, newest first', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {101, 102};
+
+      final result = await mail.search(const MailFilter(text: 'x'));
+
+      final found = result as MailMessages;
+      expect([for (final m in found.messages) m.uid], [102, 101]);
+      expect(found.total, 2);
+      expect(found.unread, 1);
+    });
+
+    test('no matches is an empty list, not an error', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {};
+
+      final result = await mail.search(const MailFilter(text: 'nope'));
+
+      final found = result as MailMessages;
+      expect(found.messages, isEmpty);
+      expect(found.total, 0);
+    });
+
+    test('caps at count, but total is every match', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {101, 102};
+
+      final result = await mail.search(const MailFilter(text: 'x'), count: 1);
+
+      final found = result as MailMessages;
+      expect(found.messages, hasLength(1));
+      expect(found.total, 2);
+    });
+  });
+
   group('moveToTrash', () {
     tearDown(() => server.stop());
 

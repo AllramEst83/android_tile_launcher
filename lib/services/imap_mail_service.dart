@@ -19,6 +19,14 @@ import 'package:enough_mail/enough_mail.dart'
         MessageFlags,
         MessageSequence,
         MimeMessage,
+        SearchQueryBuilder,
+        SearchQueryType,
+        SearchTermBefore,
+        SearchTermBody,
+        SearchTermFrom,
+        SearchTermOr,
+        SearchTermSubject,
+        SearchTermTo,
         SmtpClient,
         SmtpException,
         SmtpResponse,
@@ -37,6 +45,7 @@ class ImapMailService implements MailService {
     this.timeout = const Duration(seconds: 20),
     this.smtpHost,
     this.smtpPort = 465,
+    this.clock = DateTime.now,
   });
 
   final MailAccountStore _accounts;
@@ -57,6 +66,10 @@ class ImapMailService implements MailService {
   /// TLS from the first byte (no `STARTTLS`), the same as [secure] does for
   /// IMAP; ports 465 and 993 both expect this.
   final int smtpPort;
+
+  /// What "now" is, for turning [MailFilter.olderThan] into a cutoff date.
+  /// Injectable for tests; normally the real clock.
+  final DateTime Function() clock;
 
   @override
   Future<MailAccountInfo?> account() async {
@@ -136,6 +149,60 @@ class ImapMailService implements MailService {
         messages,
         total: total,
         unread: status.messagesUnseen,
+        validity: inbox.uidValidity,
+      );
+    });
+    return switch (outcome) {
+      _Done(:final value) => value,
+      _Failed(:final reason) => MailUnavailable(reason),
+    };
+  }
+
+  @override
+  Future<MailResult> search(MailFilter filter, {int count = 20}) async {
+    final MailAccount? saved;
+    try {
+      saved = await _accounts.load();
+    } on LocalStoreException catch (error) {
+      return MailUnavailable(error.message);
+    }
+    if (saved == null) return const MailNotSetUp();
+
+    final outcome = await _session<MailMessages>(saved, (client) async {
+      final inbox = await client.selectInbox();
+      final query = _queryFor(filter);
+      final found = query == null
+          ? await client.uidSearchMessages(
+              searchCriteria: 'ALL',
+              responseTimeout: timeout,
+            )
+          : await client.uidSearchMessagesWithQuery(
+              query,
+              responseTimeout: timeout,
+            );
+      final uids = found.matchingSequence?.toList() ?? <int>[];
+      if (uids.isEmpty) {
+        return const MailMessages([], total: 0, unread: 0);
+      }
+      final sequence = MessageSequence(isUidSequence: true);
+      for (final uid in uids) {
+        sequence.add(uid);
+      }
+      final fetched = await client.uidFetchMessages(
+        sequence,
+        '(UID FLAGS ENVELOPE)',
+        responseTimeout: timeout,
+      );
+      final messages = [
+        for (final message in fetched.messages) ?mailMessageFrom(message),
+      ]..sort((a, b) => b.uid.compareTo(a.uid));
+      final capped = messages.length > count
+          ? messages.sublist(0, count)
+          : messages;
+      return MailMessages(
+        capped,
+        total: messages.length,
+        unread: messages.where((m) => m.unread).length,
         validity: inbox.uidValidity,
       );
     });
@@ -432,6 +499,32 @@ class ImapMailService implements MailService {
     } finally {
       await _hangUp(client, loggedIn: loggedIn);
     }
+  }
+
+  /// [filter] as an IMAP search query, or null when [filter] is empty (a
+  /// plain, unfiltered search). Free text searches the subject or the body
+  /// (whichever matches); every other set field narrows the results further.
+  SearchQueryBuilder? _queryFor(MailFilter filter) {
+    if (filter.isEmpty) return null;
+    final SearchQueryBuilder query = SearchQueryBuilder.from(
+      '',
+      SearchQueryType.subject,
+    );
+    if (filter.text.isNotEmpty) {
+      query.add(
+        SearchTermOr(
+          SearchTermSubject(filter.text),
+          SearchTermBody(filter.text),
+        ),
+      );
+    }
+    if (filter.from.isNotEmpty) query.add(SearchTermFrom(filter.from));
+    if (filter.to.isNotEmpty) query.add(SearchTermTo(filter.to));
+    final MailOlderThan? olderThan = filter.olderThan;
+    if (olderThan != null) {
+      query.add(SearchTermBefore(olderThan.before(clock())));
+    }
+    return query;
   }
 
   Future<void> _hangUp(ImapClient client, {required bool loggedIn}) async {

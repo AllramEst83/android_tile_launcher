@@ -6,6 +6,7 @@ import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_filter_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -1423,6 +1424,175 @@ void main() {
           .getRect(find.byKey(mailRefreshKey))
           .right;
       expect(nextRight, closeTo(refreshRight, 0.5));
+    });
+  });
+
+  group('filter', () {
+    testWidgets('FILTER opens the pane', (WidgetTester tester) async {
+      await _open(tester, _service());
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.mailFilterTitle), findsOneWidget);
+    });
+
+    testWidgets('applying a text filter searches, and shows a chip', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'lunch');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.searches, <MailFilter>[const MailFilter(text: 'lunch')]);
+      expect(find.byKey(mailFilterChipKey('text')), findsOneWidget);
+      expect(find.text(Messages.mailFilterTextChip('lunch')), findsOneWidget);
+    });
+
+    testWidgets('an older-than filter chips with its amount and unit', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterOlderThanAmountKey), '3');
+      await tester.tap(find.byKey(mailFilterUnitKey(MailAgeUnit.weeks)));
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.searches, <MailFilter>[
+        const MailFilter(olderThan: MailOlderThan(3, MailAgeUnit.weeks)),
+      ]);
+      expect(
+        find.text(Messages.mailFilterOlderThanChip(3, MailAgeUnit.weeks.label)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('no matches says so, distinct from an empty inbox', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'nope');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.mailNoMatches), findsOneWidget);
+      expect(find.text(Messages.mailInboxEmpty), findsNothing);
+    });
+
+    testWidgets("a chip's own X clears just that filter", (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'lunch');
+      await tester.enterText(find.byKey(mailFilterFromKey), 'anna@example.com');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+      mail.searches.clear();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(mailFilterChipKey('text')),
+          matching: find.text('X'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailFilterChipKey('text')), findsNothing);
+      expect(find.byKey(mailFilterChipKey('from')), findsOneWidget);
+      expect(mail.searches, <MailFilter>[
+        const MailFilter(from: 'anna@example.com'),
+      ]);
+    });
+
+    testWidgets('CLEAR ALL removes every filter and goes back to latest', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'lunch');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+      final int countsBefore = mail.counts.length;
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(mailFilterClearKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailFilterChipKey('text')), findsNothing);
+      expect(mail.counts.length, countsBefore + 1);
+      expect(find.text('* ANNA ANDERSSON'), findsOneWidget);
+    });
+
+    testWidgets('reopening the pane shows the filter already applied', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'lunch');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(mailFilterTextKey))
+            .controller
+            ?.text,
+        'lunch',
+      );
     });
   });
 
