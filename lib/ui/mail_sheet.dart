@@ -566,7 +566,9 @@ class _MailSheetState extends State<_MailSheet> {
                 ],
               ),
             ],
-            // PREV/NEXT below BACK, its own row.
+            // PREV/NEXT below BACK, its own row: PREV flush with the sheet's
+            // own left margin, NEXT pushed to its right one, so both sit as
+            // evenly clear of the sheet's edges as every row above them.
             if (open != null) ...<Widget>[
               const SizedBox(height: TileMetrics.gutter),
               Row(
@@ -576,7 +578,7 @@ class _MailSheetState extends State<_MailSheet> {
                     label: Messages.mailPrev,
                     onTap: _busy || _reading || !_canGoPrev ? null : _openPrev,
                   ),
-                  const SizedBox(width: TileMetrics.margin * 2),
+                  const Spacer(),
                   _Button(
                     key: mailNextKey,
                     label: Messages.mailNext,

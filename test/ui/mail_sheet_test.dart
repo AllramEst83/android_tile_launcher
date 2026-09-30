@@ -1052,6 +1052,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('BO BERG'), findsOneWidget);
     });
+
+    testWidgets('NEXT sits flush right, PREV flush left, like the row above', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      final double prevLeft = tester.getRect(find.byKey(mailPrevKey)).left;
+      final double backLeft = tester.getRect(find.byKey(mailBackKey)).left;
+      final double nextRight = tester.getRect(find.byKey(mailNextKey)).right;
+      expect(prevLeft, backLeft);
+
+      await tester.tap(find.byKey(mailBackKey));
+      await tester.pumpAndSettle();
+      final double refreshRight = tester
+          .getRect(find.byKey(mailRefreshKey))
+          .right;
+      expect(nextRight, closeTo(refreshRight, 0.5));
+    });
   });
 
   group('bulk read/unread', () {
