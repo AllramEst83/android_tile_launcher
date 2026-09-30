@@ -114,6 +114,14 @@ Future<void> _read(WidgetTester tester, int uid) async {
   await tester.pumpAndSettle();
 }
 
+/// A compose field's own text, ignoring the invisible placeholder it carries
+/// while empty with chips already in it.
+String _visibleField(WidgetTester tester, Key key) => tester
+    .widget<TextField>(find.byKey(key))
+    .controller!
+    .text
+    .replaceAll('​', '');
+
 Future<void> _open(
   WidgetTester tester,
   FakeMailService mail, {
@@ -933,9 +941,10 @@ void main() {
 
       expect(find.text(Messages.mailComposeTitle), findsOneWidget);
       expect(
-        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
-        'anna@example.com',
+        find.byKey(composeChipKey('to', 'anna@example.com')),
+        findsOneWidget,
       );
+      expect(_visibleField(tester, composeToKey), '');
       expect(
         tester
             .widget<TextField>(find.byKey(composeSubjectKey))
@@ -964,9 +973,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
-        'anna@example.com',
+        find.byKey(composeChipKey('to', 'anna@example.com')),
+        findsOneWidget,
       );
+      expect(_visibleField(tester, composeToKey), '');
       expect(
         tester
             .widget<TextField>(find.byKey(composeSubjectKey))
@@ -1044,9 +1054,10 @@ void main() {
 
       expect(find.text(Messages.mailComposeTitle), findsOneWidget);
       expect(
-        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
-        'bo@example.com',
+        find.byKey(composeChipKey('to', 'bo@example.com')),
+        findsOneWidget,
       );
+      expect(_visibleField(tester, composeToKey), '');
     });
 
     testWidgets('REPLY ALL is hidden with only one recipient', (
@@ -1083,13 +1094,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
-        'anna@example.com',
+        find.byKey(composeChipKey('to', 'anna@example.com')),
+        findsOneWidget,
       );
       expect(
-        tester.widget<TextField>(find.byKey(composeCcKey)).controller?.text,
-        'cesar@example.com, bo@example.com',
+        find.byKey(composeChipKey('cc', 'cesar@example.com')),
+        findsOneWidget,
       );
+      expect(
+        find.byKey(composeChipKey('cc', 'bo@example.com')),
+        findsOneWidget,
+      );
+      expect(_visibleField(tester, composeCcKey), '');
     });
   });
 

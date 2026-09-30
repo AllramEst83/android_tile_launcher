@@ -91,10 +91,22 @@ const int mailTextLimit = 20000;
 /// separator leaves behind dropped. Order is kept; duplicates are not removed
 /// (the server does not mind, and a compose field should show what was typed).
 List<String> parseAddressList(String raw) => raw
+    // A stray zero-width space (the compose fields' own invisible
+    // placeholder for an otherwise-empty chip field) is never part of an
+    // address.
+    .replaceAll('​', '')
     .split(RegExp(r'[,;\n]'))
     .map((String part) => part.trim())
     .where((String part) => part.isNotEmpty)
     .toList();
+
+/// Whether [text] looks like a finished email address — something, an `@`,
+/// something, a dot, something — just enough to tell a completed address
+/// from one still being typed, for the compose fields' chip-as-you-type
+/// behaviour. Not full RFC validation: the server is the real judge of
+/// whether it exists.
+bool looksLikeCompleteEmail(String text) =>
+    RegExp(r'^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$').hasMatch(text.trim());
 
 /// The Cc line for "reply all": every address [body] was sent To or Cc'd to,
 /// except [selfEmail] (the account reading it) and [body]'s own sender (who

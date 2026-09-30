@@ -276,6 +276,38 @@ void main() {
     test('blank text is no addresses', () {
       expect(parseAddressList('   '), <String>[]);
     });
+
+    test('a stray zero-width space is never an address of its own', () {
+      expect(parseAddressList('​'), <String>[]);
+      expect(parseAddressList('a@b.com,​'), <String>['a@b.com']);
+    });
+  });
+
+  group('looksLikeCompleteEmail', () {
+    test('something, an @, something, a dot, something is complete', () {
+      expect(looksLikeCompleteEmail('a@b.com'), isTrue);
+      expect(looksLikeCompleteEmail('  a@b.com  '), isTrue);
+    });
+
+    test('missing a dot in the domain is not complete', () {
+      expect(looksLikeCompleteEmail('a@b'), isFalse);
+    });
+
+    test('no @ at all is not complete', () {
+      expect(looksLikeCompleteEmail('abc'), isFalse);
+    });
+
+    test('a trailing dot with nothing after it is not complete', () {
+      expect(looksLikeCompleteEmail('a@b.'), isFalse);
+    });
+
+    test('a space inside is not one address', () {
+      expect(looksLikeCompleteEmail('a b@c.com'), isFalse);
+    });
+
+    test('empty text is not complete', () {
+      expect(looksLikeCompleteEmail(''), isFalse);
+    });
   });
 
   group('replyAllCcAddresses', () {
