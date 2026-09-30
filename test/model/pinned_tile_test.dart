@@ -204,4 +204,37 @@ void main() {
       );
     });
   });
+
+  group('PinnedTile.game', () {
+    test('starts wide, keyed by the game module, carrying its label', () {
+      final tile = PinnedTile.game(
+        moduleId: 'tetris',
+        label: 'TETRIS',
+        index: 0,
+      );
+
+      expect(tile.size, TileSize.wide);
+      expect(tile.kind, TileKind.game);
+      expect(tile.id, 'game:tetris');
+      expect(tile.label, 'TETRIS');
+      expect(gameModuleIdOf(tile.toTile()), 'tetris');
+    });
+
+    test('the label round-trips through JSON', () {
+      final tile = PinnedTile.game(
+        moduleId: 'tetris',
+        label: 'TETRIS',
+        index: 1,
+      );
+
+      expect(PinnedTile.fromJson(tile.toJson()), tile);
+    });
+
+    test('only a game tile has a game module id', () {
+      expect(
+        gameModuleIdOf(PinnedTile.app(packageName: 'a', index: 0).toTile()),
+        isNull,
+      );
+    });
+  });
 }

@@ -285,4 +285,33 @@ void main() {
       expect(restarted.pinned.single.id, contactTileId('k1'));
     });
   });
+
+  group('pinGame', () {
+    test(
+      'adds a wide tile per game module, carrying the label, and saves',
+      () async {
+        final InMemoryLocalStore store = InMemoryLocalStore();
+        final GridState state = _state(store);
+
+        await state.pinGame(moduleId: 'tetris', label: 'TETRIS');
+
+        final PinnedTile tile = state.pinned.single;
+        expect(tile.kind, TileKind.game);
+        expect(tile.id, gameTileId('tetris'));
+        expect(tile.size, TileSize.wide);
+        expect(tile.label, 'TETRIS');
+        expect(state.isPinned(gameTileId('tetris')), isTrue);
+        expect(store.writes, 1);
+      },
+    );
+
+    test('pinning the same game twice changes nothing', () async {
+      final GridState state = _state(InMemoryLocalStore());
+
+      await state.pinGame(moduleId: 'tetris', label: 'TETRIS');
+      await state.pinGame(moduleId: 'tetris', label: 'TETRIS');
+
+      expect(state.pinned, hasLength(1));
+    });
+  });
 }

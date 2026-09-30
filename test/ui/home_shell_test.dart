@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/games/tetris/tetris_screen.dart';
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
@@ -815,6 +816,66 @@ void main() {
       expect(find.byKey(contactCallKey), findsNothing);
       expect(find.text('ANNA ANDERSSON'), findsWidgets);
     });
+
+    testWidgets('pinning a game from ADD TILE puts its tile on home', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await pumpShell(tester, FakeAppRepository(), gridState: gridState);
+      await tester.pump();
+
+      await tester.tap(find.text(Messages.addTile));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('TETRIS'));
+      await tester.tap(find.text('TETRIS'));
+      await tester.pumpAndSettle();
+
+      expect(gridState.isPinned(gameTileId('tetris')), isTrue);
+      expect(_onHome(find.text('TETRIS')), findsOneWidget);
+    });
+
+    testWidgets('a game tile opens it fullscreen, and back returns home', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      await gridState.pinGame(moduleId: 'tetris', label: 'TETRIS');
+      await pumpShell(tester, FakeAppRepository(), gridState: gridState);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.text('TETRIS')));
+      // Not pumpAndSettle: Flame's own game loop schedules a frame every
+      // tick for as long as the game is mounted, so it never "settles". Two
+      // pumps: the first starts the push transition, the second finishes it.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byKey(tetrisCloseKey), findsOneWidget);
+
+      await tester.tap(find.byKey(tetrisCloseKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byKey(tetrisCloseKey), findsNothing);
+      expect(_onHome(find.text('TETRIS')), findsOneWidget);
+    });
+
+    testWidgets(
+      'a game tile is labelled in the grid editor, and does not open',
+      (WidgetTester tester) async {
+        final GridState gridState = _gridState();
+        await gridState.pinGame(moduleId: 'tetris', label: 'TETRIS');
+        await pumpShell(tester, FakeAppRepository(), gridState: gridState);
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        await tester.longPress(_onHome(find.text('TETRIS')));
+        await tester.pumpAndSettle();
+
+        expect(_inEditor(find.text('TETRIS')), findsOneWidget);
+        expect(find.byKey(tetrisCloseKey), findsNothing);
+      },
+    );
 
     testWidgets('an unset-up mail tile sets mail up, then shows the inbox', (
       WidgetTester tester,

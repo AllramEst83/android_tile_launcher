@@ -379,6 +379,19 @@ abstract final class Messages {
       'DIRECTLY FROM ANDROID ON THIS PHONE, ASKED FOR ONLY WHEN THE '
       'TILE THAT NEEDS THEM IS FIRST ADDED OR OPENED.';
 
+  static const String tetrisTitle = 'TETRIS';
+  static const String tetrisScore = 'SCORE';
+  static const String tetrisLines = 'LINES';
+  static const String tetrisLevel = 'LEVEL';
+  static const String tetrisNext = 'NEXT';
+  static const String tetrisGameOver = 'GAME OVER';
+  static const String tetrisRestart = 'RESTART';
+  static const String tetrisLeft = 'LEFT';
+  static const String tetrisRight = 'RIGHT';
+  static const String tetrisRotate = 'ROTATE';
+  static const String tetrisDrop = 'DROP';
+  static const String tetrisHardDrop = 'SLAM';
+
   // Why an expression could not be worked out: lower case, as they are said;
   // the pad shows them in capitals.
   static String exprUnexpected(String found) => "unexpected '$found'";

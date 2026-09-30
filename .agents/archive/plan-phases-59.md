@@ -1,0 +1,29 @@
+# Archived plan — Phase 59
+
+Full history of `plan.md` from 2026-09-30, moved here once this phase was implemented and verified, to keep the live `plan.md` short. See `plan.md` for the current phase list; see `.agents/archive/plan-phases-57.md` for the phase before this one.
+
+## Done
+
+| Phase | What it delivered |
+|---|---|
+| 59 | **A Tetris game, and the module system to add more.** Flutter Flame was chosen over hand-rolling a game loop or another engine — it is MIT-licensed, well-maintained, and its `FlameGame`/`GameWidget` (a `Canvas`, an `update(dt)`/`render(canvas)` loop) are all this needs; the flat C64 look needs none of its sprite/physics/tilemap sub-packages. A new top-level `lib/games/` layer holds a `GameModule` interface (`id`, `label`, `play(context)`) and a `gameModules` registry list — adding a game means adding one to that list, nothing else; `TileKind.game` is shared by every game (id-prefixed `game:<moduleId>`, like a contact tile, since there can be more than one). Tetris's own rules engine (`model/tetris_board.dart`: a 10×20 board, 7-bag randomizer, movement/rotation-with-kicks/soft-and-hard-drop/gravity tick, line-clear scoring and levelling, game-over) is pure Dart, no Flutter, per `model/`'s own rule; `games/tetris/tetris_game.dart` is the Flame layer that drives it and republishes its state as a `ValueNotifier` HUD; `games/tetris/tetris_screen.dart` opens it fullscreen (`immersiveSticky`, restored on exit) with on-screen LEFT/RIGHT/ROTATE/DROP/SLAM buttons (LEFT/RIGHT/DROP repeat while held) plus swipe-to-move/drop and tap-to-rotate, a GAME OVER overlay with RESTART, and a tile face reusing the existing `AppTileContent` glyph-and-label widget — no new tile-chrome widget needed. |
+
+## Deliberately different from the terminal launcher
+
+- **No command line.** `help`, `ui rich|plain`, aliases, `&&` chaining and macros have no counterpart here; a tile is either self-evident or badly designed.
+- **`list`, `open`, `refresh`, `uninstall`** stop being commands and become the drawer, a tap, a pull-to-refresh and a long-press action.
+- **A small set of canvases**, not six themes. The sixteen VIC-II colours are the palette in all of them; the canvas changes, not the tile colours.
+- **Rich vs. plain** does not exist. Every tile is a card by definition.
+
+## Not implemented (on purpose or not yet)
+
+- **Widgets**: hosting real Android `AppWidget`s is a much larger job (`AppWidgetHost`, permissions, remote views) and is not planned. Tiles are ours.
+- **Notification badges** need notification-listener access, which is a heavy permission; only the counts we can get another way (mail, calendar) are planned.
+- **Wallpaper pass-through, acrylic blur, 3D tile tilt, rounded corners**: all in the Stitch mockups, none in this design. Flat, opaque, square.
+- **Landscape and tablets**: portrait phone only until the phone version is good.
+- **A joystick or slider control for Tetris**: buttons and swipes cover everything the piece actions need; a future game with analogue movement is what would actually call for one.
+- **High scores / a shared save**: nothing persists between plays yet — every open starts a fresh board.
+
+## Changelog (2026-09-30, Phase 59)
+
+- 2026-09-30: Phase 59 (Tetris, and the `games/` module system) implemented and pushed — not yet tested on the user's phone (no touch/swipe feel, haptics, or performance check under a real Android build). plan.md compacted again: Phase 59 and its changelog moved to [.agents/archive/plan-phases-59.md](.agents/archive/plan-phases-59.md); phase numbering otherwise unchanged. `plan.md` is now empty of phases, awaiting the user's phone test and next batch.
