@@ -30,6 +30,11 @@ Future<void> showAddTileSheet(
     // The list grows with each tile kind; a sheet capped at the default
     // height would overflow on a short screen.
     isScrollControlled: true,
+    // Without this the sheet's own surface (not just its content, which the
+    // inner `SafeArea` already keeps clear) could still extend up under the
+    // status bar and a camera cutout once the list was long enough to reach
+    // that high — the same fix the mail and Bluetooth sheets already use.
+    useSafeArea: true,
     builder: (BuildContext sheetContext) {
       final List<TileKind> available = <TileKind>[
         for (final TileKind kind in TileKind.values)

@@ -79,6 +79,22 @@ void main() {
     expect(find.text('CONTACT'), findsOneWidget);
   });
 
+  testWidgets('the list stays clear of a camera cutout at the top', (
+    WidgetTester tester,
+  ) async {
+    // Every system kind is on offer (nothing pinned yet): plenty to reach
+    // the top of a short screen if the sheet did not keep clear of it.
+    tester.view
+      ..physicalSize = const Size(400, 700)
+      ..devicePixelRatio = 1
+      ..padding = const FakeViewPadding(top: 40);
+    addTearDown(tester.view.reset);
+
+    await _open(tester, _gridState());
+
+    expect(tester.getTopLeft(find.text('CLOCK')).dy, greaterThanOrEqualTo(40));
+  });
+
   testWidgets('CONTACT is always offered, and opens the picker', (
     WidgetTester tester,
   ) async {
