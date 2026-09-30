@@ -264,6 +264,35 @@ void main() {
     expect(repository.refreshCalls, 1);
   });
 
+  testWidgets(
+    'the app list refreshes when the launcher comes back to the front',
+    (WidgetTester tester) async {
+      final FakeAppRepository repository = FakeAppRepository(
+        apps: const [AppInfo(label: 'Clock', packageName: 'pkg.clock')],
+      );
+      await pumpShell(tester, repository);
+      await tester.pump();
+
+      // Simulates installing an app while the launcher is backgrounded (the
+      // Play Store, say) — nothing here asks for a refresh directly.
+      repository.apps = const [
+        AppInfo(label: 'Clock', packageName: 'pkg.clock'),
+        AppInfo(label: 'Maps', packageName: 'pkg.maps'),
+      ];
+      tester.binding.handleAppLifecycleStateChanged(
+        AppLifecycleState.inactive,
+      );
+      tester.binding.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+      await tester.pumpAndSettle();
+
+      expect(repository.refreshCalls, 1);
+      await _swipeToDrawer(tester);
+      expect(_inDrawer(find.text('MAPS')), findsOneWidget);
+    },
+  );
+
   group('grid editor', () {
     Future<GridState> pinTwo(WidgetTester tester) async {
       // A realistic phone-tall canvas, not the default (wider-than-tall)

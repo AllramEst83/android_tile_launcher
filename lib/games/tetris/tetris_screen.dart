@@ -48,15 +48,20 @@ class TetrisScreen extends StatefulWidget {
   State<TetrisScreen> createState() => _TetrisScreenState();
 }
 
-class _TetrisScreenState extends State<TetrisScreen>
-    with WidgetsBindingObserver {
+class _TetrisScreenState extends State<TetrisScreen> {
   late TetrisGame _game;
   Offset? _dragStart;
 
+  // No lifecycle handling of our own: FlameGame already pauses/resumes its
+  // own game loop on backgrounding (`pauseWhenBackgrounded`, on by default),
+  // via its own WidgetsBindingObserver — and it only reacts to a definite
+  // `paused`/`resumed`, never to `inactive`. A duplicate observer here once
+  // set `paused = true` on `inactive` too, which switching to immersive
+  // mode (just below) can itself trigger as a transient blip on some Android
+  // versions — freezing the game before the player ever saw it move.
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     unawaited(
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
     );
@@ -65,15 +70,9 @@ class _TetrisScreenState extends State<TetrisScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     _game.hud.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _game.paused = state != AppLifecycleState.resumed;
   }
 
   void _restart() => setState(() => _game = TetrisGame());

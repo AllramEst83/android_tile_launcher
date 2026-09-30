@@ -62,7 +62,7 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late Future<List<AppInfo>> _apps;
   final PageController _pageController = PageController();
   final FocusNode _searchFocus = FocusNode();
@@ -71,14 +71,25 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _apps = widget.appRepository.listApps();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  // Installing or uninstalling an app happens on a screen Android owns (the
+  // Play Store, Settings), not this one, so the only way to see the result
+  // is to re-read once this app is in front again — the same pattern the
+  // Bluetooth sheet already uses for its own adapter/device state.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refresh());
   }
 
   Future<void> _refresh() async {
