@@ -171,13 +171,18 @@ void main() {
     await mail.latest(count: 10);
 
     final MailSendResult result = await mail.send(
-      to: 'a@b.se',
+      to: <String>['a@b.se'],
       subject: 'Hi',
       text: 'Hi',
     );
 
     expect(result, isA<MailSent>());
-    expect(inner.sent, <(String, String, String)>[('a@b.se', 'Hi', 'Hi')]);
+    expect(inner.sent, hasLength(1));
+    final (to, cc, subject, text) = inner.sent.single;
+    expect(to, <String>['a@b.se']);
+    expect(cc, isEmpty);
+    expect(subject, 'Hi');
+    expect(text, 'Hi');
     // Still within the kept listing's age, so this is served from the cache
     // sending left untouched, not a second call to the server.
     await mail.latest(count: 10);

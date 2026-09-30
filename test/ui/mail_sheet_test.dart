@@ -48,6 +48,8 @@ MailOpened _opened(
   String from,
   String subject, {
   String fromAddress = '',
+  List<MailParticipant> to = const <MailParticipant>[],
+  List<MailParticipant> cc = const <MailParticipant>[],
   String text = 'Hello, this is the whole message.',
   String? html,
   bool truncated = false,
@@ -59,6 +61,8 @@ MailOpened _opened(
     uid: uid,
     from: from,
     fromAddress: fromAddress,
+    to: to,
+    cc: cc,
     subject: subject,
     text: text,
     html: html,
@@ -883,9 +887,12 @@ void main() {
       await tester.tap(find.byKey(composeSendKey));
       await tester.pumpAndSettle();
 
-      expect(mail.sent, <(String, String, String)>[
-        ('anna@example.com', 'Hello', 'Hi there'),
-      ]);
+      expect(mail.sent, hasLength(1));
+      final (to, cc, subject, text) = mail.sent.single;
+      expect(to, <String>['anna@example.com']);
+      expect(cc, isEmpty);
+      expect(subject, 'Hello');
+      expect(text, 'Hi there');
       expect(find.text(Messages.mailComposeTitle), findsNothing);
     });
 
@@ -979,6 +986,83 @@ void main() {
       expect(
         tester.widget<TextField>(find.byKey(composeBodyKey)).controller?.text,
         contains('On MON 28 SEP 09:05, Anna Andersson wrote:'),
+      );
+    });
+  });
+
+  group('to/cc and reply all', () {
+    testWidgets('shows To and Cc as tappable chips', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        fromAddress: 'anna@example.com',
+        to: const <MailParticipant>[
+          MailParticipant(address: 'kay@gmail.com', name: 'Kay'),
+        ],
+        cc: const <MailParticipant>[
+          MailParticipant(address: 'bo@example.com', name: 'Bo Berg'),
+        ],
+      );
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      expect(find.text('KAY'), findsOneWidget);
+      expect(find.text('BO BERG'), findsOneWidget);
+
+      await tester.tap(find.text('BO BERG'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.mailComposeTitle), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
+        'bo@example.com',
+      );
+    });
+
+    testWidgets('REPLY ALL is hidden with only one recipient', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      expect(find.byKey(mailReplyAllKey), findsNothing);
+    });
+
+    testWidgets('REPLY ALL addresses the sender and copies the rest', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        fromAddress: 'anna@example.com',
+        to: const <MailParticipant>[
+          MailParticipant(address: 'kay@gmail.com', name: 'Kay'),
+          MailParticipant(address: 'cesar@example.com', name: 'Cesar'),
+        ],
+        cc: const <MailParticipant>[
+          MailParticipant(address: 'bo@example.com', name: 'Bo Berg'),
+        ],
+      );
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      expect(find.byKey(mailReplyAllKey), findsOneWidget);
+      await tester.tap(find.byKey(mailReplyAllKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
+        'anna@example.com',
+      );
+      expect(
+        tester.widget<TextField>(find.byKey(composeCcKey)).controller?.text,
+        'cesar@example.com, bo@example.com',
       );
     });
   });

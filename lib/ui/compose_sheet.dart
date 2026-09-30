@@ -1,24 +1,28 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 
 /// Keys so tests can find the parts.
 const Key composeToKey = ValueKey<String>('compose-to');
+const Key composeCcKey = ValueKey<String>('compose-cc');
 const Key composeSubjectKey = ValueKey<String>('compose-subject');
 const Key composeBodyKey = ValueKey<String>('compose-body');
 const Key composeSendKey = ValueKey<String>('compose-send');
 
 /// What COMPOSE on the mail sheet opens (blank), or what tapping the sender's
-/// address in an open message opens (addressed to them, subject prefixed
-/// `RE:`, [body] the original text quoted below): to, subject and the message
-/// text, SEND on the account already set up. Closes on its own once the
-/// server accepts it.
+/// address or REPLY/REPLY ALL/FORWARD in an open message opens: to, cc,
+/// subject and the message text, SEND on the account already set up. [to] and
+/// [cc] may each name more than one address (comma, semicolon or newline
+/// separated); typing more into either field works the same way. Closes on
+/// its own once the server accepts it.
 Future<void> showComposeSheet(
   BuildContext context, {
   required MailService mail,
   String? to,
+  String? cc,
   String? subject,
   String? body,
 }) {
@@ -32,16 +36,29 @@ Future<void> showComposeSheet(
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
       ),
-      child: _ComposeSheet(mail: mail, to: to, subject: subject, body: body),
+      child: _ComposeSheet(
+        mail: mail,
+        to: to,
+        cc: cc,
+        subject: subject,
+        body: body,
+      ),
     ),
   );
 }
 
 class _ComposeSheet extends StatefulWidget {
-  const _ComposeSheet({required this.mail, this.to, this.subject, this.body});
+  const _ComposeSheet({
+    required this.mail,
+    this.to,
+    this.cc,
+    this.subject,
+    this.body,
+  });
 
   final MailService mail;
   final String? to;
+  final String? cc;
   final String? subject;
   final String? body;
 
@@ -52,6 +69,9 @@ class _ComposeSheet extends StatefulWidget {
 class _ComposeSheetState extends State<_ComposeSheet> {
   late final TextEditingController _to = TextEditingController(
     text: widget.to ?? '',
+  );
+  late final TextEditingController _cc = TextEditingController(
+    text: widget.cc ?? '',
   );
   late final TextEditingController _subject = TextEditingController(
     text: widget.subject ?? '',
@@ -68,6 +88,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
   @override
   void dispose() {
     _to.dispose();
+    _cc.dispose();
     _subject.dispose();
     _body.dispose();
     super.dispose();
@@ -75,7 +96,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
 
   Future<void> _send() async {
     if (_busy) return;
-    final String to = _to.text.trim();
+    final List<String> to = parseAddressList(_to.text);
     if (to.isEmpty) {
       setState(() => _error = Messages.mailSendNeedsTo);
       return;
@@ -91,6 +112,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
     });
     final MailSendResult result = await widget.mail.send(
       to: to,
+      cc: parseAddressList(_cc.text),
       subject: _subject.text.trim(),
       text: text,
     );
@@ -134,6 +156,12 @@ class _ComposeSheetState extends State<_ComposeSheet> {
                 fieldKey: composeToKey,
                 label: Messages.mailTo,
                 controller: _to,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              _Field(
+                fieldKey: composeCcKey,
+                label: Messages.mailCc,
+                controller: _cc,
                 keyboardType: TextInputType.emailAddress,
               ),
               _Field(

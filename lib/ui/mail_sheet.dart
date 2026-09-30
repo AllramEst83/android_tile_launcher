@@ -16,6 +16,7 @@ Key mailCheckboxKey(int uid) => ValueKey<String>('mail-checkbox-$uid');
 const Key mailComposeKey = ValueKey<String>('mail-compose');
 const Key mailFromComposeKey = ValueKey<String>('mail-from-compose');
 const Key mailReplyKey = ValueKey<String>('mail-reply');
+const Key mailReplyAllKey = ValueKey<String>('mail-reply-all');
 const Key mailForwardKey = ValueKey<String>('mail-forward');
 const Key mailPrevKey = ValueKey<String>('mail-prev');
 const Key mailNextKey = ValueKey<String>('mail-next');
@@ -385,6 +386,23 @@ class _MailSheetState extends State<_MailSheet> {
     body: _quotedOriginal(body),
   );
 
+  /// Whether [body] had more than one recipient (besides this account),
+  /// so REPLY and REPLY ALL would actually differ.
+  bool _hasOtherRecipients(MailBody body) =>
+      replyAllCcAddresses(body, _email).isNotEmpty;
+
+  /// Opens a reply to everyone [body] went to: addressed to the original
+  /// sender, same as REPLY, but copying every other To/Cc address too (never
+  /// this account's own, never the sender twice).
+  Future<void> _replyAll(MailBody body) => showComposeSheet(
+    context,
+    mail: widget.mail,
+    to: body.fromAddress,
+    cc: replyAllCcAddresses(body, _email).join(', '),
+    subject: _replySubject(body.subject),
+    body: _quotedOriginal(body),
+  );
+
   /// Where the open message sits in [_messages] (newest first), for PREV/NEXT.
   int? get _openIndex {
     final int? uid = _openUid;
@@ -659,25 +677,29 @@ class _MailSheetState extends State<_MailSheet> {
         children: <Widget>[
           Text(Messages.mailFrom, style: label),
           if (body.fromAddress.isNotEmpty)
-            InkWell(
+            _AddressChip(
               key: mailFromComposeKey,
+              text: body.from,
               onTap: _busy ? null : () => _composeTo(body.fromAddress),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: TileColors.accent,
-                    width: TileMetrics.bevel,
-                  ),
-                ),
-                child: Text(
-                  body.from.toUpperCase(),
-                  style: value?.copyWith(color: TileColors.accent),
-                ),
-              ),
             )
           else
             Text(body.from.toUpperCase(), style: value),
+          if (body.to.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(Messages.mailTo, style: label),
+            _AddressChipRow(
+              participants: body.to,
+              onTap: _busy ? null : _composeTo,
+            ),
+          ],
+          if (body.cc.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(Messages.mailCc, style: label),
+            _AddressChipRow(
+              participants: body.cc,
+              onTap: _busy ? null : _composeTo,
+            ),
+          ],
           if (body.date != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(Messages.mailDate, style: label),
@@ -785,6 +807,12 @@ class _MailSheetState extends State<_MailSheet> {
           label: Messages.mailReply,
           onTap: _busy || opened == null ? null : () => _reply(opened),
         ),
+        if (opened != null && _hasOtherRecipients(opened))
+          _Button(
+            key: mailReplyAllKey,
+            label: Messages.mailReplyAll,
+            onTap: _busy ? null : () => _replyAll(opened),
+          ),
         _Button(
           key: mailForwardKey,
           label: Messages.mailForward,
@@ -927,6 +955,62 @@ class _MailSheetState extends State<_MailSheet> {
           label: Messages.mailNo,
           onTap: () => setState(() => _confirmingForget = false),
         ),
+      ],
+    );
+  }
+}
+
+/// One address as a small bordered chip — the badge look From, To and Cc all
+/// share. A `null` [onTap] leaves it inert rather than hiding the border, so
+/// a busy reader still reads the same.
+class _AddressChip extends StatelessWidget {
+  const _AddressChip({super.key, required this.text, required this.onTap});
+
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: TileColors.accent,
+            width: TileMetrics.bevel,
+          ),
+        ),
+        child: Text(
+          text.toUpperCase(),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(fontSize: 13, color: TileColors.accent),
+        ),
+      ),
+    );
+  }
+}
+
+/// Every address on a To or Cc line, each its own chip, wrapping onto as many
+/// lines as a narrow phone needs. Tapping one composes a fresh message to it,
+/// the same as tapping the From chip does.
+class _AddressChipRow extends StatelessWidget {
+  const _AddressChipRow({required this.participants, required this.onTap});
+
+  final List<MailParticipant> participants;
+  final void Function(String address)? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: <Widget>[
+        for (final MailParticipant p in participants)
+          _AddressChip(
+            text: p.label,
+            onTap: onTap == null ? null : () => onTap!(p.address),
+          ),
       ],
     );
   }

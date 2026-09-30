@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -201,6 +202,109 @@ void main() {
         stripImagesFromHtml('<p>No pictures here</p>'),
         '<p>No pictures here</p>',
       );
+    });
+  });
+
+  group('parseAddressList', () {
+    test('splits on comma, semicolon or newline, trimmed', () {
+      expect(parseAddressList('a@b.com, c@d.com;  e@f.com\ng@h.com'), <String>[
+        'a@b.com',
+        'c@d.com',
+        'e@f.com',
+        'g@h.com',
+      ]);
+    });
+
+    test('drops the empty pieces a trailing separator leaves', () {
+      expect(parseAddressList('a@b.com, ,c@d.com,'), <String>[
+        'a@b.com',
+        'c@d.com',
+      ]);
+    });
+
+    test('one address with nothing to split on is itself', () {
+      expect(parseAddressList('a@b.com'), <String>['a@b.com']);
+    });
+
+    test('blank text is no addresses', () {
+      expect(parseAddressList('   '), <String>[]);
+    });
+  });
+
+  group('replyAllCcAddresses', () {
+    MailBody body({
+      String fromAddress = 'anna@example.com',
+      List<MailParticipant> to = const <MailParticipant>[],
+      List<MailParticipant> cc = const <MailParticipant>[],
+    }) => MailBody(
+      uid: 1,
+      from: 'Anna',
+      fromAddress: fromAddress,
+      to: to,
+      cc: cc,
+      subject: 'Hi',
+      text: 'Hi',
+    );
+
+    test('every other To and Cc address, sender and self left out', () {
+      final result = replyAllCcAddresses(
+        body(
+          to: const <MailParticipant>[
+            MailParticipant(address: 'kay@gmail.com'),
+            MailParticipant(address: 'cesar@example.com'),
+          ],
+          cc: const <MailParticipant>[
+            MailParticipant(address: 'bo@example.com'),
+          ],
+        ),
+        'kay@gmail.com',
+      );
+
+      expect(result, <String>['cesar@example.com', 'bo@example.com']);
+    });
+
+    test('case-insensitive, and duplicates dropped', () {
+      final result = replyAllCcAddresses(
+        body(
+          to: const <MailParticipant>[
+            MailParticipant(address: 'Kay@Gmail.com'),
+            MailParticipant(address: 'bo@example.com'),
+          ],
+          cc: const <MailParticipant>[
+            MailParticipant(address: 'BO@example.com'),
+          ],
+        ),
+        'kay@gmail.com',
+      );
+
+      expect(result, <String>['bo@example.com']);
+    });
+
+    test('nobody left over is an empty list', () {
+      final result = replyAllCcAddresses(
+        body(
+          to: const <MailParticipant>[
+            MailParticipant(address: 'kay@gmail.com'),
+          ],
+        ),
+        'kay@gmail.com',
+      );
+
+      expect(result, isEmpty);
+    });
+
+    test('no self address known still drops the sender', () {
+      final result = replyAllCcAddresses(
+        body(
+          to: const <MailParticipant>[
+            MailParticipant(address: 'anna@example.com'),
+            MailParticipant(address: 'bo@example.com'),
+          ],
+        ),
+        null,
+      );
+
+      expect(result, <String>['bo@example.com']);
     });
   });
 }

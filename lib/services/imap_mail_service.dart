@@ -302,7 +302,8 @@ class ImapMailService implements MailService {
 
   @override
   Future<MailSendResult> send({
-    required String to,
+    required List<String> to,
+    List<String> cc = const <String>[],
     required String subject,
     required String text,
   }) async {
@@ -343,8 +344,13 @@ class ImapMailService implements MailService {
       loggedIn = true;
       final MimeMessage message = MessageBuilder.buildSimpleTextMessage(
         MailAddress('', saved.email),
-        <MailAddress>[MailAddress('', to)],
+        <MailAddress>[
+          for (final String address in to) MailAddress('', address),
+        ],
         text,
+        cc: <MailAddress>[
+          for (final String address in cc) MailAddress('', address),
+        ],
         subject: subject,
       );
       final SmtpResponse sendResponse = await client
@@ -448,6 +454,18 @@ String _scrub(String? text, String secret) {
   return secret.isEmpty ? line : line.replaceAll(secret, '***');
 }
 
+/// [addresses] as [MailParticipant]s, an address with no address itself
+/// (which happens) left out. Kept apart from the network so it can be tested
+/// on its own.
+List<MailParticipant> _participantsFrom(List<MailAddress>? addresses) => [
+  for (final MailAddress a in addresses ?? const <MailAddress>[])
+    if (a.email.trim().isNotEmpty)
+      MailParticipant(
+        address: a.email.trim(),
+        name: a.personalName?.trim() ?? '',
+      ),
+];
+
 sealed class _Outcome<T> {
   const _Outcome();
 }
@@ -540,6 +558,8 @@ MailBody mailBodyFrom(
     uid: entry.uid,
     from: entry.from,
     fromAddress: message.from?.firstOrNull?.email.trim() ?? '',
+    to: _participantsFrom(message.to),
+    cc: _participantsFrom(message.cc),
     subject: entry.subject,
     date: entry.date,
     text: tidy.text,

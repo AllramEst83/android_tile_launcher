@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/model/clock_format.dart';
+import 'package:android_tile_launcher/model/mail.dart';
 
 /// The IMAP server most likely to belong to [email], to save typing it: the
 /// big providers' own, else `imap.` plus the domain. Empty when [email] has no
@@ -83,6 +84,36 @@ const int mailTextLimit = 20000;
   final int space = text.lastIndexOf(RegExp(r'\s'));
   if (space > 0 && space > limit - 200) text = text.substring(0, space);
   return (text: text.trimRight(), truncated: true);
+}
+
+/// [raw] split into addresses on a comma, semicolon or newline (whatever a
+/// To/Cc field is typed with), trimmed and with the empty pieces a trailing
+/// separator leaves behind dropped. Order is kept; duplicates are not removed
+/// (the server does not mind, and a compose field should show what was typed).
+List<String> parseAddressList(String raw) => raw
+    .split(RegExp(r'[,;\n]'))
+    .map((String part) => part.trim())
+    .where((String part) => part.isNotEmpty)
+    .toList();
+
+/// The Cc line for "reply all": every address [body] was sent To or Cc'd to,
+/// except [selfEmail] (the account reading it) and [body]'s own sender (who
+/// becomes the reply's To, not its Cc, the same as a plain REPLY). Order is
+/// kept, case-insensitive duplicates dropped.
+List<String> replyAllCcAddresses(MailBody body, String? selfEmail) {
+  final String self = (selfEmail ?? '').trim().toLowerCase();
+  final String sender = body.fromAddress.trim().toLowerCase();
+  final List<String> result = <String>[];
+  final Set<String> seen = <String>{};
+  for (final MailParticipant p in <MailParticipant>[...body.to, ...body.cc]) {
+    final String address = p.address.trim();
+    final String key = address.toLowerCase();
+    if (address.isEmpty || key == self || key == sender || !seen.add(key)) {
+      continue;
+    }
+    result.add(address);
+  }
+  return result;
 }
 
 /// Whether [text] looks like HTML markup rather than plain prose: some

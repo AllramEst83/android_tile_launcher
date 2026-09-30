@@ -126,6 +126,7 @@ abstract final class Messages {
   static const String mailPrev = '< PREV';
   static const String mailNext = 'NEXT >';
   static const String mailReply = 'REPLY';
+  static const String mailReplyAll = 'REPLY ALL';
   static const String mailForward = 'FORWARD';
   static const String mailMarkRead = 'MARK AS READ';
   static const String mailMarkUnread = 'MARK AS UNREAD';
@@ -134,6 +135,8 @@ abstract final class Messages {
   static const String mailMarkedUnread = 'MARKED AS UNREAD.';
   static const String mailNotMarked = 'OPENED, BUT COULD NOT MARK IT READ.';
   static const String mailFrom = 'FROM';
+  static const String mailTo = 'TO';
+  static const String mailCc = 'CC';
   static const String mailDate = 'DATE';
   static const String mailNoText = '(NOTHING TO SHOW: NO TEXT IN THIS MESSAGE)';
   static const String mailCutOff =
@@ -166,7 +169,6 @@ abstract final class Messages {
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS UNREAD.';
   static const String mailCompose = 'COMPOSE';
   static const String mailComposeTitle = 'NEW MESSAGE';
-  static const String mailTo = 'TO';
   static const String mailSubject = 'SUBJECT';
   static const String mailBody = 'MESSAGE';
   static const String mailSend = 'SEND';

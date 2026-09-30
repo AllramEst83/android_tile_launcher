@@ -472,6 +472,39 @@ void main() {
       expect(opened.body.attachments, 0);
     });
 
+    test('reads To and Cc from the message headers', () async {
+      await boot([
+        const FakeImapMessage(
+          uid: 20,
+          subject: '"Team lunch"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'anna@example.com',
+          name: 'Anna Berg',
+          raw:
+              'From: Anna Berg <anna@example.com>\r\n'
+              'To: Kay <kay@example.com>, cesar@example.com\r\n'
+              'Cc: Bo Berg <bo@example.com>\r\n'
+              'Subject: Team lunch\r\n'
+              'Date: Fri, 25 Sep 2026 10:00:00 +0000\r\n'
+              'Message-ID: <20@example.com>\r\n'
+              'MIME-Version: 1.0\r\n'
+              'Content-Type: text/plain; charset=utf-8\r\n\r\n'
+              'Hi!\r\n',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(20) as MailOpened;
+
+      expect(opened.body.to.map((p) => (p.name, p.address)).toList(), [
+        ('Kay', 'kay@example.com'),
+        ('', 'cesar@example.com'),
+      ]);
+      expect(opened.body.cc.map((p) => (p.name, p.address)).toList(), [
+        ('Bo Berg', 'bo@example.com'),
+      ]);
+    });
+
     test('marks it read, on the server, and says so', () async {
       await boot(const [lunch]);
       await setUp();
@@ -862,7 +895,7 @@ void main() {
       await bootSmtp(account: false);
 
       expect(
-        await smtpMail.send(to: 'a@b.com', subject: 'Hi', text: 'Hi'),
+        await smtpMail.send(to: <String>['a@b.com'], subject: 'Hi', text: 'Hi'),
         isA<MailSendNotSetUp>(),
       );
       expect(smtp.sent, isEmpty);
@@ -872,7 +905,7 @@ void main() {
       await bootSmtp();
 
       final result = await smtpMail.send(
-        to: 'anna@example.com',
+        to: <String>['anna@example.com'],
         subject: 'Lunch?',
         text: 'Same place as usual?',
       );
@@ -896,7 +929,7 @@ void main() {
       );
 
       final result = await smtpMail.send(
-        to: 'a@b.com',
+        to: <String>['a@b.com'],
         subject: 'Hi',
         text: 'Hi',
       );
@@ -912,7 +945,7 @@ void main() {
       smtp.rejectRecipient = true;
 
       final result = await smtpMail.send(
-        to: 'nobody@example.com',
+        to: <String>['nobody@example.com'],
         subject: 'Hi',
         text: 'Hi',
       );
@@ -926,7 +959,7 @@ void main() {
       await smtp.stop();
 
       final result = await smtpMail.send(
-        to: 'a@b.com',
+        to: <String>['a@b.com'],
         subject: 'Hi',
         text: 'Hi',
       );
@@ -939,7 +972,7 @@ void main() {
       smtpSecrets.data['mailAccount'] = 'not json';
 
       final result = await smtpMail.send(
-        to: 'a@b.com',
+        to: <String>['a@b.com'],
         subject: 'Hi',
         text: 'Hi',
       );

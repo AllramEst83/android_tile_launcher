@@ -104,6 +104,19 @@ class MailMoveFailed extends MailMoveResult {
   final String reason;
 }
 
+/// One address on a message's To or Cc line: a display name (may be empty)
+/// and the address itself (never empty — an entry with no address is left
+/// out by whoever builds the list).
+class MailParticipant {
+  const MailParticipant({required this.address, this.name = ''});
+
+  final String name;
+  final String address;
+
+  /// What a chip shows: the name if there is one, else the bare address.
+  String get label => name.isNotEmpty ? name : address;
+}
+
 /// One message in full, as far as this launcher shows one: who, when, what,
 /// and its text (plain text, or the readable part of an HTML-only message).
 /// Attachments and pictures are counted, never downloaded to the screen.
@@ -112,6 +125,8 @@ class MailBody {
     required this.uid,
     required this.from,
     this.fromAddress = '',
+    this.to = const <MailParticipant>[],
+    this.cc = const <MailParticipant>[],
     required this.subject,
     required this.text,
     this.html,
@@ -128,6 +143,12 @@ class MailBody {
   /// the sender to compose a fresh message (never shown itself: [from] is
   /// what the reader shows). Empty if the message gave none.
   final String fromAddress;
+
+  /// Who the message was addressed to and copied to, in the order the
+  /// message itself gave them. Either may be empty.
+  final List<MailParticipant> to;
+  final List<MailParticipant> cc;
+
   final String subject;
   final DateTime? date;
 

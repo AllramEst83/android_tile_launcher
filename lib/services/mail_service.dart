@@ -43,10 +43,12 @@ abstract interface class MailService {
   /// nothing unless it returns [MailMarked].
   Future<MailMarkResult> mark(int uid, {required bool read, int? validity});
 
-  /// Sends a new message from the set-up account. Never throws; nothing is
-  /// sent unless it returns [MailSent].
+  /// Sends a new message from the set-up account to every address in [to],
+  /// copying every address in [cc]. Never throws; nothing is sent unless it
+  /// returns [MailSent].
   Future<MailSendResult> send({
-    required String to,
+    required List<String> to,
+    List<String> cc = const <String>[],
     required String subject,
     required String text,
   });
