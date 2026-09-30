@@ -8,4 +8,9 @@ abstract interface class ContactsRepository {
   /// Everyone with a number, by name; [ContactsRead], [ContactsDenied] or
   /// [ContactsUnavailable] (never [ContactsNoAccess]: this asks first).
   Future<ContactsResult> all();
+
+  /// The same contacts, but never asks for permission: a plain
+  /// [ContactsNoAccess] instead, for a feature (compose's address
+  /// autocomplete) that must never interrupt with a dialog of its own.
+  Future<ContactsResult> peek();
 }

@@ -82,6 +82,7 @@ class LauncherSettings {
     this.agendaWeekView = false,
     this.agendaGridView = false,
     this.lastUsedCalendarId,
+    this.mailSignature = '',
   });
 
   final ThemeVariant theme;
@@ -123,6 +124,10 @@ class LauncherSettings {
   /// screen.
   final int? lastUsedCalendarId;
 
+  /// Appended to every new message, reply and forward, with a blank line
+  /// above it; empty (the default) adds nothing. Set on the settings screen.
+  final String mailSignature;
+
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
 
@@ -152,6 +157,7 @@ class LauncherSettings {
     bool? agendaWeekView,
     bool? agendaGridView,
     int? lastUsedCalendarId,
+    String? mailSignature,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -165,6 +171,7 @@ class LauncherSettings {
     agendaWeekView: agendaWeekView ?? this.agendaWeekView,
     agendaGridView: agendaGridView ?? this.agendaGridView,
     lastUsedCalendarId: lastUsedCalendarId ?? this.lastUsedCalendarId,
+    mailSignature: mailSignature ?? this.mailSignature,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -180,6 +187,7 @@ class LauncherSettings {
     'agendaWeekView': agendaWeekView,
     'agendaGridView': agendaGridView,
     'lastUsedCalendarId': lastUsedCalendarId,
+    'mailSignature': mailSignature,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -233,6 +241,9 @@ class LauncherSettings {
       lastUsedCalendarId: json['lastUsedCalendarId'] is int
           ? json['lastUsedCalendarId']! as int
           : defaults.lastUsedCalendarId,
+      mailSignature: json['mailSignature'] is String
+          ? json['mailSignature']! as String
+          : defaults.mailSignature,
     );
   }
 
@@ -250,7 +261,8 @@ class LauncherSettings {
       other.appIcons == appIcons &&
       other.agendaWeekView == agendaWeekView &&
       other.agendaGridView == agendaGridView &&
-      other.lastUsedCalendarId == lastUsedCalendarId;
+      other.lastUsedCalendarId == lastUsedCalendarId &&
+      other.mailSignature == mailSignature;
 
   @override
   int get hashCode => Object.hash(
@@ -266,9 +278,10 @@ class LauncherSettings {
     agendaWeekView,
     agendaGridView,
     lastUsedCalendarId,
+    mailSignature,
   );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, lastUsedCalendarId: $lastUsedCalendarId)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature)';
 }

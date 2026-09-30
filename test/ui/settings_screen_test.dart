@@ -351,6 +351,54 @@ void main() {
     });
   });
 
+  group('mail signature', () {
+    testWidgets('empty by default', (WidgetTester tester) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(settingsKey('signature')))
+            .controller
+            ?.text,
+        '',
+      );
+    });
+
+    testWidgets('typing saves it at once', (WidgetTester tester) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+
+      await tester.ensureVisible(find.byKey(settingsKey('signature')));
+      await tester.enterText(
+        find.byKey(settingsKey('signature')),
+        'Sent from my launcher',
+      );
+      await tester.pumpAndSettle();
+
+      expect(rig.settings.settings.mailSignature, 'Sent from my launcher');
+    });
+
+    testWidgets('a saved signature shows when the screen reopens', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.settings.load();
+      await rig.settings.update(
+        rig.settings.settings.copyWith(mailSignature: 'Kay'),
+      );
+      await rig.open(tester);
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(settingsKey('signature')))
+            .controller
+            ?.text,
+        'Kay',
+      );
+    });
+  });
+
   group('export', () {
     testWidgets('copies the tiles and settings, and says how many', (
       WidgetTester tester,

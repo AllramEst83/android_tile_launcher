@@ -14,6 +14,9 @@ class LiveContactsRepository implements ContactsRepository {
   final PermissionService permissions;
 
   @override
+  Future<ContactsResult> peek() => contacts.all();
+
+  @override
   Future<ContactsResult> all() async {
     final ContactsResult first = await contacts.all();
     if (first is! ContactsNoAccess) return first;

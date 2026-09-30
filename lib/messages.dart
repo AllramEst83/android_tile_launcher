@@ -157,6 +157,7 @@ abstract final class Messages {
   static const String mailForgetAsk = 'FORGET THIS ACCOUNT AND ITS PASSWORD?';
   static const String mailRefresh = 'REFRESH';
   static const String mailSelect = 'SELECT';
+  static const String mailSelectAll = 'SELECT ALL';
   static const String mailCancelSelect = 'CANCEL';
   static String mailSelectedCount(int n) => '$n SELECTED';
   static String mailDeleteSelected(int n) => 'DELETE ($n)';
@@ -269,6 +270,10 @@ abstract final class Messages {
   static const String settingsHomeUnknown = 'COULD NOT FIND OUT.';
   static const String settingsHomeChecking = 'CHECKING...';
   static const String settingsOpenHome = 'CHOOSE HOME APP';
+  static const String settingsMail = 'MAIL';
+  static const String settingsSignature = 'SIGNATURE';
+  static const String settingsSignatureNote =
+      'ADDED TO THE END OF NEW MESSAGES, REPLIES AND FORWARDS.';
   static const String settingsLayout = 'LAYOUT';
   static const String settingsExport = 'EXPORT';
   static const String settingsImport = 'IMPORT';

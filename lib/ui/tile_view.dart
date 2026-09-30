@@ -17,6 +17,7 @@ import 'package:android_tile_launcher/services/attachment_download_service.dart'
 import 'package:android_tile_launcher/services/bluetooth_service.dart';
 import 'package:android_tile_launcher/services/bluetooth_tile_source.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
+import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/mail_tile_source.dart';
@@ -302,6 +303,7 @@ Widget tileContent(
                       mailContent.result,
                       refreshNow,
                       attachmentDownload: services.attachmentDownload,
+                      contacts: services.contacts,
                     ),
                   )
                 : null,
@@ -508,6 +510,7 @@ Future<void> _mailTap(
   MailResult result,
   VoidCallback refreshNow, {
   required AttachmentDownloadService attachmentDownload,
+  required ContactsRepository contacts,
 }) async {
   switch (result) {
     case MailNotSetUp():
@@ -517,6 +520,7 @@ Future<void> _mailTap(
         context,
         mail: mail,
         attachmentDownload: attachmentDownload,
+        contacts: contacts,
       );
     case MailUnavailable():
       // A saved account that cannot be read (its key is gone) never will be:

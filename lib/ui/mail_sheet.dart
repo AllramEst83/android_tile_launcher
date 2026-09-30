@@ -5,8 +5,10 @@ import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:android_tile_launcher/services/attachment_download_service.dart';
+import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
@@ -33,6 +35,7 @@ const Key mailBodyKey = ValueKey<String>('mail-body');
 const Key mailForgetYesKey = ValueKey<String>('mail-forget-yes');
 const Key mailForgetNoKey = ValueKey<String>('mail-forget-no');
 const Key mailSelectKey = ValueKey<String>('mail-select');
+const Key mailSelectAllKey = ValueKey<String>('mail-select-all');
 const Key mailCancelSelectKey = ValueKey<String>('mail-cancel-select');
 const Key mailBulkDeleteKey = ValueKey<String>('mail-bulk-delete');
 const Key mailBulkReadKey = ValueKey<String>('mail-bulk-read');
@@ -58,8 +61,9 @@ String _forwardSubject(String subject) {
 
 /// [body]'s own text, quoted under an "on ... wrote:" line and led by two
 /// blank lines for the reply or forward itself — the compose sheet puts the
-/// cursor above it, so typing starts there, not inside the quote.
-String _quotedOriginal(MailBody body) {
+/// cursor above it, so typing starts there, not inside the quote. [signature],
+/// when set, sits in that same leading space, above the quote.
+String _quotedOriginal(MailBody body, {String signature = ''}) {
   final String who = body.date == null
       ? '${body.from} wrote:'
       : 'On ${formatClockDate(body.date!)} '
@@ -68,7 +72,8 @@ String _quotedOriginal(MailBody body) {
       .split('\n')
       .map((String line) => '> $line')
       .join('\n');
-  return '\n\n$who\n$quoted';
+  final String sig = signature.isEmpty ? '' : '$signature\n\n';
+  return '\n\n$sig$who\n$quoted';
 }
 
 DateTime _systemNow() => DateTime.now();
@@ -86,6 +91,7 @@ Future<void> showMailSheet(
   BuildContext context, {
   required MailService mail,
   required AttachmentDownloadService attachmentDownload,
+  required ContactsRepository contacts,
   DateTime Function() clock = _systemNow,
 }) {
   return showModalBottomSheet<void>(
@@ -104,6 +110,7 @@ Future<void> showMailSheet(
         child: _MailSheet(
           mail: mail,
           attachmentDownload: attachmentDownload,
+          contacts: contacts,
           clock: clock,
         ),
       );
@@ -115,11 +122,13 @@ class _MailSheet extends StatefulWidget {
   const _MailSheet({
     required this.mail,
     required this.attachmentDownload,
+    required this.contacts,
     required this.clock,
   });
 
   final MailService mail;
   final AttachmentDownloadService attachmentDownload;
+  final ContactsRepository contacts;
   final DateTime Function() clock;
 
   @override
@@ -334,6 +343,12 @@ class _MailSheetState extends State<_MailSheet> {
     if (!_selected.remove(uid)) _selected.add(uid);
   });
 
+  void _selectAll() => setState(() {
+    _selected
+      ..clear()
+      ..addAll(_messages.map((MailMessage m) => m.uid));
+  });
+
   /// Moves every selected message to Trash, one at a time (so
   /// [_bulkTrash]'s own progress line means something), then reloads from
   /// the server — the same "look at what is actually there now" reasoning
@@ -405,12 +420,25 @@ class _MailSheetState extends State<_MailSheet> {
     });
   }
 
-  Future<void> _compose() => showComposeSheet(context, mail: widget.mail);
+  /// Appended to every new message, reply and forward; empty adds nothing.
+  String get _signature => SettingsScope.of(context).mailSignature;
+
+  Future<void> _compose() => showComposeSheet(
+    context,
+    mail: widget.mail,
+    contacts: widget.contacts,
+    body: _signature.isEmpty ? null : '\n\n$_signature',
+  );
 
   /// Opens a blank message addressed to [address]: what tapping the sender's
   /// own chip does, rather than a reply (REPLY is its own button now).
-  Future<void> _composeTo(String address) =>
-      showComposeSheet(context, mail: widget.mail, to: address);
+  Future<void> _composeTo(String address) => showComposeSheet(
+    context,
+    mail: widget.mail,
+    contacts: widget.contacts,
+    to: address,
+    body: _signature.isEmpty ? null : '\n\n$_signature',
+  );
 
   /// Opens a reply to [body]'s own sender: addressed to them, the subject
   /// prefixed `RE:` unless it already is one, and the original text quoted
@@ -418,9 +446,10 @@ class _MailSheetState extends State<_MailSheet> {
   Future<void> _reply(MailBody body) => showComposeSheet(
     context,
     mail: widget.mail,
+    contacts: widget.contacts,
     to: body.fromAddress,
     subject: _replySubject(body.subject),
-    body: _quotedOriginal(body),
+    body: _quotedOriginal(body, signature: _signature),
   );
 
   /// Opens a forward of [body]: the same quoted text as a reply, but with TO
@@ -428,8 +457,9 @@ class _MailSheetState extends State<_MailSheet> {
   Future<void> _forward(MailBody body) => showComposeSheet(
     context,
     mail: widget.mail,
+    contacts: widget.contacts,
     subject: _forwardSubject(body.subject),
-    body: _quotedOriginal(body),
+    body: _quotedOriginal(body, signature: _signature),
   );
 
   /// Whether [body] had more than one recipient (besides this account),
@@ -443,10 +473,11 @@ class _MailSheetState extends State<_MailSheet> {
   Future<void> _replyAll(MailBody body) => showComposeSheet(
     context,
     mail: widget.mail,
+    contacts: widget.contacts,
     to: body.fromAddress,
     cc: replyAllCcAddresses(body, _email).join(', '),
     subject: _replySubject(body.subject),
-    body: _quotedOriginal(body),
+    body: _quotedOriginal(body, signature: _signature),
   );
 
   /// Where the open message sits in [_messages] (newest first), for PREV/NEXT.
@@ -542,6 +573,14 @@ class _MailSheetState extends State<_MailSheet> {
                       ),
                     ),
                   ),
+                  _Button(
+                    key: mailSelectAllKey,
+                    label: Messages.mailSelectAll,
+                    onTap: _busy || _selected.length == _messages.length
+                        ? null
+                        : _selectAll,
+                  ),
+                  const SizedBox(width: 8),
                   _Button(
                     key: mailCancelSelectKey,
                     label: Messages.mailCancelSelect,

@@ -1,18 +1,29 @@
 import 'package:android_tile_launcher/messages.dart';
+import 'package:android_tile_launcher/model/contact.dart';
+import 'package:android_tile_launcher/services/contacts_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../fakes/fake_contacts.dart';
 import '../fakes/fake_mail_service.dart';
 
-Future<void> _open(WidgetTester tester, FakeMailService mail) async {
+Future<void> _open(
+  WidgetTester tester,
+  FakeMailService mail, {
+  List<Contact> contacts = const <Contact>[],
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: tileLauncherTheme(),
       home: Builder(
         builder: (BuildContext context) => TextButton(
-          onPressed: () => showComposeSheet(context, mail: mail),
+          onPressed: () => showComposeSheet(
+            context,
+            mail: mail,
+            contacts: FakeContactsRepository(contacts),
+          ),
           child: const Text('open'),
         ),
       ),
@@ -209,6 +220,103 @@ void main() {
       expect(subject, 'Hi');
       expect(text, 'Hello there');
       expect(find.text(Messages.mailComposeTitle), findsNothing);
+    });
+  });
+
+  group('contact autocomplete', () {
+    const Contact anna = Contact(
+      key: 'k1',
+      name: 'Anna Andersson',
+      numbers: <PhoneNumber>[PhoneNumber('070-1', 'MOBILE')],
+      emails: <String>['anna@example.com'],
+    );
+
+    testWidgets('suggests a match on name or email, once two letters in', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, FakeMailService(), contacts: const <Contact>[anna]);
+
+      await tester.enterText(find.byKey(composeToKey), 'a');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(composeSuggestionKey('to', 'anna@example.com')),
+        findsNothing,
+      );
+
+      await tester.enterText(find.byKey(composeToKey), 'an');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(composeSuggestionKey('to', 'anna@example.com')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('tapping a suggestion chips it and clears the field', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, FakeMailService(), contacts: const <Contact>[anna]);
+
+      await tester.enterText(find.byKey(composeToKey), 'anna');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(composeSuggestionKey('to', 'anna@example.com')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(composeChipKey('to', 'anna@example.com')),
+        findsOneWidget,
+      );
+      expect(_visible(tester, composeToKey), '');
+    });
+
+    testWidgets('an already-chipped address is not suggested again', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, FakeMailService(), contacts: const <Contact>[anna]);
+
+      await tester.enterText(find.byKey(composeToKey), 'anna@example.com,');
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(composeCcKey), 'anna');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(composeSuggestionKey('cc', 'anna@example.com')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(composeSuggestionKey('to', 'anna@example.com')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('no contacts access is simply no suggestions', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = FakeMailService();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: tileLauncherTheme(),
+          home: Builder(
+            builder: (BuildContext context) => TextButton(
+              onPressed: () => showComposeSheet(
+                context,
+                mail: mail,
+                contacts: FakeContactsRepository()
+                  ..result = const ContactsNoAccess(),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(composeToKey), 'anna');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('ANNA'), findsNothing);
     });
   });
 }

@@ -4,15 +4,19 @@ import 'dart:typed_data';
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/services/attachment_download_service.dart';
+import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 
 import '../fakes/fake_attachment_download_service.dart';
+import '../fakes/fake_contacts.dart';
 import '../fakes/fake_mail_service.dart';
+import '../fakes/in_memory_local_store.dart';
 
 // Monday 28 September 2026, half past ten.
 final DateTime _now = DateTime(2026, 9, 28, 10, 30);
@@ -126,6 +130,7 @@ Future<void> _open(
   WidgetTester tester,
   FakeMailService mail, {
   FakeAttachmentDownloadService? attachmentDownload,
+  FakeContactsRepository? contacts,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -137,6 +142,7 @@ Future<void> _open(
             mail: mail,
             attachmentDownload:
                 attachmentDownload ?? FakeAttachmentDownloadService(),
+            contacts: contacts ?? FakeContactsRepository(),
             clock: () => _now,
           ),
           child: const Text('open'),
@@ -701,6 +707,19 @@ void main() {
       expect(find.text(Messages.mailSelectedCount(1)), findsOneWidget);
     });
 
+    testWidgets('SELECT ALL checks every message', (WidgetTester tester) async {
+      await _open(tester, _service());
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailSelectAllKey));
+      await tester.pump();
+
+      expect(find.text(Messages.mailSelectedCount(2)), findsOneWidget);
+      expect(find.byKey(mailCheckboxKey(12)), findsOneWidget);
+      expect(find.byKey(mailCheckboxKey(11)), findsOneWidget);
+    });
+
     testWidgets('DELETE is disabled until something is selected', (
       WidgetTester tester,
     ) async {
@@ -1022,6 +1041,96 @@ void main() {
       expect(
         tester.widget<TextField>(find.byKey(composeBodyKey)).controller?.text,
         contains('On MON 28 SEP 09:05, Anna Andersson wrote:'),
+      );
+    });
+  });
+
+  group('signature', () {
+    Future<void> openWithSignature(
+      WidgetTester tester,
+      FakeMailService mail,
+      String signature,
+    ) async {
+      final SettingsState settingsState = SettingsState(
+        store: InMemoryLocalStore(),
+      );
+      await settingsState.update(
+        settingsState.settings.copyWith(mailSignature: signature),
+      );
+      await tester.pumpWidget(
+        SettingsScope(
+          state: settingsState,
+          // Above MaterialApp, not inside it: showMailSheet opens a modal
+          // route on the app's own Navigator, a sibling of `home`'s route
+          // rather than a descendant of it, so the scope must be an ancestor
+          // of the whole app to reach that route too.
+          child: MaterialApp(
+            theme: tileLauncherTheme(),
+            home: Builder(
+              builder: (BuildContext context) => TextButton(
+                onPressed: () => showMailSheet(
+                  context,
+                  mail: mail,
+                  attachmentDownload: FakeAttachmentDownloadService(),
+                  contacts: FakeContactsRepository(),
+                  clock: () => _now,
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('appended to a new blank message', (WidgetTester tester) async {
+      final FakeMailService mail = _service();
+      await openWithSignature(tester, mail, 'Sent from my launcher');
+
+      await tester.tap(find.byKey(mailComposeKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byKey(composeBodyKey)).controller?.text,
+        contains('Sent from my launcher'),
+      );
+    });
+
+    testWidgets('appended above the quote in a reply', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await openWithSignature(tester, mail, 'Kay');
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailReplyKey));
+      await tester.pumpAndSettle();
+
+      final String? text = tester
+          .widget<TextField>(find.byKey(composeBodyKey))
+          .controller
+          ?.text;
+      expect(text, contains('Kay'));
+      // Above the quote, not mixed into it.
+      expect(
+        text!.indexOf('Kay'),
+        lessThan(text.indexOf('On MON 28 SEP 09:05')),
+      );
+    });
+
+    testWidgets('no signature set adds nothing extra', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+
+      await tester.tap(find.byKey(mailComposeKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byKey(composeBodyKey)).controller?.text,
+        '',
       );
     });
   });

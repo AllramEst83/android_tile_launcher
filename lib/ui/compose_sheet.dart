@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/messages.dart';
+import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
+import 'package:android_tile_launcher/services/contacts_repository.dart';
+import 'package:android_tile_launcher/services/contacts_service.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +21,10 @@ const Key composeSendKey = ValueKey<String>('compose-send');
 Key composeChipKey(String field, String address) =>
     ValueKey<String>('compose-chip-$field-$address');
 
+/// One contact suggestion under [field] ('to' or 'cc').
+Key composeSuggestionKey(String field, String email) =>
+    ValueKey<String>('compose-suggestion-$field-$email');
+
 /// What COMPOSE on the mail sheet opens (blank), or what tapping the sender's
 /// address or REPLY/REPLY ALL/FORWARD in an open message opens: to, cc,
 /// subject and the message text, SEND on the account already set up. [to] and
@@ -28,6 +37,7 @@ Key composeChipKey(String field, String address) =>
 Future<void> showComposeSheet(
   BuildContext context, {
   required MailService mail,
+  required ContactsRepository contacts,
   String? to,
   String? cc,
   String? subject,
@@ -45,6 +55,7 @@ Future<void> showComposeSheet(
       ),
       child: _ComposeSheet(
         mail: mail,
+        contacts: contacts,
         to: to,
         cc: cc,
         subject: subject,
@@ -57,6 +68,7 @@ Future<void> showComposeSheet(
 class _ComposeSheet extends StatefulWidget {
   const _ComposeSheet({
     required this.mail,
+    required this.contacts,
     this.to,
     this.cc,
     this.subject,
@@ -64,6 +76,7 @@ class _ComposeSheet extends StatefulWidget {
   });
 
   final MailService mail;
+  final ContactsRepository contacts;
   final String? to;
   final String? cc;
   final String? subject;
@@ -95,6 +108,12 @@ class _ComposeSheetState extends State<_ComposeSheet> {
   bool _busy = false;
   String? _error;
 
+  /// Every (name, email) this phone's contacts offer, for the To/Cc fields'
+  /// own autocomplete. Loaded once, silently: [ContactsRepository.peek]
+  /// never asks for permission, so a phone book that is not accessible just
+  /// means no suggestions rather than a dialog interrupting compose.
+  List<(String name, String email)> _contactSuggestions = <(String, String)>[];
+
   @override
   void initState() {
     super.initState();
@@ -104,6 +123,18 @@ class _ComposeSheetState extends State<_ComposeSheet> {
     final (List<String> ccChips, String ccRest) = _splitSeed(widget.cc ?? '');
     _ccChips = ccChips;
     _cc = TextEditingController(text: ccRest);
+    unawaited(_loadContactSuggestions());
+  }
+
+  Future<void> _loadContactSuggestions() async {
+    final ContactsResult result = await widget.contacts.peek();
+    if (!mounted || result is! ContactsRead) return;
+    setState(() {
+      _contactSuggestions = <(String, String)>[
+        for (final Contact c in result.contacts)
+          for (final String email in c.emails) (c.name, email),
+      ];
+    });
   }
 
   @override
@@ -199,6 +230,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
                 label: Messages.mailTo,
                 controller: _to,
                 chips: _toChips,
+                suggestions: _contactSuggestions,
                 onChipsChanged: (List<String> chips) =>
                     setState(() => _toChips = chips),
               ),
@@ -208,6 +240,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
                 label: Messages.mailCc,
                 controller: _cc,
                 chips: _ccChips,
+                suggestions: _contactSuggestions,
                 onChipsChanged: (List<String> chips) =>
                     setState(() => _ccChips = chips),
               ),
@@ -279,6 +312,7 @@ class _ChipAddressField extends StatefulWidget {
     required this.label,
     required this.controller,
     required this.chips,
+    required this.suggestions,
     required this.onChipsChanged,
   });
 
@@ -287,6 +321,10 @@ class _ChipAddressField extends StatefulWidget {
   final String label;
   final TextEditingController controller;
   final List<String> chips;
+
+  /// This phone's contacts as (name, email) pairs, for suggesting a match
+  /// while typing.
+  final List<(String name, String email)> suggestions;
   final ValueChanged<List<String>> onChipsChanged;
 
   @override
@@ -371,7 +409,12 @@ class _ChipAddressFieldState extends State<_ChipAddressField> {
       start = m.end;
     }
     remaining.write(text.substring(start));
-    if (chipped.isEmpty) return;
+    if (chipped.isEmpty) {
+      // Nothing chipped, but the typed text changed: refresh the contact
+      // suggestions it filters below.
+      setState(() {});
+      return;
+    }
     final List<String> newChips = <String>[...widget.chips, ...chipped];
     widget.onChipsChanged(newChips);
     _setPending(remaining.toString(), hasChips: newChips.isNotEmpty);
@@ -392,6 +435,38 @@ class _ChipAddressFieldState extends State<_ChipAddressField> {
   void _removeChip(String address) => widget.onChipsChanged(
     widget.chips.where((String a) => a != address).toList(),
   );
+
+  /// Chips [email] straight from a tapped suggestion, replacing whatever was
+  /// being typed.
+  void _pickSuggestion(String email) {
+    if (widget.chips.contains(email)) {
+      _setPending('', hasChips: widget.chips.isNotEmpty);
+      return;
+    }
+    final List<String> newChips = <String>[...widget.chips, email];
+    widget.onChipsChanged(newChips);
+    _setPending('', hasChips: newChips.isNotEmpty);
+  }
+
+  /// The contacts worth showing under the field right now: whatever is being
+  /// typed, if it names at least two characters of a name or an address, and
+  /// only while it is not already a chip.
+  List<(String name, String email)> get _matches {
+    final String query = widget.controller.text
+        .replaceAll(_emptyMarker, '')
+        .trim()
+        .toLowerCase();
+    if (query.length < 2) return const <(String, String)>[];
+    return widget.suggestions
+        .where(
+          (r) =>
+              !widget.chips.contains(r.$2) &&
+              (r.$1.toLowerCase().contains(query) ||
+                  r.$2.toLowerCase().contains(query)),
+        )
+        .take(5)
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -445,6 +520,21 @@ class _ChipAddressFieldState extends State<_ChipAddressField> {
               ),
             ),
           ),
+          for (final (String name, String email) in _matches)
+            InkWell(
+              key: composeSuggestionKey(widget.chipField, email),
+              onTap: () => _pickSuggestion(email),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  '${name.toUpperCase()} — $email',
+                  style: text.bodySmall?.copyWith(
+                    fontSize: 11,
+                    color: TileColors.accent,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

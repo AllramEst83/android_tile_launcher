@@ -47,6 +47,7 @@ void main() {
         agendaWeekView: true,
         agendaGridView: true,
         lastUsedCalendarId: 7,
+        mailSignature: 'Sent from my launcher',
       );
 
       expect(LauncherSettings.fromJson(settings.toJson()), settings);
@@ -54,6 +55,18 @@ void main() {
 
     test('lastUsedCalendarId defaults to null, unset', () {
       expect(const LauncherSettings().lastUsedCalendarId, isNull);
+    });
+
+    test('mailSignature defaults to empty', () {
+      expect(const LauncherSettings().mailSignature, '');
+    });
+
+    test('a mailSignature of the wrong type is ignored, not fatal', () {
+      final LauncherSettings settings = LauncherSettings.fromJson(
+        <String, Object?>{'mailSignature': 7},
+      );
+
+      expect(settings.mailSignature, '');
     });
 
     test('a lastUsedCalendarId of the wrong type is ignored, not fatal', () {
