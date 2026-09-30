@@ -47,10 +47,11 @@ Each phase gets designed in detail only when it's reached; this is an outline so
 54. **Tile-list breathing room.** The "+ ADD TILE" sheet's tile list can run
     under the status bar/camera cutout when full; give it the same top
     clearance the other sheets have.
+55. **Flutter Game** (Make sure you commit and push before starting this phase) I would like you to build a small Tetris game in the C64 style we have established. The first decision is: do we need a framework like Flutter Flame, can you build this yourself, or are there other frameworks or libraries out there that better suit our needs? When the tile is tapped, I want the game to launch into fullscreen mode, and when exiting, return to the launcher. Lets discuss before starting. 
 
 ## Deliberately different from the terminal launcher
 
-- **No command line.** `help`, `ui rich|plain`, aliases, `&&` chaining and macros have no counterpart here; a tile is either self-evident or badly designed.
+- **No command line.** `help`, `ui rich|plain`, aliases, `&&` chaining and macros have no    counterpart here; a tile is either self-evident or badly designed.
 - **`list`, `open`, `refresh`, `uninstall`** stop being commands and become the drawer, a tap, a pull-to-refresh and a long-press action.
 - **A small set of canvases**, not six themes. The sixteen VIC-II colours are the palette in all of them; the canvas changes, not the tile colours.
 - **Rich vs. plain** does not exist. Every tile is a card by definition.

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_format.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
@@ -34,12 +36,22 @@ Future<void> showAgendaSheet(
     context: context,
     backgroundColor: TileColors.canvas,
     isScrollControlled: true,
-    builder: (BuildContext sheetContext) => ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.75,
-      ),
-      child: _AgendaSheet(repository: repository, clock: clock),
-    ),
+    builder: (BuildContext sheetContext) {
+      final MediaQueryData media = MediaQuery.of(sheetContext);
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          // As tall as the screen allows, short of the status bar/camera
+          // cutout at the top (plus a little breathing room below it) —
+          // a week with many events should not be capped well short of
+          // that just because a day view rarely needs the room.
+          maxHeight: math.min(
+            media.size.height * 0.92,
+            media.size.height - media.padding.top - TileMetrics.margin,
+          ),
+        ),
+        child: _AgendaSheet(repository: repository, clock: clock),
+      );
+    },
   );
 }
 
