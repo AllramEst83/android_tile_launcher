@@ -385,6 +385,15 @@ void main() {
     expect(repository.betweenCalls, greaterThan(before));
   });
 
+  testWidgets('the close key closes the sheet', (WidgetTester tester) async {
+    await _open(tester, withEvents());
+
+    await tester.tap(find.byKey(agendaCloseKey));
+    await tester.pumpAndSettle();
+
+    expect(find.text(Messages.agendaTitle), findsNothing);
+  });
+
   group('week grid', () {
     testWidgets('WEEK:GRID shows the week as a time grid', (
       WidgetTester tester,

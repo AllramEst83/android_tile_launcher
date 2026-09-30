@@ -22,6 +22,7 @@ const Key agendaNavForwardKey = ValueKey<String>('agenda-nav-forward');
 const Key agendaNavLabelKey = ValueKey<String>('agenda-nav-label');
 const Key agendaAddEventKey = ValueKey<String>('agenda-add-event');
 const Key agendaTodayKey = ValueKey<String>('agenda-today');
+const Key agendaCloseKey = ValueKey<String>('agenda-close');
 
 DateTime _systemNow() => DateTime.now();
 
@@ -188,7 +189,23 @@ class _AgendaSheetState extends State<_AgendaSheet> {
           children: <Widget>[
             // So the title is not flush against the sheet's own top edge.
             const SizedBox(height: TileMetrics.gutter),
-            Text(Messages.agendaTitle, style: text.bodyMedium),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(Messages.agendaTitle, style: text.bodyMedium),
+                ),
+                SizedBox(
+                  width: 48,
+                  child: PadKey(
+                    key: agendaCloseKey,
+                    label: 'X',
+                    height: 32,
+                    fontSize: 12,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: TileMetrics.gutter),
             // Its own row, under the title's (three toggles beside it would
             // not fit a narrow phone), split into equal thirds so DAY,
