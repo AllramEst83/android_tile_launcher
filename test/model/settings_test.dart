@@ -46,6 +46,7 @@ void main() {
         appIcons: false,
         agendaWeekView: true,
         agendaGridView: true,
+        agendaGridZoom: 1.8,
         lastUsedCalendarId: 7,
         mailSignature: 'Sent from my launcher',
       );
@@ -55,6 +56,18 @@ void main() {
 
     test('lastUsedCalendarId defaults to null, unset', () {
       expect(const LauncherSettings().lastUsedCalendarId, isNull);
+    });
+
+    test('agendaGridZoom defaults to 1', () {
+      expect(const LauncherSettings().agendaGridZoom, 1);
+    });
+
+    test('an agendaGridZoom of the wrong type is ignored, not fatal', () {
+      final LauncherSettings settings = LauncherSettings.fromJson(
+        <String, Object?>{'agendaGridZoom': 'big'},
+      );
+
+      expect(settings.agendaGridZoom, 1);
     });
 
     test('mailSignature defaults to empty', () {

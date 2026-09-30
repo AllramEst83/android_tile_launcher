@@ -303,6 +303,11 @@ class _AgendaSheetState extends State<_AgendaSheet> {
             now: _now,
             repository: widget.repository,
             onChanged: _load,
+            initialHeightPerMinute: SettingsScope.of(context).agendaGridZoom,
+            onHeightPerMinuteChanged: (double value) =>
+                SettingsScope.stateOf(context)?.update(
+                  SettingsScope.of(context).copyWith(agendaGridZoom: value),
+                ),
           );
         }
         final DateTime start = _rangeStart;

@@ -81,6 +81,7 @@ class LauncherSettings {
     this.appIcons = true,
     this.agendaWeekView = false,
     this.agendaGridView = false,
+    this.agendaGridZoom = 1,
     this.lastUsedCalendarId,
     this.mailSignature = '',
   });
@@ -116,6 +117,13 @@ class LauncherSettings {
   /// than the list. Meaningless while [agendaWeekView] is false; remembered
   /// UI state the same way that is.
   final bool agendaGridView;
+
+  /// How tall an hour is drawn in the Week:Grid view (`WeekView`'s own
+  /// `heightPerMinute`), last set by a pinch there. Saved so it survives
+  /// stepping between weeks — the grid widget is recreated on every reload,
+  /// so without this its own zoom would reset each time. Remembered UI
+  /// state, the same as [agendaWeekView] and [agendaGridView].
+  final double agendaGridZoom;
 
   /// The calendar last saved an event to, so `+ ADD EVENT`'s own calendar
   /// field defaults to it rather than always the account's primary — `null`
@@ -156,6 +164,7 @@ class LauncherSettings {
     bool? appIcons,
     bool? agendaWeekView,
     bool? agendaGridView,
+    double? agendaGridZoom,
     int? lastUsedCalendarId,
     String? mailSignature,
   }) => LauncherSettings(
@@ -170,6 +179,7 @@ class LauncherSettings {
     appIcons: appIcons ?? this.appIcons,
     agendaWeekView: agendaWeekView ?? this.agendaWeekView,
     agendaGridView: agendaGridView ?? this.agendaGridView,
+    agendaGridZoom: agendaGridZoom ?? this.agendaGridZoom,
     lastUsedCalendarId: lastUsedCalendarId ?? this.lastUsedCalendarId,
     mailSignature: mailSignature ?? this.mailSignature,
   );
@@ -186,6 +196,7 @@ class LauncherSettings {
     'appIcons': appIcons,
     'agendaWeekView': agendaWeekView,
     'agendaGridView': agendaGridView,
+    'agendaGridZoom': agendaGridZoom,
     'lastUsedCalendarId': lastUsedCalendarId,
     'mailSignature': mailSignature,
   };
@@ -238,6 +249,9 @@ class LauncherSettings {
       agendaGridView: json['agendaGridView'] is bool
           ? json['agendaGridView']! as bool
           : defaults.agendaGridView,
+      agendaGridZoom: json['agendaGridZoom'] is num
+          ? (json['agendaGridZoom']! as num).toDouble()
+          : defaults.agendaGridZoom,
       lastUsedCalendarId: json['lastUsedCalendarId'] is int
           ? json['lastUsedCalendarId']! as int
           : defaults.lastUsedCalendarId,
@@ -261,6 +275,7 @@ class LauncherSettings {
       other.appIcons == appIcons &&
       other.agendaWeekView == agendaWeekView &&
       other.agendaGridView == agendaGridView &&
+      other.agendaGridZoom == agendaGridZoom &&
       other.lastUsedCalendarId == lastUsedCalendarId &&
       other.mailSignature == mailSignature;
 
@@ -277,11 +292,12 @@ class LauncherSettings {
     appIcons,
     agendaWeekView,
     agendaGridView,
+    agendaGridZoom,
     lastUsedCalendarId,
     mailSignature,
   );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, agendaGridZoom: $agendaGridZoom, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature)';
 }
