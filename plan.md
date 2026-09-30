@@ -4,7 +4,7 @@ Goal: an Android home-screen launcher made of live tiles, so the user rarely has
 
 Guidance for agents: [AGENTS.md](AGENTS.md) and [.agents/](.agents/README.md). Each step ends with `dart format`, `flutter analyze`, `flutter test` clean, `flutter build apk --debug` after touching `android/`, and — where it touches the phone — a device check. Small steps: finish and verify one before starting the next.
 
-Phases 0–24 (foundation through the app itself being feature-complete: apps, mosaic, drawer, persistence, grid editor, clock, device tile, weather, agenda, people, mail, Text TV, calc/convert, alarms, settings, wallpaper, and several rounds of visual/UI polish) are archived in [.agents/archive/plan-phases-0-24.md](.agents/archive/plan-phases-0-24.md). Phases 25–44 (grid-editor and tile-size overhauls, font scaling, several tile fixes found on the user's own phone, a device-tile icon set, a Google-services survey, the file/disk explorer and its all-files-access rebuild, settings visual grouping, a Bluetooth tile and its own later bugfix, the tile-size grid picker and its two follow-up fixes, bolder C64 styling, mail bulk delete, a help screen, and a search-field clear icon and its own follow-up fix) are archived in [.agents/archive/plan-phases-25-44.md](.agents/archive/plan-phases-25-44.md), along with their full changelog. Phases 45–48 (calendar add/edit/delete and its phone-testing follow-up fixes, mail compose/reply, the contacts/app-drawer scrubber alignment fix, and a rotation-lock tile) are archived in [.agents/archive/plan-phases-45-48.md](.agents/archive/plan-phases-45-48.md). This file is now empty of phases, awaiting the user's next batch.
+Phases 0–24 (foundation through the app itself being feature-complete: apps, mosaic, drawer, persistence, grid editor, clock, device tile, weather, agenda, people, mail, Text TV, calc/convert, alarms, settings, wallpaper, and several rounds of visual/UI polish) are archived in [.agents/archive/plan-phases-0-24.md](.agents/archive/plan-phases-0-24.md). Phases 25–44 (grid-editor and tile-size overhauls, font scaling, several tile fixes found on the user's own phone, a device-tile icon set, a Google-services survey, the file/disk explorer and its all-files-access rebuild, settings visual grouping, a Bluetooth tile and its own later bugfix, the tile-size grid picker and its two follow-up fixes, bolder C64 styling, mail bulk delete, a help screen, and a search-field clear icon and its own follow-up fix) are archived in [.agents/archive/plan-phases-25-44.md](.agents/archive/plan-phases-25-44.md), along with their full changelog. Phases 45–48 (calendar add/edit/delete and its phone-testing follow-up fixes, mail compose/reply, the contacts/app-drawer scrubber alignment fix, and a rotation-lock tile) are archived in [.agents/archive/plan-phases-45-48.md](.agents/archive/plan-phases-45-48.md). Phases 49, 50, 52, 53 and 54 (mail's rich view/chip/reply/forward/prev-next/bulk read-unread, the calendar sheet reclaiming vertical space, the Bluetooth tile showing connected devices, the scrubber drift fix and its new persistent marker, and the add-tile sheet's camera-cutout fix) are archived in [.agents/archive/plan-phases-49-54.md](.agents/archive/plan-phases-49-54.md). Phase 51 (the calendar's "Week: Grid" view) is implemented but held uncommitted below, pending the user's own phone test; Phase 55 (a Tetris game) is queued below, not yet started.
 
 The sibling repo `../android_terminal_launcher` already solves some of these problems (weather, mail, calendar, contacts, Text TV) in pure-Dart services worth reading before inventing a solution here, but its presentation never transfers — there is no command line here.
 
@@ -12,41 +12,12 @@ The sibling repo `../android_terminal_launcher` already solves some of these pro
 
 Each phase gets designed in detail only when it's reached; this is an outline so the order is agreed up front. Small, independent phases can be reordered without much cost — ask if a different order would be more useful before starting.
 
-49. **Mail pane: rich view, chip, reply/forward, prev/next, bulk read/unread.**
-    Render the message body as HTML (a rich view, not raw markup) via a small
-    HTML-rendering package. Style the sender's address as a tappable
-    C64-styled chip/badge; tapping it opens a blank COMPOSE (not a reply).
-    Add REPLY (between MARK UNREAD and TRASH) and FORWARD (same slot, but
-    with TO left blank instead of pre-filled) buttons. Add prev/next chevrons
-    below the BACK row to step between messages without returning to the
-    list. In the list's SELECT mode, add READ and UNREAD bulk actions
-    alongside DELETE.
-50. **Calendar week view: reclaim vertical space.** Let the week pane grow to
-    fill available height, keeping only enough top padding to clear the
-    status bar/camera cutout.
-    *(Commit and push through here, then pause: the next sub-phase needs the
-    user's own testing before it is committed.)*
 51. **Calendar "Week: Grid" view.** A new agenda view alongside the existing
     week view: a time-grid week (hours down the side, days across the top,
     events as positioned/sized blocks — see `_temp_/image.png` for the
     target look), restyled for the C64 look, with the same buttons/actions
-    the week view has. *(Implement, but hold the commit/push until the user
-    has tested it.)*
-52. **Bluetooth tile rework.** Show currently-connected devices on the tile
-    itself, more or fewer as the tile is resized; drop the ON/OFF and
-    MANAGE DEVICES buttons from the tile. In the expanded sheet, show the
-    full device list (connected and disconnected) filling the pane.
-53. **Scrubber accuracy and a second marker.** Fix the jump-index drift
-    where the targeted letter falls out of sync with the list's actual
-    scroll position as the list grows (see
-    `_temp_/WhatsApp Image 2026-09-30 at 07.47.54.jpeg`); add a second,
-    persistent marker that snaps around the letter actually at the top of
-    the list (distinct from the existing drag-touch highlight); jumping to a
-    letter should align its group header to the top of the viewport with a
-    little breathing room, not flush against the edge.
-54. **Tile-list breathing room.** The "+ ADD TILE" sheet's tile list can run
-    under the status bar/camera cutout when full; give it the same top
-    clearance the other sheets have.
+    the week view has. *(Implemented; held uncommitted, pending the user's
+    own phone test.)*
 55. **Flutter Game** (Pause here and make sure you commit and push before starting this phase) I would like you to build a small Tetris game in the C64 style we have established. The first decision is: do we need a framework like Flutter Flame, can you build this yourself, or are there other frameworks or libraries out there that better suit our needs? When the tile is tapped, I want the game to launch into fullscreen mode, and when exiting, return to the launcher. I want touce/swipe controls as well as on screen touch controls. Sliders, buttons and joystick. Let's discuss this before starting. I plan for us to build more games like this, so getting the structure right from the beginning is key. Basically, I want the games to be loaded as modules into the class or service responsible for running them, making it easy to add and remove games.
 
 ## Deliberately different from the terminal launcher
@@ -71,3 +42,4 @@ Each phase gets designed in detail only when it's reached; this is an outline so
 
 - 2026-09-29: plan.md compacted. Phases 25–44 and their changelog moved to [.agents/archive/plan-phases-25-44.md](.agents/archive/plan-phases-25-44.md); phase numbering otherwise unchanged. Plan is now empty of phases, awaiting the user's next batch.
 - 2026-09-29: plan.md compacted again. Phases 45–48 (calendar add/edit/delete, mail compose/reply, the scrubber alignment fix, a rotation-lock tile, and the phone-testing follow-up fixes to the first two) and their changelog moved to [.agents/archive/plan-phases-45-48.md](.agents/archive/plan-phases-45-48.md); phase numbering otherwise unchanged. Plan is now empty of phases, awaiting the user's next batch.
+- 2026-09-30: plan.md compacted again. Phases 49, 50, 52, 53 and 54 (mail rich view/chip/reply/forward/prev-next/bulk read-unread, the calendar sheet reclaiming vertical space, the Bluetooth tile showing connected devices, the scrubber drift fix and its new persistent marker, and the add-tile sheet's camera-cutout fix) and their changelog moved to [.agents/archive/plan-phases-49-54.md](.agents/archive/plan-phases-49-54.md); phase numbering otherwise unchanged. Phase 51 stays, implemented but held uncommitted pending the user's phone test; Phase 55 stays, not yet started.
