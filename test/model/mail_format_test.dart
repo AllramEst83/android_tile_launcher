@@ -166,4 +166,41 @@ void main() {
       expect(plainTextFromHtml('<tr><td>a</td><td>b</td></tr>').trim(), 'a b');
     });
   });
+
+  group('looksLikeHtml', () {
+    test('a full document is markup', () {
+      expect(looksLikeHtml('<html><body><p>Hi</p></body></html>'), isTrue);
+    });
+
+    test('a bare tag is markup', () {
+      expect(looksLikeHtml('Hello<br>there'), isTrue);
+      expect(looksLikeHtml('<div>Hi</div>'), isTrue);
+    });
+
+    test('ordinary prose is not markup', () {
+      expect(looksLikeHtml('Hi there, see you < 5pm?'), isFalse);
+    });
+
+    test('only checks the first part of a very long text', () {
+      final String prose = 'a' * 3000;
+      expect(looksLikeHtml('$prose<div>late tag</div>'), isFalse);
+    });
+  });
+
+  group('stripImagesFromHtml', () {
+    test('drops an img tag, self-closed or not', () {
+      expect(
+        stripImagesFromHtml('<p>Hi</p><img src="x.png"><p>Bye</p>'),
+        '<p>Hi</p><p>Bye</p>',
+      );
+      expect(stripImagesFromHtml('<img src="x.png" />'), '');
+    });
+
+    test('leaves everything else alone', () {
+      expect(
+        stripImagesFromHtml('<p>No pictures here</p>'),
+        '<p>No pictures here</p>',
+      );
+    });
+  });
 }

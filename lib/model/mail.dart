@@ -114,6 +114,7 @@ class MailBody {
     this.fromAddress = '',
     required this.subject,
     required this.text,
+    this.html,
     this.date,
     this.truncated = false,
     this.attachments = 0,
@@ -123,15 +124,21 @@ class MailBody {
   final int uid;
   final String from;
 
-  /// The sender's own address, for REPLY to address to (never shown itself:
-  /// [from] is what the reader shows). Empty if the message gave none.
+  /// The sender's own address, for REPLY/FORWARD to address and for tapping
+  /// the sender to compose a fresh message (never shown itself: [from] is
+  /// what the reader shows). Empty if the message gave none.
   final String fromAddress;
   final String subject;
   final DateTime? date;
 
   /// Never empty: a message with nothing to show says so in [text]'s place
-  /// on the screen, not here.
+  /// on the screen, not here. Always plain text, even when [html] is set (for
+  /// quoting a reply/forward, and as the reader's fallback).
   final String text;
+
+  /// The message's own markup, images stripped, for a rich view; null when
+  /// the message was plain text to begin with (then [text] is shown as-is).
+  final String? html;
 
   /// Whether [text] was cut short because the message is very long.
   final bool truncated;

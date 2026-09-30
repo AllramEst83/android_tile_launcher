@@ -495,23 +495,37 @@ MailMessage? mailMessageFrom(MimeMessage message) {
 }
 
 /// [message] (fetched whole) as what the reader shows, given its list [entry]
-/// for who, when and what. The plain text part if there is one, else the
-/// readable text of the HTML part; tidied and cut at [mailTextLimit]. Kept apart
-/// from the network so it can be tested on its own.
+/// for who, when and what. The plain text part if there is one and actually
+/// reads as prose, else the message's HTML (for a rich view) with its own
+/// text kept too, for quoting and as the fallback; tidied and cut at
+/// [mailTextLimit]. Kept apart from the network so it can be tested on its own.
 MailBody mailBodyFrom(
   MimeMessage message,
   MailMessage entry, {
   bool markedRead = true,
 }) {
   String raw = '';
+  String? html;
   try {
-    raw = message.decodeTextPlainPart() ?? '';
-    if (raw.trim().isEmpty) {
-      final html = message.decodeTextHtmlPart();
-      if (html != null) raw = plainTextFromHtml(html);
+    final String? plainPart = message.decodeTextPlainPart();
+    final String? htmlPart = message.decodeTextHtmlPart();
+    if (htmlPart != null && htmlPart.trim().isNotEmpty) {
+      html = stripImagesFromHtml(htmlPart).trim();
+    }
+    if (plainPart != null &&
+        plainPart.trim().isNotEmpty &&
+        !looksLikeHtml(plainPart)) {
+      raw = plainPart;
+    } else if (htmlPart != null && htmlPart.trim().isNotEmpty) {
+      raw = plainTextFromHtml(htmlPart);
+    } else if (plainPart != null && plainPart.trim().isNotEmpty) {
+      // The "plain" part is itself markup (a sloppy sender): show it rich too.
+      html = stripImagesFromHtml(plainPart).trim();
+      raw = plainTextFromHtml(plainPart);
     }
   } on Object {
     raw = '';
+    html = null;
   }
   var attachments = 0;
   try {
@@ -529,6 +543,7 @@ MailBody mailBodyFrom(
     subject: entry.subject,
     date: entry.date,
     text: tidy.text,
+    html: html,
     truncated: tidy.truncated,
     attachments: attachments,
     markedRead: markedRead,

@@ -121,6 +121,10 @@ abstract final class Messages {
   static const String mailChecking = 'CHECKING...';
   static const String mailTrash = 'TRASH';
   static const String mailBack = '< BACK';
+  static const String mailPrev = '< PREV';
+  static const String mailNext = 'NEXT >';
+  static const String mailReply = 'REPLY';
+  static const String mailForward = 'FORWARD';
   static const String mailMarkRead = 'MARK AS READ';
   static const String mailMarkUnread = 'MARK AS UNREAD';
   static const String mailOpening = 'OPENING...';
@@ -146,12 +150,18 @@ abstract final class Messages {
   static const String mailCancelSelect = 'CANCEL';
   static String mailSelectedCount(int n) => '$n SELECTED';
   static String mailDeleteSelected(int n) => 'DELETE ($n)';
+  static String mailReadSelected(int n) => 'READ ($n)';
+  static String mailUnreadSelected(int n) => 'UNREAD ($n)';
   static String mailBulkTrashAsk(int n) =>
       'MOVE $n ${n == 1 ? 'EMAIL' : 'EMAILS'} TO TRASH? THIS CAN\'T BE UNDONE.';
   static String mailBulkDeleting(int done, int total) =>
       'DELETING $done OF $total...';
   static String mailBulkMoved(int n) =>
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MOVED TO TRASH.';
+  static String mailBulkMarkedRead(int n) =>
+      '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS READ.';
+  static String mailBulkMarkedUnread(int n) =>
+      '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS UNREAD.';
   static const String mailCompose = 'COMPOSE';
   static const String mailComposeTitle = 'NEW MESSAGE';
   static const String mailTo = 'TO';

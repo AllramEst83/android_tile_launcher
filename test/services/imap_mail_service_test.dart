@@ -536,22 +536,79 @@ void main() {
       expect(opened.body.text, isNot(contains('color:red')));
     });
 
-    test('takes the plain text when both are there', () async {
+    test(
+      'takes the plain text when both are there, but shows html too',
+      () async {
+        await boot(const [
+          FakeImapMessage(
+            uid: 8,
+            subject: '"Both"',
+            date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+            address: 'a@example.com',
+            text: 'plain version',
+            html: '<p>html version</p>',
+          ),
+        ]);
+        await setUp();
+
+        final opened = await mail.read(8) as MailOpened;
+
+        expect(opened.body.text, 'plain version');
+        expect(opened.body.html, '<p>html version</p>');
+      },
+    );
+
+    test('an HTML-only message keeps its markup for a rich view', () async {
       await boot(const [
         FakeImapMessage(
-          uid: 8,
-          subject: '"Both"',
+          uid: 11,
+          subject: '"News"',
           date: 'Fri, 25 Sep 2026 10:00:00 +0000',
-          address: 'a@example.com',
-          text: 'plain version',
-          html: '<p>html version</p>',
+          address: 'news@example.com',
+          html: '<p>Rich <b>news</b></p><img src="http://example.com/x.png">',
         ),
       ]);
       await setUp();
 
-      final opened = await mail.read(8) as MailOpened;
+      final opened = await mail.read(11) as MailOpened;
 
-      expect(opened.body.text, 'plain version');
+      expect(opened.body.html, '<p>Rich <b>news</b></p>');
+    });
+
+    test('a "plain" part that is really markup is shown rich too', () async {
+      await boot(const [
+        FakeImapMessage(
+          uid: 12,
+          subject: '"Sloppy"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          text: '<div>Not actually plain</div>',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(12) as MailOpened;
+
+      expect(opened.body.html, '<div>Not actually plain</div>');
+      expect(opened.body.text, 'Not actually plain');
+    });
+
+    test('plain prose with no markup is shown as-is, with no html', () async {
+      await boot(const [
+        FakeImapMessage(
+          uid: 13,
+          subject: '"Plain"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          text: 'Just a normal note.',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(13) as MailOpened;
+
+      expect(opened.body.html, isNull);
+      expect(opened.body.text, 'Just a normal note.');
     });
 
     test('counts attachments without showing them', () async {

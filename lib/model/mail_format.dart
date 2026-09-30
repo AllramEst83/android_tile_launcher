@@ -85,6 +85,25 @@ const int mailTextLimit = 20000;
   return (text: text.trimRight(), truncated: true);
 }
 
+/// Whether [text] looks like HTML markup rather than plain prose: some
+/// senders' mail clients fill the "plain text" alternative with the markup
+/// itself by mistake, and that should still be shown as a rich view rather
+/// than as literal angle brackets. Only the first part is checked; a message
+/// can be large and this only needs a hint, not a proof.
+bool looksLikeHtml(String text) {
+  final String sample = text.length > 2000 ? text.substring(0, 2000) : text;
+  return RegExp(
+    r'<(!doctype\s+html|html[\s>]|body[\s>]|div[\s>]|table[\s>]|p[\s>]|br\s*/?>|span[\s>]|a\s)',
+    caseSensitive: false,
+  ).hasMatch(sample);
+}
+
+/// [html] with every `<img>` tag removed. Pictures are counted, never shown
+/// ([MailBody.attachments]); an `<img>` left in a rich view would fetch a
+/// remote file behind the scenes just to render the message.
+String stripImagesFromHtml(String html) =>
+    html.replaceAll(RegExp(r'<img\b[^>]*>', caseSensitive: false), '');
+
 /// The readable text of an HTML message: what is between the tags, with
 /// paragraphs, line breaks, list items and table rows kept as lines, and
 /// scripts, styles, comments and the head dropped. Not a browser: it shows what

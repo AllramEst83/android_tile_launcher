@@ -12,7 +12,41 @@ The sibling repo `../android_terminal_launcher` already solves some of these pro
 
 Each phase gets designed in detail only when it's reached; this is an outline so the order is agreed up front. Small, independent phases can be reordered without much cost — ask if a different order would be more useful before starting.
 
-*(none queued right now — add phases here when ready.)*
+49. **Mail pane: rich view, chip, reply/forward, prev/next, bulk read/unread.**
+    Render the message body as HTML (a rich view, not raw markup) via a small
+    HTML-rendering package. Style the sender's address as a tappable
+    C64-styled chip/badge; tapping it opens a blank COMPOSE (not a reply).
+    Add REPLY (between MARK UNREAD and TRASH) and FORWARD (same slot, but
+    with TO left blank instead of pre-filled) buttons. Add prev/next chevrons
+    below the BACK row to step between messages without returning to the
+    list. In the list's SELECT mode, add READ and UNREAD bulk actions
+    alongside DELETE.
+50. **Calendar week view: reclaim vertical space.** Let the week pane grow to
+    fill available height, keeping only enough top padding to clear the
+    status bar/camera cutout.
+    *(Commit and push through here, then pause: the next sub-phase needs the
+    user's own testing before it is committed.)*
+51. **Calendar "Week: Grid" view.** A new agenda view alongside the existing
+    week view: a time-grid week (hours down the side, days across the top,
+    events as positioned/sized blocks — see `_temp_/image.png` for the
+    target look), restyled for the C64 look, with the same buttons/actions
+    the week view has. *(Implement, but hold the commit/push until the user
+    has tested it.)*
+52. **Bluetooth tile rework.** Show currently-connected devices on the tile
+    itself, more or fewer as the tile is resized; drop the ON/OFF and
+    MANAGE DEVICES buttons from the tile. In the expanded sheet, show the
+    full device list (connected and disconnected) filling the pane.
+53. **Scrubber accuracy and a second marker.** Fix the jump-index drift
+    where the targeted letter falls out of sync with the list's actual
+    scroll position as the list grows (see
+    `_temp_/WhatsApp Image 2026-09-30 at 07.47.54.jpeg`); add a second,
+    persistent marker that snaps around the letter actually at the top of
+    the list (distinct from the existing drag-touch highlight); jumping to a
+    letter should align its group header to the top of the viewport with a
+    little breathing room, not flush against the edge.
+54. **Tile-list breathing room.** The "+ ADD TILE" sheet's tile list can run
+    under the status bar/camera cutout when full; give it the same top
+    clearance the other sheets have.
 
 ## Deliberately different from the terminal launcher
 

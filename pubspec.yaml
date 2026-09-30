@@ -17,6 +17,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_secure_storage: ^11.2.0
+  flutter_widget_from_html_core: ^0.17.4
   permission_handler: ^13.0.2
   shared_preferences: ^2.5.5
 

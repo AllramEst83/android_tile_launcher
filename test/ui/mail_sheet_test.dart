@@ -49,6 +49,7 @@ MailOpened _opened(
   String subject, {
   String fromAddress = '',
   String text = 'Hello, this is the whole message.',
+  String? html,
   bool truncated = false,
   int attachments = 0,
   bool markedRead = true,
@@ -60,6 +61,7 @@ MailOpened _opened(
     fromAddress: fromAddress,
     subject: subject,
     text: text,
+    html: html,
     truncated: truncated,
     attachments: attachments,
     markedRead: markedRead,
@@ -823,10 +825,19 @@ void main() {
       await tester.tap(find.byKey(mailTrashNoKey));
       await tester.pump();
 
-      final Rect mark = tester.getRect(find.byKey(mailMarkKey));
-      final Rect trash = tester.getRect(find.byKey(mailTrashKey));
-      expect(trash.right, lessThanOrEqualTo(360 - TileMetrics.margin));
-      expect(trash.left - mark.right, greaterThanOrEqualTo(TileMetrics.margin));
+      // Four buttons now (MARK, REPLY, FORWARD, TRASH): they may wrap onto a
+      // second line at this width rather than overflow, so only bounds are
+      // checked, not that they all share one row.
+      for (final Key key in <Key>[
+        mailMarkKey,
+        mailReplyKey,
+        mailForwardKey,
+        mailTrashKey,
+      ]) {
+        final Rect rect = tester.getRect(find.byKey(key));
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(360));
+      }
     });
 
     testWidgets('the list header with COMPOSE also fits a narrow phone', (
@@ -878,13 +889,45 @@ void main() {
       expect(find.text(Messages.mailComposeTitle), findsNothing);
     });
 
-    testWidgets('tapping the sender opens a reply, addressed and subjected', (
+    testWidgets('tapping the sender opens a blank message addressed to them', (
       WidgetTester tester,
     ) async {
       await _open(tester, _service());
       await _read(tester, 12);
 
-      await tester.tap(find.byKey(mailFromReplyKey));
+      await tester.tap(find.byKey(mailFromComposeKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.mailComposeTitle), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
+        'anna@example.com',
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(composeSubjectKey))
+            .controller
+            ?.text,
+        '',
+      );
+    });
+
+    testWidgets('no address on the message: FROM is not tappable', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 11);
+
+      expect(find.byKey(mailFromComposeKey), findsNothing);
+    });
+
+    testWidgets('REPLY opens addressed, subjected and quoted', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailReplyKey));
       await tester.pumpAndSettle();
 
       expect(
@@ -913,13 +956,156 @@ void main() {
       expect(body?.selection.baseOffset, 0);
     });
 
-    testWidgets('no address on the message: FROM is not tappable', (
+    testWidgets('FORWARD opens blank-addressed, subjected and quoted', (
       WidgetTester tester,
     ) async {
       await _open(tester, _service());
-      await _read(tester, 11);
+      await _read(tester, 12);
 
-      expect(find.byKey(mailFromReplyKey), findsNothing);
+      await tester.tap(find.byKey(mailForwardKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
+        '',
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(composeSubjectKey))
+            .controller
+            ?.text,
+        'Fwd: Lunch on Friday?',
+      );
+      expect(
+        tester.widget<TextField>(find.byKey(composeBodyKey)).controller?.text,
+        contains('On MON 28 SEP 09:05, Anna Andersson wrote:'),
+      );
+    });
+  });
+
+  group('rich body', () {
+    testWidgets('a message with markup renders it rich, not as raw tags', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        fromAddress: 'anna@example.com',
+        text: 'Sure, see you then',
+        html: '<p>Sure, <b>see you then</b></p>',
+      );
+      await _open(tester, mail);
+
+      await _read(tester, 12);
+
+      expect(find.text('Sure, see you then', findRichText: true), findsWidgets);
+      expect(find.byType(SelectableText), findsNothing);
+    });
+
+    testWidgets('plain text still renders as selectable text', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+
+      await _read(tester, 12);
+
+      expect(find.byKey(mailBodyKey), findsOneWidget);
+      expect(tester.widget(find.byKey(mailBodyKey)), isA<SelectableText>());
+    });
+  });
+
+  group('prev/next', () {
+    testWidgets('steps to the next and previous message in the list', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailNextKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text('BO BERG'), findsOneWidget);
+
+      await tester.tap(find.byKey(mailPrevKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ANNA ANDERSSON'), findsOneWidget);
+    });
+
+    testWidgets('PREV does nothing on the first message, NEXT on the last', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailPrevKey));
+      await tester.pumpAndSettle();
+      expect(find.text('ANNA ANDERSSON'), findsOneWidget);
+
+      await tester.tap(find.byKey(mailNextKey));
+      await tester.pumpAndSettle();
+      expect(find.text('BO BERG'), findsOneWidget);
+
+      await tester.tap(find.byKey(mailNextKey));
+      await tester.pumpAndSettle();
+      expect(find.text('BO BERG'), findsOneWidget);
+    });
+  });
+
+  group('bulk read/unread', () {
+    testWidgets('READ marks every selected message read', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      await tester.tap(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailBulkReadKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.marks, <(int, bool, int?)>[(12, true, 77)]);
+      expect(find.text(Messages.mailBulkMarkedRead(1)), findsOneWidget);
+      // Selection mode ends and the list still shows read, not unread, now.
+      expect(find.byKey(mailSelectKey), findsOneWidget);
+      expect(find.text('* ANNA ANDERSSON'), findsNothing);
+    });
+
+    testWidgets('UNREAD marks every selected message unread', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      await tester.tap(find.byKey(mailMessageKey(11)));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailBulkUnreadKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.marks, <(int, bool, int?)>[(11, false, 77)]);
+      expect(find.text(Messages.mailBulkMarkedUnread(1)), findsOneWidget);
+      expect(find.text('* BO BERG'), findsOneWidget);
+    });
+
+    testWidgets('disabled until something is selected', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailBulkReadKey));
+      await tester.tap(find.byKey(mailBulkUnreadKey));
+      await tester.pump();
+
+      expect(mail.marks, isEmpty);
     });
   });
 }

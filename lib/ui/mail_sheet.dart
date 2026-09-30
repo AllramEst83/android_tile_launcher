@@ -8,12 +8,17 @@ import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 
 /// Keys so tests can find the parts.
 Key mailMessageKey(int uid) => ValueKey<String>('mail-message-$uid');
 Key mailCheckboxKey(int uid) => ValueKey<String>('mail-checkbox-$uid');
 const Key mailComposeKey = ValueKey<String>('mail-compose');
-const Key mailFromReplyKey = ValueKey<String>('mail-from-reply');
+const Key mailFromComposeKey = ValueKey<String>('mail-from-compose');
+const Key mailReplyKey = ValueKey<String>('mail-reply');
+const Key mailForwardKey = ValueKey<String>('mail-forward');
+const Key mailPrevKey = ValueKey<String>('mail-prev');
+const Key mailNextKey = ValueKey<String>('mail-next');
 const Key mailTrashKey = ValueKey<String>('mail-trash');
 const Key mailTrashYesKey = ValueKey<String>('mail-trash-yes');
 const Key mailTrashNoKey = ValueKey<String>('mail-trash-no');
@@ -28,6 +33,8 @@ const Key mailForgetNoKey = ValueKey<String>('mail-forget-no');
 const Key mailSelectKey = ValueKey<String>('mail-select');
 const Key mailCancelSelectKey = ValueKey<String>('mail-cancel-select');
 const Key mailBulkDeleteKey = ValueKey<String>('mail-bulk-delete');
+const Key mailBulkReadKey = ValueKey<String>('mail-bulk-read');
+const Key mailBulkUnreadKey = ValueKey<String>('mail-bulk-unread');
 const Key mailBulkYesKey = ValueKey<String>('mail-bulk-yes');
 const Key mailBulkNoKey = ValueKey<String>('mail-bulk-no');
 
@@ -38,10 +45,17 @@ String _replySubject(String subject) {
   return trimmed.isEmpty ? 'Re:' : 'Re: $trimmed';
 }
 
+/// `Fwd: <subject>`, unless [subject] already reads as a forward.
+String _forwardSubject(String subject) {
+  final String trimmed = subject.trim();
+  if (trimmed.toLowerCase().startsWith('fwd:')) return trimmed;
+  return trimmed.isEmpty ? 'Fwd:' : 'Fwd: $trimmed';
+}
+
 /// [body]'s own text, quoted under an "on ... wrote:" line and led by two
-/// blank lines for the reply itself — the compose sheet puts the cursor
-/// above it, so typing starts there, not inside the quote.
-String _quotedReply(MailBody body) {
+/// blank lines for the reply or forward itself — the compose sheet puts the
+/// cursor above it, so typing starts there, not inside the quote.
+String _quotedOriginal(MailBody body) {
   final String who = body.date == null
       ? '${body.from} wrote:'
       : 'On ${formatClockDate(body.date!)} '
@@ -346,6 +360,11 @@ class _MailSheetState extends State<_MailSheet> {
 
   Future<void> _compose() => showComposeSheet(context, mail: widget.mail);
 
+  /// Opens a blank message addressed to [address]: what tapping the sender's
+  /// own chip does, rather than a reply (REPLY is its own button now).
+  Future<void> _composeTo(String address) =>
+      showComposeSheet(context, mail: widget.mail, to: address);
+
   /// Opens a reply to [body]'s own sender: addressed to them, the subject
   /// prefixed `RE:` unless it already is one, and the original text quoted
   /// under the (empty) space for the reply itself.
@@ -354,8 +373,78 @@ class _MailSheetState extends State<_MailSheet> {
     mail: widget.mail,
     to: body.fromAddress,
     subject: _replySubject(body.subject),
-    body: _quotedReply(body),
+    body: _quotedOriginal(body),
   );
+
+  /// Opens a forward of [body]: the same quoted text as a reply, but with TO
+  /// left blank rather than pre-filled with the original sender.
+  Future<void> _forward(MailBody body) => showComposeSheet(
+    context,
+    mail: widget.mail,
+    subject: _forwardSubject(body.subject),
+    body: _quotedOriginal(body),
+  );
+
+  /// Where the open message sits in [_messages] (newest first), for PREV/NEXT.
+  int? get _openIndex {
+    final int? uid = _openUid;
+    if (uid == null) return null;
+    final int i = _messages.indexWhere((MailMessage m) => m.uid == uid);
+    return i < 0 ? null : i;
+  }
+
+  bool get _canGoPrev => (_openIndex ?? -1) > 0;
+  bool get _canGoNext {
+    final int? i = _openIndex;
+    return i != null && i < _messages.length - 1;
+  }
+
+  Future<void> _openPrev() async {
+    final int? i = _openIndex;
+    if (i == null || i <= 0) return;
+    await _open(_messages[i - 1]);
+  }
+
+  Future<void> _openNext() async {
+    final int? i = _openIndex;
+    if (i == null || i >= _messages.length - 1) return;
+    await _open(_messages[i + 1]);
+  }
+
+  /// Marks every selected message read or unread, in place (no reload: unlike
+  /// a trash move, marking never changes who is in the list).
+  Future<void> _bulkMark(bool read) async {
+    final List<int> uids = _selected.toList();
+    setState(() => _busy = true);
+    int marked = 0;
+    for (final int uid in uids) {
+      final MailMarkResult result = await widget.mail.mark(
+        uid,
+        read: read,
+        validity: _validity,
+      );
+      if (!mounted) return;
+      switch (result) {
+        case MailMarked():
+          _setUnread(uid, !read);
+          marked++;
+        case MailMarkGone():
+          _dropFromList(uid);
+        case MailMarkNotSetUp():
+        case MailMarkFailed():
+          break;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _selecting = false;
+      _selected.clear();
+      _status = read
+          ? Messages.mailBulkMarkedRead(marked)
+          : Messages.mailBulkMarkedUnread(marked);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -393,14 +482,6 @@ class _MailSheetState extends State<_MailSheet> {
                     key: mailCancelSelectKey,
                     label: Messages.mailCancelSelect,
                     onTap: _busy ? null : _cancelSelecting,
-                  ),
-                  const SizedBox(width: 8),
-                  _Button(
-                    key: mailBulkDeleteKey,
-                    label: Messages.mailDeleteSelected(_selected.length),
-                    onTap: _busy || _selected.isEmpty
-                        ? null
-                        : () => setState(() => _confirmingBulkTrash = true),
                   ),
                 ] else ...<Widget>[
                   Text(
@@ -449,6 +530,57 @@ class _MailSheetState extends State<_MailSheet> {
                     key: mailComposeKey,
                     label: Messages.mailCompose,
                     onTap: _busy ? null : _compose,
+                  ),
+                ],
+              ),
+            ],
+            // READ/UNREAD/DELETE wrap onto a second line on a narrow phone,
+            // rather than a fixed row that would overflow.
+            if (_selecting) ...<Widget>[
+              const SizedBox(height: TileMetrics.gutter),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  _Button(
+                    key: mailBulkReadKey,
+                    label: Messages.mailReadSelected(_selected.length),
+                    onTap: _busy || _selected.isEmpty
+                        ? null
+                        : () => _bulkMark(true),
+                  ),
+                  _Button(
+                    key: mailBulkUnreadKey,
+                    label: Messages.mailUnreadSelected(_selected.length),
+                    onTap: _busy || _selected.isEmpty
+                        ? null
+                        : () => _bulkMark(false),
+                  ),
+                  _Button(
+                    key: mailBulkDeleteKey,
+                    label: Messages.mailDeleteSelected(_selected.length),
+                    onTap: _busy || _selected.isEmpty
+                        ? null
+                        : () => setState(() => _confirmingBulkTrash = true),
+                  ),
+                ],
+              ),
+            ],
+            // PREV/NEXT below BACK, its own row.
+            if (open != null) ...<Widget>[
+              const SizedBox(height: TileMetrics.gutter),
+              Row(
+                children: <Widget>[
+                  _Button(
+                    key: mailPrevKey,
+                    label: Messages.mailPrev,
+                    onTap: _busy || _reading || !_canGoPrev ? null : _openPrev,
+                  ),
+                  const SizedBox(width: TileMetrics.margin * 2),
+                  _Button(
+                    key: mailNextKey,
+                    label: Messages.mailNext,
+                    onTap: _busy || _reading || !_canGoNext ? null : _openNext,
                   ),
                 ],
               ),
@@ -526,11 +658,20 @@ class _MailSheetState extends State<_MailSheet> {
           Text(Messages.mailFrom, style: label),
           if (body.fromAddress.isNotEmpty)
             InkWell(
-              key: mailFromReplyKey,
-              onTap: _busy ? null : () => _reply(body),
-              child: Text(
-                body.from.toUpperCase(),
-                style: value?.copyWith(color: TileColors.accent),
+              key: mailFromComposeKey,
+              onTap: _busy ? null : () => _composeTo(body.fromAddress),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: TileColors.accent,
+                    width: TileMetrics.bevel,
+                  ),
+                ),
+                child: Text(
+                  body.from.toUpperCase(),
+                  style: value?.copyWith(color: TileColors.accent),
+                ),
               ),
             )
           else
@@ -556,17 +697,7 @@ class _MailSheetState extends State<_MailSheet> {
           const SizedBox(height: 8),
           Container(height: 2, color: TileColors.bezel),
           const SizedBox(height: TileMetrics.gutter),
-          SelectableText(
-            body.text.isEmpty ? Messages.mailNoText : body.text,
-            key: mailBodyKey,
-            style: text.bodySmall?.copyWith(
-              fontSize: 12,
-              height: 1.7,
-              color: body.text.isEmpty
-                  ? TileColors.muted
-                  : TileColors.textBright,
-            ),
-          ),
+          _bodyContent(body, text),
           if (body.truncated) ...<Widget>[
             const SizedBox(height: 8),
             Text(Messages.mailCutOff, style: label),
@@ -580,8 +711,35 @@ class _MailSheetState extends State<_MailSheet> {
     );
   }
 
-  /// MARK AS READ / MARK AS UNREAD and TRASH, with room between them; TRASH
-  /// asks again first.
+  /// The whole message: rendered rich when it has real markup ([MailBody.html]),
+  /// else its plain text as-is.
+  Widget _bodyContent(MailBody body, TextTheme text) {
+    final String? html = body.html;
+    if (html != null && html.trim().isNotEmpty) {
+      return HtmlWidget(
+        html,
+        key: mailBodyKey,
+        textStyle: text.bodySmall?.copyWith(
+          fontSize: 12,
+          height: 1.7,
+          color: TileColors.textBright,
+        ),
+      );
+    }
+    return SelectableText(
+      body.text.isEmpty ? Messages.mailNoText : body.text,
+      key: mailBodyKey,
+      style: text.bodySmall?.copyWith(
+        fontSize: 12,
+        height: 1.7,
+        color: body.text.isEmpty ? TileColors.muted : TileColors.textBright,
+      ),
+    );
+  }
+
+  /// MARK AS READ/UNREAD, REPLY, FORWARD and TRASH, with room between them
+  /// (wrapping onto a second line on a narrow phone rather than overflowing);
+  /// TRASH asks again first.
   Widget _actions(TextTheme text, int uid) {
     if (_confirmingTrash == uid) {
       return Row(
@@ -609,15 +767,27 @@ class _MailSheetState extends State<_MailSheet> {
       );
     }
     final bool unread = _entry(uid)?.unread ?? false;
-    return Row(
+    final MailBody? opened = _opened;
+    return Wrap(
+      spacing: TileMetrics.margin * 2,
+      runSpacing: TileMetrics.gutter,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
         _Button(
           key: mailMarkKey,
           label: unread ? Messages.mailMarkRead : Messages.mailMarkUnread,
           onTap: _busy ? null : () => _toggleRead(uid),
         ),
-        // Room between them, so one is not hit for the other.
-        const SizedBox(width: TileMetrics.margin * 2),
+        _Button(
+          key: mailReplyKey,
+          label: Messages.mailReply,
+          onTap: _busy || opened == null ? null : () => _reply(opened),
+        ),
+        _Button(
+          key: mailForwardKey,
+          label: Messages.mailForward,
+          onTap: _busy || opened == null ? null : () => _forward(opened),
+        ),
         _Button(
           key: mailTrashKey,
           label: Messages.mailTrash,
