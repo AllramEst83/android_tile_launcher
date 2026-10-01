@@ -11,14 +11,28 @@ import '../fakes/fake_clipboard_service.dart';
 import '../fakes/fake_link_service.dart';
 
 const Key _fakeScannerKey = ValueKey<String>('fake-scanner');
+const Key _fakeUnreadableKey = ValueKey<String>('fake-unreadable');
 
-/// Stands in for the real camera preview: a button that reports [value] as a
-/// decoded code when tapped, so a test never touches real camera hardware.
-Widget Function(ValueChanged<String>) _fakeScannerDetecting(String value) =>
-    (ValueChanged<String> onDetect) => TextButton(
-      key: _fakeScannerKey,
-      onPressed: () => onDetect(value),
-      child: const Text('DETECT'),
+/// Stands in for the real camera preview: one button that reports [value] as
+/// a decoded code when tapped, and another that reports a code-shaped thing
+/// that could not be decoded, so a test never touches real camera hardware.
+Widget Function(ValueChanged<String>, VoidCallback) _fakeScannerDetecting(
+  String value,
+) =>
+    (ValueChanged<String> onDetect, VoidCallback onUnreadable) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        TextButton(
+          key: _fakeScannerKey,
+          onPressed: () => onDetect(value),
+          child: const Text('DETECT'),
+        ),
+        TextButton(
+          key: _fakeUnreadableKey,
+          onPressed: onUnreadable,
+          child: const Text('UNREADABLE'),
+        ),
+      ],
     );
 
 Future<void> _open(
@@ -26,7 +40,7 @@ Future<void> _open(
   required FakeCameraService camera,
   FakeLinkService? link,
   FakeClipboardService? clipboard,
-  Widget Function(ValueChanged<String>)? scanner,
+  Widget Function(ValueChanged<String>, VoidCallback)? scanner,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -197,6 +211,87 @@ void main() {
       expect(find.byKey(_fakeScannerKey), findsOneWidget);
       expect(find.byKey(qrScannerCopyKey), findsNothing);
       expect(find.text(Messages.qrScannerAim), findsOneWidget);
+    });
+
+    testWidgets(
+      'the footer keys share one height, even though SCAN AGAIN is longest',
+      (WidgetTester tester) async {
+        await _open(
+          tester,
+          camera: FakeCameraService(),
+          scanner: _fakeScannerDetecting('https://example.com'),
+        );
+        await tester.tap(find.byKey(_fakeScannerKey));
+        await tester.pumpAndSettle();
+
+        final double openHeight = tester
+            .getSize(find.byKey(qrScannerOpenKey))
+            .height;
+        final double copyHeight = tester
+            .getSize(find.byKey(qrScannerCopyKey))
+            .height;
+        final double scanAgainHeight = tester
+            .getSize(find.byKey(qrScannerScanAgainKey))
+            .height;
+        expect(copyHeight, openHeight);
+        expect(scanAgainHeight, openHeight);
+      },
+    );
+  });
+
+  group('the reticle', () {
+    testWidgets('shows while aiming, hidden once a code is read', (
+      WidgetTester tester,
+    ) async {
+      await _open(
+        tester,
+        camera: FakeCameraService(),
+        scanner: _fakeScannerDetecting('hello'),
+      );
+      expect(find.byKey(qrScannerReticleKey), findsOneWidget);
+
+      await tester.tap(find.byKey(_fakeScannerKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(qrScannerReticleKey), findsNothing);
+    });
+
+    testWidgets('an unreadable code flashes it without changing the view', (
+      WidgetTester tester,
+    ) async {
+      await _open(
+        tester,
+        camera: FakeCameraService(),
+        scanner: _fakeScannerDetecting('hello'),
+      );
+
+      await tester.tap(find.byKey(_fakeUnreadableKey));
+      await tester.pumpAndSettle();
+
+      // Still aiming: no result, the fake scanner (and its DETECT button)
+      // stays up, nothing was reported as read.
+      expect(find.byKey(qrScannerReticleKey), findsOneWidget);
+      expect(find.byKey(_fakeScannerKey), findsOneWidget);
+      expect(find.text(Messages.qrScannerAim), findsOneWidget);
+    });
+
+    testWidgets('reappears, reset, after SCAN AGAIN', (
+      WidgetTester tester,
+    ) async {
+      await _open(
+        tester,
+        camera: FakeCameraService(),
+        scanner: _fakeScannerDetecting('hello'),
+      );
+      await tester.tap(find.byKey(_fakeUnreadableKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(_fakeScannerKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(qrScannerScanAgainKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(qrScannerReticleKey), findsOneWidget);
     });
   });
 }
