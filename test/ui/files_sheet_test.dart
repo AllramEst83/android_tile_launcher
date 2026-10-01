@@ -466,6 +466,92 @@ void main() {
       });
     });
 
+    group('columns', () {
+      testWidgets(
+        'the storage volumes list has no MODIFIED/SIZE to squeeze NAME for',
+        (WidgetTester tester) async {
+          await _open(tester, withEntries());
+
+          // Every root entry is synthetic (no modified date, no item count),
+          // so those columns — and their sort headers — are not shown there
+          // at all, and a long volume name is never shortened to make room
+          // for them.
+          expect(find.text('INTERNAL STORAGE'), findsOneWidget);
+          expect(
+            find.byKey(filesSortHeaderKey(FileSortKey.modified)),
+            findsNothing,
+          );
+          expect(
+            find.byKey(filesSortHeaderKey(FileSortKey.size)),
+            findsNothing,
+          );
+        },
+      );
+
+      testWidgets('MODIFIED/SIZE columns reappear once inside a volume', (
+        WidgetTester tester,
+      ) async {
+        await _open(tester, withEntries());
+        await tester.tap(find.byKey(filesRowKey('/storage/emulated/0')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(filesSortHeaderKey(FileSortKey.modified)),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(filesSortHeaderKey(FileSortKey.size)),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('a wide item count widens its column instead of wrapping, at '
+          'EXTRA LARGE too', (WidgetTester tester) async {
+        final service = FakeFilesService()
+          ..access = true
+          ..rootsResult = FilesListed(<FileEntry>[
+            const FileEntry(
+              name: 'INTERNAL STORAGE',
+              path: '/root',
+              isDirectory: true,
+              sizeBytes: 0,
+            ),
+          ])
+          ..resultsByPath['/root'] = FilesListed(<FileEntry>[
+            FileEntry(
+              name: 'Downloads',
+              path: '/root/Downloads',
+              isDirectory: true,
+              sizeBytes: 0,
+              modified: d(10),
+              itemCount: 9999,
+            ),
+          ]);
+        await _open(tester, service, textScale: 1.3);
+        await tester.tap(find.byKey(filesRowKey('/root')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('9999 ITEMS'), findsOneWidget);
+        // A wrapped Text grows past a single line's own height; the header
+        // InkWell's own minimum tap-target height is a fixed 32 regardless
+        // of whether its Text wrapped, so measure the Text itself.
+        final double headerTextHeight = tester
+            .getSize(
+              find.descendant(
+                of: find.byKey(filesSortHeaderKey(FileSortKey.modified)),
+                matching: find.byType(Text),
+              ),
+            )
+            .height;
+        final double rowTextHeight = tester
+            .getSize(find.text('9999 ITEMS'))
+            .height;
+        expect(headerTextHeight, lessThan(20));
+        expect(rowTextHeight, lessThan(20));
+        expect(tester.takeException(), isNull);
+      });
+    });
+
     group('search and filter', () {
       testWidgets('typing in SEARCH narrows the list by name', (
         WidgetTester tester,

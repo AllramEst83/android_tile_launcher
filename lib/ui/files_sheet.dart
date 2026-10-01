@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/byte_format.dart';
@@ -37,8 +38,6 @@ const Key filesBulkDeleteKey = ValueKey<String>('files-bulk-delete');
 const Key filesBulkYesKey = ValueKey<String>('files-bulk-yes');
 const Key filesBulkNoKey = ValueKey<String>('files-bulk-no');
 
-const double _modifiedColumnWidth = 60;
-const double _sizeColumnWidth = 56;
 const double _actionsColumnWidth = 36;
 const double _checkboxColumnWidth = 26;
 
@@ -393,6 +392,60 @@ class _FilesSheetState extends State<_FilesSheet> {
 
   Widget _listing(TextTheme text, List<FileEntry> raw) {
     final List<FileEntry> visible = _visible(raw);
+    final DateTime now = DateTime.now();
+    final TextStyle metaStyle =
+        text.bodySmall?.copyWith(fontSize: 9, color: TileColors.muted) ??
+        const TextStyle(fontSize: 9);
+    // The real ambient scale (the FONT SIZE setting, applied as a MediaQuery
+    // textScaler override in app.dart) — a bare TextPainter applies none of
+    // its own, so every width below must be measured against this one, not
+    // left to default, or it under-measures by however much FONT SIZE is
+    // scaling the real Text up.
+    final TextScaler textScaler = MediaQuery.textScalerOf(context);
+    // The top-level list of storage volumes has nothing to put in MODIFIED
+    // or SIZE — every entry there is synthetic (AndroidFilesService.roots)
+    // — so neither column (header included) is shown at all rather than
+    // reserving space nothing will ever fill, squeezing NAME for it; a
+    // volume's own name is the one thing worth the room.
+    final bool showMeta = _path != null;
+    // Wide enough for the widest text each column will actually show (its
+    // own header, sort arrow included, counts as a candidate too) — a fixed
+    // guess clipped "MODIFIED ▼" and a folder's own "168 ITEMS" into two
+    // lines the moment either ran longer than guessed, at any font scale.
+    double modifiedWidth = 0;
+    double sizeWidth = 0;
+    if (showMeta) {
+      modifiedWidth = _textWidth(
+        '${FileSortKey.modified.label} ▼',
+        metaStyle,
+        textScaler,
+      );
+      sizeWidth = _textWidth(
+        '${FileSortKey.size.label} ▼',
+        metaStyle,
+        textScaler,
+      );
+      for (final FileEntry entry in visible) {
+        final String modified = formatFileDate(entry.modified, now);
+        if (modified.isNotEmpty) {
+          modifiedWidth = math.max(
+            modifiedWidth,
+            _textWidth(modified, metaStyle, textScaler),
+          );
+        }
+        final String size = _sizeTextOf(entry);
+        if (size.isNotEmpty) {
+          sizeWidth = math.max(
+            sizeWidth,
+            _textWidth(size, metaStyle, textScaler),
+          );
+        }
+      }
+      // A little breathing room against sub-pixel rounding between this
+      // measurement and the real layout.
+      modifiedWidth += 2;
+      sizeWidth += 2;
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -517,7 +570,7 @@ class _FilesSheetState extends State<_FilesSheet> {
             style: text.bodyMedium,
           )
         else ...<Widget>[
-          _columnHeader(text),
+          _columnHeader(text, showMeta, modifiedWidth, sizeWidth),
           Flexible(
             child: ListView(
               shrinkWrap: true,
@@ -525,6 +578,10 @@ class _FilesSheetState extends State<_FilesSheet> {
                 for (final FileEntry entry in visible)
                   _FileRow(
                     entry: entry,
+                    now: now,
+                    showMeta: showMeta,
+                    modifiedColumnWidth: modifiedWidth,
+                    sizeColumnWidth: sizeWidth,
                     selecting: _selecting,
                     selected: _selected.contains(entry.path),
                     onOpen: () => _open(entry),
@@ -577,7 +634,12 @@ class _FilesSheetState extends State<_FilesSheet> {
     );
   }
 
-  Widget _columnHeader(TextTheme text) {
+  Widget _columnHeader(
+    TextTheme text,
+    bool showMeta,
+    double modifiedWidth,
+    double sizeWidth,
+  ) {
     TextStyle? styleFor(FileSortKey key) => text.bodySmall?.copyWith(
       fontSize: 9,
       color: _sortKey == key ? TileColors.textBright : TileColors.muted,
@@ -603,31 +665,34 @@ class _FilesSheetState extends State<_FilesSheet> {
               ),
             ),
           ),
-          SizedBox(
-            width: _modifiedColumnWidth,
-            child: InkWell(
-              key: filesSortHeaderKey(FileSortKey.modified),
-              onTap: () => _tapSort(FileSortKey.modified),
-              child: Text(
-                labelFor(FileSortKey.modified),
-                style: styleFor(FileSortKey.modified),
-                textAlign: TextAlign.right,
+          if (showMeta) ...<Widget>[
+            SizedBox(
+              width: modifiedWidth,
+              child: InkWell(
+                key: filesSortHeaderKey(FileSortKey.modified),
+                onTap: () => _tapSort(FileSortKey.modified),
+                child: Text(
+                  labelFor(FileSortKey.modified),
+                  style: styleFor(FileSortKey.modified),
+                  textAlign: TextAlign.right,
+                ),
               ),
             ),
-          ),
-          SizedBox(
-            width: _sizeColumnWidth,
-            child: InkWell(
-              key: filesSortHeaderKey(FileSortKey.size),
-              onTap: () => _tapSort(FileSortKey.size),
-              child: Text(
-                labelFor(FileSortKey.size),
-                style: styleFor(FileSortKey.size),
-                textAlign: TextAlign.right,
+            SizedBox(
+              width: sizeWidth,
+              child: InkWell(
+                key: filesSortHeaderKey(FileSortKey.size),
+                onTap: () => _tapSort(FileSortKey.size),
+                child: Text(
+                  labelFor(FileSortKey.size),
+                  style: styleFor(FileSortKey.size),
+                  textAlign: TextAlign.right,
+                ),
               ),
             ),
-          ),
-          if (!_selecting) const SizedBox(width: _actionsColumnWidth),
+          ],
+          if (!_selecting && showMeta)
+            const SizedBox(width: _actionsColumnWidth),
         ],
       ),
     );
@@ -837,6 +902,10 @@ class _FileCheckbox extends StatelessWidget {
 class _FileRow extends StatelessWidget {
   const _FileRow({
     required this.entry,
+    required this.now,
+    required this.showMeta,
+    required this.modifiedColumnWidth,
+    required this.sizeColumnWidth,
     required this.selecting,
     required this.selected,
     required this.onOpen,
@@ -845,6 +914,19 @@ class _FileRow extends StatelessWidget {
   });
 
   final FileEntry entry;
+
+  /// Shared with the sheet's own column-width measurement, so a row's
+  /// MODIFIED text is never computed from a different instant than the one
+  /// its column was sized against.
+  final DateTime now;
+
+  /// `false` at the top-level list of storage volumes, where MODIFIED, SIZE
+  /// and the delete action are all meaningless (see `_listing`'s own doc) —
+  /// skips all three cells entirely rather than reserving dead space for
+  /// them, leaving NAME the room instead.
+  final bool showMeta;
+  final double modifiedColumnWidth;
+  final double sizeColumnWidth;
   final bool selecting;
   final bool selected;
   final VoidCallback onOpen;
@@ -864,6 +946,7 @@ class _FileRow extends StatelessWidget {
     final TextStyle metaStyle =
         text.bodySmall?.copyWith(fontSize: 9, color: TileColors.muted) ??
         const TextStyle(fontSize: 9);
+    final TextScaler textScaler = MediaQuery.textScalerOf(context);
     final VoidCallback? delete = onDelete;
     return Padding(
       key: filesRowKey(entry.path),
@@ -894,33 +977,32 @@ class _FileRow extends StatelessWidget {
                     entry.name.toUpperCase(),
                     constraints.maxWidth,
                     nameStyle,
+                    textScaler,
                   ),
                   maxLines: 1,
                   style: nameStyle,
                 ),
               ),
             ),
-            SizedBox(
-              width: _modifiedColumnWidth,
-              child: Text(
-                formatFileDate(entry.modified, DateTime.now()),
-                textAlign: TextAlign.right,
-                style: metaStyle,
+            if (showMeta) ...<Widget>[
+              SizedBox(
+                width: modifiedColumnWidth,
+                child: Text(
+                  formatFileDate(entry.modified, now),
+                  textAlign: TextAlign.right,
+                  style: metaStyle,
+                ),
               ),
-            ),
-            SizedBox(
-              width: _sizeColumnWidth,
-              child: Text(
-                entry.isDirectory
-                    ? (entry.itemCount == null
-                          ? ''
-                          : Messages.filesItemCount(entry.itemCount!))
-                    : formatBytes(entry.sizeBytes),
-                textAlign: TextAlign.right,
-                style: metaStyle,
+              SizedBox(
+                width: sizeColumnWidth,
+                child: Text(
+                  _sizeTextOf(entry),
+                  textAlign: TextAlign.right,
+                  style: metaStyle,
+                ),
               ),
-            ),
-            if (!selecting)
+            ],
+            if (!selecting && showMeta)
               SizedBox(
                 width: _actionsColumnWidth,
                 child: delete == null
@@ -962,23 +1044,38 @@ class _FileRow extends StatelessWidget {
   }
 }
 
+/// The rendered width of [text] at [style] — one line, as it would actually
+/// lay out. Shared by [_fitName] (does `name` fit the space it's given?) and
+/// the sheet's own MODIFIED/SIZE column sizing (how wide do they need to be
+/// to fit *their* content, header included?). [textScaler] must be the real
+/// ambient one (`MediaQuery.textScalerOf(context)`): a `TextPainter` applies
+/// none of its own by default, so measuring without it under-measures by
+/// however much the FONT SIZE setting is scaling the real `Text` up —
+/// exactly the gap that let MODIFIED/SIZE wrap again at EXTRA LARGE even
+/// after they were sized to fit their un-scaled content.
+double _textWidth(String text, TextStyle style, TextScaler textScaler) {
+  final TextPainter painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: TextDirection.ltr,
+    textScaler: textScaler,
+    maxLines: 1,
+  )..layout();
+  return painter.width;
+}
+
 /// [name] as-is if it fits [maxWidth] at [style], else shortened in the
 /// middle — a prefix, `...`, then a suffix long enough to keep the extension
 /// readable (`THISSAHDSJ...DSDSDSA.MP4`, not a plain end-ellipsis that would
-/// hide it). Measured with the real [style] via [TextPainter] rather than
-/// assumed, since a fixed character budget would be wrong the moment the
-/// FONT SIZE setting changes it.
-String _fitName(String name, double maxWidth, TextStyle style) {
-  double widthOf(String s) {
-    final TextPainter painter = TextPainter(
-      text: TextSpan(text: s, style: style),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-    )..layout();
-    return painter.width;
-  }
-
-  if (widthOf(name) <= maxWidth) return name;
+/// hide it). Measured with the real [style]/[textScaler] via [_textWidth]
+/// rather than assumed, since a fixed character budget would be wrong the
+/// moment the FONT SIZE setting changes it.
+String _fitName(
+  String name,
+  double maxWidth,
+  TextStyle style,
+  TextScaler textScaler,
+) {
+  if (_textWidth(name, style, textScaler) <= maxWidth) return name;
 
   final int dot = name.lastIndexOf('.');
   final bool hasExtension = dot > 0 && dot < name.length - 1;
@@ -989,8 +1086,15 @@ String _fitName(String name, double maxWidth, TextStyle style) {
     final String candidate =
         '${stem.substring(0, keep)}...${stem.substring(stem.length - keep)}'
         '$extension';
-    if (widthOf(candidate) <= maxWidth) return candidate;
+    if (_textWidth(candidate, style, textScaler) <= maxWidth) return candidate;
   }
   // Even one character either side does not fit; give up the prefix first.
   return '...$extension';
 }
+
+/// What the SIZE column shows: a file's own byte size, a folder's item
+/// count (its own `sizeBytes` stays `0`/meaningless, as it always has), or
+/// empty when even the item count could not be read.
+String _sizeTextOf(FileEntry entry) => entry.isDirectory
+    ? (entry.itemCount == null ? '' : Messages.filesItemCount(entry.itemCount!))
+    : formatBytes(entry.sizeBytes);
