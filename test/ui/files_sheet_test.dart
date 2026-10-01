@@ -16,6 +16,11 @@ Future<SettingsState> _open(
   WidgetTester tester,
   FakeFilesService service, {
   SettingsState? settings,
+  // The app's own FONT SIZE setting is a MediaQuery textScaler override
+  // (see app.dart); reproduced directly here (rather than pumping the whole
+  // TileLauncherApp just for this) so a test can check the row of buttons
+  // beside the search box still fits at EXTRA LARGE (1.3x).
+  double textScale = 1,
 }) async {
   // A phone-tall viewport: the FILTER pane's text field, TYPE chips,
   // OLDER/NEWER toggle, unit chips and APPLY/CLEAR row do not all fit the
@@ -31,6 +36,11 @@ Future<SettingsState> _open(
   await tester.pumpWidget(
     MaterialApp(
       theme: tileLauncherTheme(),
+      builder: (BuildContext context, Widget? child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Builder(
         builder: (BuildContext context) => TextButton(
           onPressed: () =>
@@ -483,6 +493,24 @@ void main() {
 
         expect(find.text(Messages.filesNoMatches), findsOneWidget);
       });
+
+      testWidgets(
+        'FILTER and SELECT stay single-line beside the search box, at '
+        'EXTRA LARGE too',
+        (WidgetTester tester) async {
+          await _open(tester, withEntries(), textScale: 1.3);
+          await tester.tap(find.byKey(filesRowKey('/storage/emulated/0')));
+          await tester.pumpAndSettle();
+
+          // A wrapped label grows the button past its own configured
+          // minHeight (32) to fit a second line; sized to the text instead
+          // of a fixed width (which clipped "FILTER"/"SELECT" into two
+          // lines at a larger font scale), it stays exactly that tall.
+          expect(tester.getSize(find.byKey(filesFilterKey)).height, 32);
+          expect(tester.getSize(find.byKey(filesSelectKey)).height, 32);
+          expect(tester.takeException(), isNull);
+        },
+      );
 
       testWidgets('FILTER applies a type filter and shows a removable chip', (
         WidgetTester tester,

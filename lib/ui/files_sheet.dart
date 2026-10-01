@@ -483,28 +483,24 @@ class _FilesSheetState extends State<_FilesSheet> {
                 ),
               ),
               const SizedBox(width: 8),
-              SizedBox(
-                width: 64,
-                child: PadKey(
-                  key: filesFilterKey,
-                  label: Messages.filesFilter,
-                  height: 32,
-                  fontSize: 10,
-                  selected: !_filter.isEmpty,
-                  onTap: _openFilter,
-                ),
+              PadKey(
+                key: filesFilterKey,
+                label: Messages.filesFilter,
+                height: 32,
+                fontSize: 10,
+                selected: !_filter.isEmpty,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                onTap: _openFilter,
               ),
               if (_path != null) ...<Widget>[
                 const SizedBox(width: 8),
-                SizedBox(
-                  width: 64,
-                  child: PadKey(
-                    key: filesSelectKey,
-                    label: Messages.filesSelect,
-                    height: 32,
-                    fontSize: 10,
-                    onTap: raw.isEmpty ? null : _startSelecting,
-                  ),
+                PadKey(
+                  key: filesSelectKey,
+                  label: Messages.filesSelect,
+                  height: 32,
+                  fontSize: 10,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  onTap: raw.isEmpty ? null : _startSelecting,
                 ),
               ],
             ],
