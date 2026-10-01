@@ -3,6 +3,15 @@ import 'package:android_tile_launcher/ui/scene_tile_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const Key _fakeLottieKey = ValueKey<String>('fake-lottie');
+
+/// Stands in for the real [DotLottieView] so no test ever mounts the real
+/// platform view — the same seam `QrScannerScreen.scannerBuilder` uses for
+/// the camera preview. Shows [animation]'s label as plain text so a test can
+/// tell which one was built without touching a real `.lottie` file.
+Widget _fakeLottie(SceneAnimation animation) =>
+    Text(animation.label, key: _fakeLottieKey);
+
 Future<void> _pump(
   WidgetTester tester, {
   SceneAnimation animation = SceneAnimation.rocket,
@@ -12,61 +21,18 @@ Future<void> _pump(
     MaterialApp(
       home: SceneTileContentView(
         animation: animation,
-        ink: Colors.white,
         onTap: onTap,
+        lottieBuilder: _fakeLottie,
       ),
     ),
   );
-  // flutter_animate starts each effect after a zero-duration `Future.delayed`
-  // (its own `Animate.delay` defaults to none); without this extra pump that
-  // timer is still outstanding when the test ends, and the binding's own
-  // "no pending timers" check (rightly) fails the test over it. A duration,
-  // not a bare `pump()`, so the fake clock actually advances past it.
-  await tester.pump(const Duration(milliseconds: 50));
 }
 
 void main() {
-  testWidgets('the rocket shows its hull and flame', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('shows the given animation', (WidgetTester tester) async {
     await _pump(tester);
 
-    expect(find.text(rocketHull.join('\n')), findsOneWidget);
-    expect(find.text(rocketFlame), findsOneWidget);
-  });
-
-  testWidgets('the palm tree shows its fronds/trunk and the shoreline', (
-    WidgetTester tester,
-  ) async {
-    await _pump(tester, animation: SceneAnimation.palmTree);
-
-    expect(find.text(palmTree.join('\n')), findsOneWidget);
-    expect(find.text(palmWaves), findsOneWidget);
-  });
-
-  testWidgets('the flower shows its head, stem and the ground', (
-    WidgetTester tester,
-  ) async {
-    await _pump(tester, animation: SceneAnimation.flower);
-
-    expect(find.text(flowerHead), findsOneWidget);
-    expect(find.text(flowerStem.join('\n')), findsOneWidget);
-    expect(find.text(flowerGround), findsOneWidget);
-  });
-
-  testWidgets('stays correct through several seconds of its own animation', (
-    WidgetTester tester,
-  ) async {
-    await _pump(tester);
-
-    // The moving pieces (flame, bob, twinkle) never change what text is
-    // shown, only how it is transformed — so this should hold at any point
-    // in the loop, not just the instant it mounts.
-    await tester.pump(const Duration(seconds: 3));
-
-    expect(find.text(rocketHull.join('\n')), findsOneWidget);
-    expect(find.text(rocketFlame), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    expect(find.text(SceneAnimation.rocket.label), findsOneWidget);
   });
 
   testWidgets('switching the animation shows its own art instead', (
@@ -74,8 +40,8 @@ void main() {
   ) async {
     await _pump(tester, animation: SceneAnimation.flower);
 
-    expect(find.text(rocketHull.join('\n')), findsNothing);
-    expect(find.text(flowerHead), findsOneWidget);
+    expect(find.text(SceneAnimation.rocket.label), findsNothing);
+    expect(find.text(SceneAnimation.flower.label), findsOneWidget);
   });
 
   testWidgets('tapping it calls onTap', (WidgetTester tester) async {
@@ -96,5 +62,17 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('with no override, builds a real DotLottieView', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SceneTileContentView(animation: SceneAnimation.rocket),
+      ),
+    );
+
+    expect(find.byKey(sceneTileArtKey), findsOneWidget);
   });
 }

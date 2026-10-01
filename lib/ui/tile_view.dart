@@ -442,7 +442,6 @@ Widget tileContent(
       return Builder(
         builder: (context) => SceneTileContentView(
           animation: SettingsScope.of(context).sceneAnimation,
-          ink: tile.colour.ink,
           onTap: interactive
               ? () => unawaited(
                   showSceneSheet(

@@ -14,10 +14,10 @@ environment:
 
 dependencies:
   calendar_view: ^2.0.0
+  dotlottie_flutter: ^0.1.7
   enough_mail: ^2.1.7
   flutter:
     sdk: flutter
-  flutter_animate: ^4.5.2
   flutter_secure_storage: ^11.2.0
   flutter_widget_from_html_core: ^0.17.4
   mobile_scanner: ^7.4.2
@@ -45,9 +45,11 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # The lock-screen wallpapers settings can put on the phone, one per theme.
+  # The lock-screen wallpapers settings can put on the phone, one per theme,
+  # and the Scene tile's looping .lottie files (see model/scene_animation.dart).
   assets:
     - assets/wallpapers/
+    - assets/lottie/
 
   # Bundled (OFL 1.1, see fonts/OFL.txt) so the launcher works offline at boot.
   fonts:

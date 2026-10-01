@@ -16,13 +16,16 @@ void main() {
     expect(SceneAnimation.flower.label, 'FLOWER');
   });
 
-  test('none of the art pieces are empty', () {
-    expect(rocketHull, isNotEmpty);
-    expect(rocketFlame, isNotEmpty);
-    expect(palmTree, isNotEmpty);
-    expect(palmWaves, isNotEmpty);
-    expect(flowerHead, isNotEmpty);
-    expect(flowerStem, isNotEmpty);
-    expect(flowerGround, isNotEmpty);
+  test('each points at its own bundled .lottie asset', () {
+    expect(SceneAnimation.rocket.lottieAsset, 'lottie/rocket_lunch.lottie');
+    expect(SceneAnimation.palmTree.lottieAsset, 'lottie/palm_tree_leaf.lottie');
+    expect(SceneAnimation.flower.lottieAsset, 'lottie/plant.lottie');
+  });
+
+  test('every asset path is distinct', () {
+    final Set<String> paths = SceneAnimation.values
+        .map((SceneAnimation a) => a.lottieAsset)
+        .toSet();
+    expect(paths, hasLength(SceneAnimation.values.length));
   });
 }
