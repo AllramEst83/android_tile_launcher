@@ -7,6 +7,7 @@ import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/scene_animation.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/text_tv_page.dart';
@@ -46,6 +47,8 @@ import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
 import 'package:android_tile_launcher/ui/qr_scanner_screen.dart';
 import 'package:android_tile_launcher/ui/qr_scanner_tile_view.dart';
+import 'package:android_tile_launcher/ui/scene_sheet.dart';
+import 'package:android_tile_launcher/ui/scene_tile_view.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
@@ -1144,6 +1147,39 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(bluetoothCloseKey), findsNothing);
+    });
+
+    testWidgets('the scene tile opens the animation picker sheet', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      final SettingsState settingsState = SettingsState(
+        store: InMemoryLocalStore(),
+      );
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        settingsState: settingsState,
+      );
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.scene);
+      await tester.pumpAndSettle();
+      expect(settingsState.settings.sceneAnimation, SceneAnimation.rocket);
+
+      await tester.tap(_onHome(find.byKey(sceneTileArtKey)));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(sceneCloseKey), findsOneWidget);
+
+      await tester.tap(find.byKey(sceneOptionKey(SceneAnimation.palmTree)));
+      await tester.pumpAndSettle();
+
+      // The animation itself keeps ticking on its own timer throughout, so
+      // checking the saved choice is what stays true regardless of exactly
+      // which of its frames happens to be showing by now.
+      expect(find.byKey(sceneCloseKey), findsNothing);
+      expect(settingsState.settings.sceneAnimation, SceneAnimation.palmTree);
     });
 
     testWidgets('tapping the sound tile cycles normal, vibrate, silent', (

@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/scene_animation.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -49,6 +50,7 @@ void main() {
         agendaGridZoom: 1.8,
         lastUsedCalendarId: 7,
         mailSignature: 'Sent from my launcher',
+        sceneAnimation: SceneAnimation.flower,
       );
 
       expect(LauncherSettings.fromJson(settings.toJson()), settings);
@@ -80,6 +82,18 @@ void main() {
       );
 
       expect(settings.mailSignature, '');
+    });
+
+    test('sceneAnimation defaults to the rocket', () {
+      expect(const LauncherSettings().sceneAnimation, SceneAnimation.rocket);
+    });
+
+    test('a sceneAnimation not one of the three is ignored, not fatal', () {
+      final LauncherSettings settings = LauncherSettings.fromJson(
+        <String, Object?>{'sceneAnimation': 'fireworks'},
+      );
+
+      expect(settings.sceneAnimation, SceneAnimation.rocket);
     });
 
     test('a lastUsedCalendarId of the wrong type is ignored, not fatal', () {

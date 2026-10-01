@@ -50,6 +50,8 @@ import 'package:android_tile_launcher/ui/mail_tile_view.dart';
 import 'package:android_tile_launcher/ui/press_listener.dart';
 import 'package:android_tile_launcher/ui/qr_scanner_screen.dart';
 import 'package:android_tile_launcher/ui/qr_scanner_tile_view.dart';
+import 'package:android_tile_launcher/ui/scene_sheet.dart';
+import 'package:android_tile_launcher/ui/scene_tile_view.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/text_tv_screen.dart';
@@ -460,6 +462,27 @@ Widget tileContent(
                 : null,
           );
         },
+      );
+    case TileKind.scene:
+      // Nothing to read from outside: its content is a setting
+      // (LauncherSettings.sceneAnimation), not a platform read, so it reads
+      // SettingsScope directly instead of going through a TileSource/
+      // TilePoller — the same "nothing to poll, just a tap" shape the calc,
+      // files and QR scanner tiles use, via the same Builder for a context
+      // of its own.
+      return Builder(
+        builder: (context) => SceneTileContentView(
+          animation: SettingsScope.of(context).sceneAnimation,
+          ink: tile.colour.ink,
+          onTap: interactive
+              ? () => unawaited(
+                  showSceneSheet(
+                    context,
+                    settings: SettingsScope.stateOf(context)!,
+                  ),
+                )
+              : null,
+        ),
       );
   }
 }

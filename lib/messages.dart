@@ -365,6 +365,8 @@ abstract final class Messages {
   static const String qrScannerScanAgain = 'SCAN AGAIN';
   static const String qrScannerOpenFailed = 'COULD NOT OPEN THAT LINK.';
 
+  static const String sceneTitle = 'SCENE';
+
   static const String helpTitle = 'HELP';
 
   static const String helpGettingAroundTitle = 'GETTING AROUND';

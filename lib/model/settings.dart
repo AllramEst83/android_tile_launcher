@@ -1,3 +1,5 @@
+import 'package:android_tile_launcher/model/scene_animation.dart';
+
 /// How the launcher looks: the screen it draws on.
 enum ThemeVariant {
   /// The C64 power-on screen: light blue on blue. The default.
@@ -84,6 +86,7 @@ class LauncherSettings {
     this.agendaGridZoom = 1,
     this.lastUsedCalendarId,
     this.mailSignature = '',
+    this.sceneAnimation = SceneAnimation.rocket,
   });
 
   final ThemeVariant theme;
@@ -136,6 +139,11 @@ class LauncherSettings {
   /// above it; empty (the default) adds nothing. Set on the settings screen.
   final String mailSignature;
 
+  /// Which of the Scene tile's animations is playing — chosen from the
+  /// tile's own picker sheet, not the settings screen (there is nothing else
+  /// to configure about it, so a whole settings section would be one field).
+  final SceneAnimation sceneAnimation;
+
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
 
@@ -167,6 +175,7 @@ class LauncherSettings {
     double? agendaGridZoom,
     int? lastUsedCalendarId,
     String? mailSignature,
+    SceneAnimation? sceneAnimation,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -182,6 +191,7 @@ class LauncherSettings {
     agendaGridZoom: agendaGridZoom ?? this.agendaGridZoom,
     lastUsedCalendarId: lastUsedCalendarId ?? this.lastUsedCalendarId,
     mailSignature: mailSignature ?? this.mailSignature,
+    sceneAnimation: sceneAnimation ?? this.sceneAnimation,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -199,6 +209,7 @@ class LauncherSettings {
     'agendaGridZoom': agendaGridZoom,
     'lastUsedCalendarId': lastUsedCalendarId,
     'mailSignature': mailSignature,
+    'sceneAnimation': sceneAnimation.name,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -258,6 +269,11 @@ class LauncherSettings {
       mailSignature: json['mailSignature'] is String
           ? json['mailSignature']! as String
           : defaults.mailSignature,
+      sceneAnimation: pick(
+        SceneAnimation.values,
+        json['sceneAnimation'],
+        defaults.sceneAnimation,
+      ),
     );
   }
 
@@ -277,7 +293,8 @@ class LauncherSettings {
       other.agendaGridView == agendaGridView &&
       other.agendaGridZoom == agendaGridZoom &&
       other.lastUsedCalendarId == lastUsedCalendarId &&
-      other.mailSignature == mailSignature;
+      other.mailSignature == mailSignature &&
+      other.sceneAnimation == sceneAnimation;
 
   @override
   int get hashCode => Object.hash(
@@ -295,9 +312,10 @@ class LauncherSettings {
     agendaGridZoom,
     lastUsedCalendarId,
     mailSignature,
+    sceneAnimation,
   );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, agendaGridZoom: $agendaGridZoom, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, agendaGridZoom: $agendaGridZoom, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature, sceneAnimation: $sceneAnimation)';
 }
