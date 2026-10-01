@@ -4,21 +4,25 @@ import 'package:android_tile_launcher/services/permission_service.dart';
 import 'package:flutter/services.dart';
 
 /// [BluetoothService] on the Kotlin `BluetoothChannelHandler` (the adapter
-/// and its paired devices) and a [PermissionService] (`BLUETOOTH_CONNECT`,
-/// asked only from [allow]) — the same read+permission split
-/// `LiveAgendaRepository` uses for the calendar, rather than a second
+/// and its paired devices, plus a broadcast-backed [changes] stream for
+/// pair/connect/adapter-state events) and a [PermissionService]
+/// (`BLUETOOTH_CONNECT`, asked only from [allow]) — the same read+permission
+/// split `LiveAgendaRepository` uses for the calendar, rather than a second
 /// repository layer for what is otherwise a small, flat interface.
 class AndroidBluetoothService implements BluetoothService {
   AndroidBluetoothService({
     required this.permissions,
     this.channel = const MethodChannel(channelName),
-  });
+    EventChannel? eventChannel,
+  }) : _eventChannel =
+           eventChannel ?? const EventChannel('$channelName/events');
 
   static const String channelName =
       'com.codedbykay.android_tile_launcher/bluetooth';
 
   final MethodChannel channel;
   final PermissionService permissions;
+  final EventChannel _eventChannel;
 
   // Why the last request for access failed. Kept for the same reason
   // `LiveAgendaRepository._denied` is: Android reports "no access" the same
@@ -62,6 +66,19 @@ class AndroidBluetoothService implements BluetoothService {
           ),
     ]);
   }
+
+  /// Lazy and cached, not a bare getter: `EventChannel.receiveBroadcastStream`
+  /// starts a fresh native listener on every call, and this is a broadcast
+  /// stream that may well have more than one Dart subscriber (any tile this
+  /// service is handed to); without caching, a second subscriber would
+  /// register a second native receiver the first never gets torn down. A
+  /// platform error (no listener on the native side) is swallowed, same as
+  /// every other failure in this file: the poll interval still covers it.
+  @override
+  late final Stream<void> changes = _eventChannel
+      .receiveBroadcastStream()
+      .map((Object? _) {})
+      .handleError((Object _) {});
 
   @override
   Future<void> allow() async {

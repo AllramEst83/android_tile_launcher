@@ -2,14 +2,18 @@ package com.codedbykay.android_tile_launcher
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
@@ -27,19 +31,34 @@ import io.flutter.plugin.common.MethodChannel
  * `BluetoothAdapter.enable`/`.disable` (removed for ordinary apps targeting
  * Android 13+) nor a profile's own `connect`/`disconnect` (always restricted
  * to system apps) is called here — there is no public way to do either from
- * a third-party app, so this does not pretend otherwise.
+ * a third-party app, so this does not pretend otherwise. A second, event
+ * channel pushes Dart a bare ping on the public broadcasts that *do* exist
+ * for pairing, per-device connection, and the adapter's own on/off state, so
+ * the tile can re-read [status] the moment one of those actually changes
+ * instead of only on its own poll interval.
  */
 class BluetoothChannelHandler(
     private val context: Context,
     messenger: BinaryMessenger,
-) : MethodChannel.MethodCallHandler {
+) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
     private val channel = MethodChannel(messenger, CHANNEL)
+    private val eventChannel = EventChannel(messenger, EVENTS_CHANNEL)
     private val manager =
         context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     private val adapter: BluetoothAdapter? = manager?.adapter
 
+    // Pings Dart (a bare success(null), no payload — Dart re-reads [status]
+    // itself) on pairing, a device connecting/disconnecting, or the adapter's
+    // own on/off state, so the tile need not wait out a full poll interval
+    // for any of those. Only live between onListen and onCancel: Dart's own
+    // [changes] is a single cached broadcast stream, so there is never more
+    // than one Flutter-side listener, and so never more than one of these
+    // registered at a time.
+    private var receiver: BroadcastReceiver? = null
+
     init {
         channel.setMethodCallHandler(this)
+        eventChannel.setStreamHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -59,8 +78,50 @@ class BluetoothChannelHandler(
         }
     }
 
+    // The per-device broadcasts (bond state, ACL connect/disconnect) are
+    // protected on API 31+: without BLUETOOTH_CONNECT, Android itself simply
+    // never delivers them to this receiver, no exception and nothing extra to
+    // check here — `ACTION_STATE_CHANGED` (the adapter's own on/off) needs no
+    // permission and still gets through either way.
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                events.success(null)
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(r, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(r, filter)
+        }
+        receiver = r
+    }
+
+    override fun onCancel(arguments: Any?) {
+        unregister()
+    }
+
     fun dispose() {
         channel.setMethodCallHandler(null)
+        eventChannel.setStreamHandler(null)
+        unregister()
+    }
+
+    private fun unregister() {
+        val r = receiver ?: return
+        receiver = null
+        try {
+            context.unregisterReceiver(r)
+        } catch (e: IllegalArgumentException) {
+            // Already unregistered (e.g. dispose after onCancel already ran);
+            // nothing left to clean up.
+        }
     }
 
     private fun status(): Map<String, Any?> {
@@ -150,6 +211,7 @@ class BluetoothChannelHandler(
 
     companion object {
         const val CHANNEL = "com.codedbykay.android_tile_launcher/bluetooth"
+        const val EVENTS_CHANNEL = "com.codedbykay.android_tile_launcher/bluetooth/events"
         private val CONNECTION_PROFILES = intArrayOf(
             BluetoothProfile.HEADSET,
             BluetoothProfile.A2DP,

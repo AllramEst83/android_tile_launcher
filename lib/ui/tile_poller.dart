@@ -11,12 +11,16 @@ import 'package:flutter/widgets.dart';
 /// [builder]'s third argument re-reads [source] immediately, for a kind
 /// whose content view can trigger its own state change (a toggle tile,
 /// straight after a tap) and doesn't want to wait for the next tick.
+/// [trigger], when a kind has its own low-latency platform signal (Bluetooth's
+/// pair/connect broadcasts, say), does the same the moment it fires, rather
+/// than waiting out [interval] — which stays as the fallback either way.
 class TilePoller extends StatefulWidget {
   const TilePoller({
     super.key,
     required this.source,
     required this.interval,
     required this.builder,
+    this.trigger,
   });
 
   final TileSource source;
@@ -27,6 +31,7 @@ class TilePoller extends StatefulWidget {
     VoidCallback refreshNow,
   )
   builder;
+  final Stream<void>? trigger;
 
   @override
   State<TilePoller> createState() => _TilePollerState();
@@ -35,6 +40,7 @@ class TilePoller extends StatefulWidget {
 class _TilePollerState extends State<TilePoller> with WidgetsBindingObserver {
   TileContent? _content;
   Timer? _timer;
+  StreamSubscription<void>? _triggerSub;
 
   @override
   void initState() {
@@ -42,6 +48,7 @@ class _TilePollerState extends State<TilePoller> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     unawaited(_refresh());
     _startTimer();
+    _triggerSub = widget.trigger?.listen((_) => _refresh());
   }
 
   void _startTimer() {
@@ -69,6 +76,7 @@ class _TilePollerState extends State<TilePoller> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    unawaited(_triggerSub?.cancel());
     super.dispose();
   }
 

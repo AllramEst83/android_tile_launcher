@@ -46,17 +46,24 @@ class _BluetoothSheet extends StatefulWidget {
 class _BluetoothSheetState extends State<_BluetoothSheet>
     with WidgetsBindingObserver {
   BluetoothStatus? _status;
+  StreamSubscription<void>? _changesSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
+    // A device can pair, unpair, connect or disconnect without the sheet
+    // ever leaving the foreground (Android's own device screen is reachable
+    // from here, but so is a car radio simply going out of range) — the same
+    // broadcast-backed nudge the tile itself listens to.
+    _changesSub = widget.bluetooth.changes.listen((_) => _load());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_changesSub?.cancel());
     super.dispose();
   }
 

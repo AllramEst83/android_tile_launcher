@@ -157,4 +157,22 @@ void main() {
 
     expect(find.text(Messages.bluetoothTitle), findsNothing);
   });
+
+  testWidgets('a pair/connect broadcast re-reads without leaving the sheet', (
+    WidgetTester tester,
+  ) async {
+    final bluetooth = FakeBluetoothService()
+      ..statusResult = const BluetoothOn(<PairedDevice>[]);
+    await _open(tester, bluetooth);
+    expect(find.text(Messages.bluetoothNoDevices), findsOneWidget);
+
+    bluetooth.statusResult = const BluetoothOn(<PairedDevice>[
+      PairedDevice(name: 'Speaker', address: 'AA:BB', connected: true),
+    ]);
+    bluetooth.emitChange();
+    await tester.pumpAndSettle();
+
+    expect(find.text('SPEAKER'), findsOneWidget);
+    expect(find.text(Messages.bluetoothNoDevices), findsNothing);
+  });
 }

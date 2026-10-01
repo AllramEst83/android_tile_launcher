@@ -440,6 +440,7 @@ Widget tileContent(
       return TilePoller(
         source: BluetoothTileSource(service: bluetooth),
         interval: const Duration(seconds: 10),
+        trigger: bluetooth.changes,
         builder: (context, content, refreshNow) {
           final BluetoothStatus status =
               (content as BluetoothTileContent).status;

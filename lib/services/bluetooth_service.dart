@@ -34,4 +34,12 @@ abstract interface class BluetoothService {
   /// Opens Android's own Bluetooth settings screen, where a paired device is
   /// actually connected, disconnected or forgotten.
   Future<void> openSettings();
+
+  /// Fires whenever Android reports a pairing, a device connecting or
+  /// disconnecting, or the adapter itself turning on or off — nothing in the
+  /// event, just a nudge to call [status] again at once rather than waiting
+  /// out a full poll interval. A platform that cannot offer this (or has not
+  /// been asked for the permission these broadcasts need) simply never
+  /// fires; the poll interval is still the fallback, never the only path.
+  Stream<void> get changes;
 }

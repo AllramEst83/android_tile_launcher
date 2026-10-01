@@ -207,4 +207,77 @@ void main() {
       await service.openSettings();
     });
   });
+
+  group('changes', () {
+    const EventChannel events = EventChannel(
+      '${AndroidBluetoothService.channelName}/events',
+    );
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(events, null);
+    });
+
+    test('forwards whatever the native broadcast receiver pings', () async {
+      MockStreamHandlerEventSink? sink;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(
+            events,
+            MockStreamHandler.inline(
+              onListen: (Object? arguments, MockStreamHandlerEventSink s) =>
+                  sink = s,
+            ),
+          );
+      final service = AndroidBluetoothService(
+        permissions: FakePermissionService(),
+      );
+
+      final received = <void>[];
+      final subscription = service.changes.listen(received.add);
+      await Future<void>.delayed(Duration.zero);
+      sink!.success(null);
+      await Future<void>.delayed(Duration.zero);
+      sink!.success(null);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received.length, 2);
+      await subscription.cancel();
+    });
+
+    test('a second listener shares the one native registration', () async {
+      int listenCalls = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(
+            events,
+            MockStreamHandler.inline(
+              onListen: (Object? arguments, MockStreamHandlerEventSink s) =>
+                  listenCalls++,
+            ),
+          );
+      final service = AndroidBluetoothService(
+        permissions: FakePermissionService(),
+      );
+
+      final first = service.changes.listen((_) {});
+      final second = service.changes.listen((_) {});
+      await Future<void>.delayed(Duration.zero);
+
+      expect(listenCalls, 1);
+      await first.cancel();
+      await second.cancel();
+    });
+
+    test('no native handler at all never throws, just never fires', () async {
+      final service = AndroidBluetoothService(
+        permissions: FakePermissionService(),
+      );
+
+      final received = <void>[];
+      final subscription = service.changes.listen(received.add);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received, isEmpty);
+      await subscription.cancel();
+    });
+  });
 }
