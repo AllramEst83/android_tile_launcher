@@ -7,9 +7,10 @@ import 'package:flutter/material.dart';
 const Key sceneTileArtKey = ValueKey<String>('scene-tile-art');
 
 /// The Scene tile's content: [animation]'s `.lottie` file, autoplaying and
-/// looping forever, scaled to fit and centred in whatever space the tile
-/// gives it — so it stays centred as the tile is resized in the grid
-/// editor, same as [BoxFit.contain] does for any image.
+/// looping forever, scaled to fill whatever space the tile gives it (and a
+/// little past its edges, see [_artScale]) and centred — so it stays centred
+/// as the tile is resized in the grid editor, same as [BoxFit.contain] does
+/// for any image.
 class SceneTileContentView extends StatelessWidget {
   const SceneTileContentView({
     super.key,
@@ -27,13 +28,20 @@ class SceneTileContentView extends StatelessWidget {
   /// the camera preview.
   final Widget Function(SceneAnimation animation)? lottieBuilder;
 
+  /// How much bigger than its tile the art is drawn — most `.lottie` files
+  /// carry their own margin around the subject, so `BoxFit.contain` alone
+  /// leaves it looking smaller than the tile that holds it. Scaling up (and
+  /// clipping) crops that built-in margin instead of shrinking the subject
+  /// further to keep it.
+  static const double _artScale = 1.25;
+
   @override
   Widget build(BuildContext context) {
     final Widget Function(SceneAnimation) build =
         lottieBuilder ?? _defaultLottie;
     final Widget art = Padding(
       key: sceneTileArtKey,
-      padding: const EdgeInsets.all(TileMetrics.gutter / 2),
+      padding: const EdgeInsets.all(TileMetrics.gutter / 4),
       // DotLottieView is a real platform view (AndroidView/UiKitView) and
       // claims every touch inside its own bounds directly, with nothing
       // declared in its `gestureRecognizers` for Flutter's gesture arena to
@@ -41,7 +49,13 @@ class SceneTileContentView extends StatelessWidget {
       // that is meant to open the picker sheet. The animation itself has no
       // interactive parts of its own, so ignoring its pointer events costs
       // nothing.
-      child: IgnorePointer(child: SizedBox.expand(child: build(animation))),
+      child: ClipRect(
+        child: IgnorePointer(
+          child: SizedBox.expand(
+            child: Transform.scale(scale: _artScale, child: build(animation)),
+          ),
+        ),
+      ),
     );
     final VoidCallback? tap = onTap;
     if (tap == null) return art;
