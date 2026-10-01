@@ -97,8 +97,11 @@ class _TileSizeGridPickerState extends State<TileSizeGridPicker> {
 
   Widget _grid(double cellSize) {
     final double step = cellSize + widget.cellGap;
+    // The width the tile really takes on this mosaic, so a full-width
+    // `wide`/`large` tile paints every column, as it is drawn.
     final (int, int) painted =
-        _hover ?? (widget.size.columns - 1, widget.size.rows - 1);
+        _hover ??
+        (widget.size.spanIn(widget.maxColumns) - 1, widget.size.rows - 1);
     final double width = widget.maxColumns * step - widget.cellGap;
     final double height = widget.maxRows * step - widget.cellGap;
     return GestureDetector(

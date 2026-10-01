@@ -27,7 +27,6 @@ abstract final class Messages {
   static const String cancel = 'CANCEL';
   static const String apply = 'APPLY';
   static const String tileSize = 'SIZE';
-  static const String tileSizeFlip = 'FLIP';
   static const String tileColour = 'COLOUR';
 
   static const String addTile = '+ ADD TILE';
@@ -418,8 +417,7 @@ abstract final class Messages {
   static const String helpResizingBody =
       'IN THE GRID EDITOR, THE SIZE GRID PAINTS A TILE\'S SHAPE FROM '
       'ITS TOP-LEFT CORNER: TAP OR DRAG TOWARD A SQUARE TO PICK EVERY '
-      'SIZE UP TO THAT ONE. FLIP SWAPS WIDTH AND HEIGHT (3×2 TO 2×3) '
-      'WHEN THE RESULT STILL FITS.';
+      'SIZE UP TO THAT ONE.';
 
   static const String helpSettingsTitle = 'SETTINGS';
   static const String helpSettingsBody =

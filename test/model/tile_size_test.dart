@@ -7,8 +7,9 @@ void main() {
       for (final TileSize size in TileSize.values) (size.columns, size.rows),
     };
 
-    expect(TileSize.values.length, 36);
-    expect(shapes.length, 36, reason: 'no two sizes share a shape');
+    // 36 shapes, plus plain 4x2/4x4 twins of the full-width wide/large.
+    expect(TileSize.values.length, 38);
+    expect(shapes.length, 36, reason: 'only wide/large share a shape');
     for (int columns = 1; columns <= 6; columns++) {
       for (int rows = 1; rows <= 6; rows++) {
         expect(
@@ -46,6 +47,12 @@ void main() {
     expect(TileSize.size4x3.spanIn(6), 4);
   });
 
+  test('a picked 4-column size never stretches to fill a 6-column mosaic', () {
+    expect(TileSize.of(4, 2).spanIn(6), 4);
+    expect(TileSize.of(4, 4).spanIn(6), 4);
+    expect(TileSize.wide.spanIn(6), 6, reason: 'saved wide tiles unchanged');
+  });
+
   test('a new size no wider than the mosaic keeps its own width', () {
     expect(TileSize.size3x1.spanIn(4), 3);
     expect(TileSize.size1x6.spanIn(4), 1);
@@ -68,11 +75,13 @@ void main() {
   group('of', () {
     test('finds the size matching any in-range columns x rows', () {
       expect(TileSize.of(1, 1), TileSize.small);
-      expect(TileSize.of(4, 4), TileSize.large);
+      expect(TileSize.of(4, 2), TileSize.size4x2);
+      expect(TileSize.of(4, 4), TileSize.size4x4);
       expect(TileSize.of(3, 5), TileSize.size3x5);
       expect(TileSize.of(5, 3), TileSize.size5x3);
       expect(TileSize.of(6, 6), TileSize.size6x6);
       for (final TileSize size in TileSize.values) {
+        if (size.fullWidth) continue;
         expect(TileSize.of(size.columns, size.rows), size);
       }
     });

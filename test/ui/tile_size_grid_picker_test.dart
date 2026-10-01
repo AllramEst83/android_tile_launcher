@@ -29,6 +29,16 @@ Future<void> _pump(
   ),
 );
 
+bool _filled(WidgetTester tester, int columns, int rows) {
+  final DecoratedBox box = tester.widget<DecoratedBox>(
+    find.descendant(
+      of: find.byKey(sizeGridCellKey(columns, rows)),
+      matching: find.byType(DecoratedBox),
+    ),
+  );
+  return (box.decoration as BoxDecoration).color == TileColors.accent;
+}
+
 void main() {
   testWidgets('every cell is at a fixed, predictable spot', (
     WidgetTester tester,
@@ -169,6 +179,43 @@ void main() {
 
       expect(picked, TileSize.size6x6);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the 4th column picks a plain 4-wide size, not a full-width '
+        'one that would stretch to 6', (WidgetTester tester) async {
+      TileSize? picked;
+      await _pump(
+        tester,
+        size: TileSize.size6x2,
+        onSizeSelected: (TileSize s) => picked = s,
+        maxColumns: 6,
+      );
+
+      await tester.tap(find.byKey(sizeGridCellKey(4, 2)));
+      await tester.pump();
+
+      expect(picked, TileSize.size4x2);
+      expect(picked!.spanIn(6), 4);
+
+      await tester.tap(find.byKey(sizeGridCellKey(4, 4)));
+      await tester.pump();
+
+      expect(picked, TileSize.size4x4);
+      expect(picked!.spanIn(6), 4);
+    });
+
+    testWidgets('a full-width tile paints every column it really spans', (
+      WidgetTester tester,
+    ) async {
+      await _pump(
+        tester,
+        size: TileSize.wide,
+        onSizeSelected: (TileSize _) {},
+        maxColumns: 6,
+      );
+
+      expect(_filled(tester, 6, 2), isTrue);
+      expect(_filled(tester, 6, 3), isFalse);
     });
   });
 
