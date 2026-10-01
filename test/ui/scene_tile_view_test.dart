@@ -75,4 +75,25 @@ void main() {
 
     expect(find.byKey(sceneTileArtKey), findsOneWidget);
   });
+
+  for (final SceneAnimation animation in SceneAnimation.values) {
+    testWidgets(
+      'every animation mounts a real DotLottieView without throwing: ${animation.name}',
+      (WidgetTester tester) async {
+        // No lottieBuilder override: this mounts the real DotLottieView.
+        // Note this does *not* prove `animation.lottieAsset` resolves to a
+        // real bundled file — a failed `rootBundle.load` inside its
+        // FutureBuilder is swallowed (`snapshot.hasData` just stays false
+        // and it renders an empty Container), so it would not have caught
+        // the `colm_and_easy.lottie` typo. See
+        // `scene_animation_test.dart`'s "is actually bundled" check for that.
+        await tester.pumpWidget(
+          MaterialApp(home: SceneTileContentView(animation: animation)),
+        );
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

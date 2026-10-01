@@ -6,7 +6,9 @@
 enum SceneAnimation {
   rocket('ROCKET LAUNCH', 'lottie/rocket_lunch.lottie'),
   palmTree('PALM TREE', 'lottie/palm_tree_leaf.lottie'),
-  flower('FLOWER', 'lottie/plant.lottie');
+  flower('FLOWER', 'lottie/plant.lottie'),
+  calmAndEasy('CALM AND EASY', 'lottie/calm_and_easy.lottie'),
+  retroVinyl('RETRO VINYL', 'lottie/retro_vinyl.lottie');
 
   const SceneAnimation(this.label, this.lottieAsset);
 
