@@ -304,4 +304,92 @@ void main() {
       expect(formatSpan(_timed('a', at, at), day), '08:15');
     });
   });
+
+  group('clampToDay', () {
+    final DateTime day = DateTime(2026, 9, 28);
+
+    test('an ordinary same-day event is unclamped', () {
+      final result = clampToDay(
+        _timed('a', DateTime(2026, 9, 28, 9), DateTime(2026, 9, 28, 10, 30)),
+        day,
+      );
+
+      expect(result!.start, DateTime(2026, 9, 28, 9));
+      expect(result.end, DateTime(2026, 9, 28, 10, 30));
+    });
+
+    test(
+      'runs on past midnight: the first day gets a share ending at midnight',
+      () {
+        final result = clampToDay(
+          _timed('a', DateTime(2026, 9, 28, 22), DateTime(2026, 9, 29, 1)),
+          day,
+        );
+
+        expect(result!.start, DateTime(2026, 9, 28, 22));
+        expect(result.end, DateTime(2026, 9, 29));
+      },
+    );
+
+    test(
+      'runs on past midnight: the second day gets a share starting at midnight',
+      () {
+        final result = clampToDay(
+          _timed('a', DateTime(2026, 9, 28, 22), DateTime(2026, 9, 29, 1)),
+          DateTime(2026, 9, 29),
+        );
+
+        expect(result!.start, DateTime(2026, 9, 29));
+        expect(result.end, DateTime(2026, 9, 29, 1));
+      },
+    );
+
+    test('began the day before: the share on day is from midnight', () {
+      final result = clampToDay(
+        _timed('a', DateTime(2026, 9, 27, 22), DateTime(2026, 9, 28, 2)),
+        day,
+      );
+
+      expect(result!.start, day);
+      expect(result.end, DateTime(2026, 9, 28, 2));
+    });
+
+    test('a span covering several days spans all of day', () {
+      final result = clampToDay(
+        _timed('a', DateTime(2026, 9, 27, 22), DateTime(2026, 9, 30, 2)),
+        day,
+      );
+
+      expect(result!.start, day);
+      expect(result.end, DateTime(2026, 9, 29));
+    });
+
+    test('a day the event does not occur on is null', () {
+      expect(
+        clampToDay(
+          _timed('a', DateTime(2026, 9, 28, 9), DateTime(2026, 9, 28, 10)),
+          DateTime(2026, 9, 29),
+        ),
+        isNull,
+      );
+    });
+
+    test(
+      'touching only the boundary (ends exactly when day starts) is null',
+      () {
+        expect(
+          clampToDay(
+            _timed('a', DateTime(2026, 9, 27, 9), DateTime(2026, 9, 28)),
+            day,
+          ),
+          isNull,
+        );
+      },
+    );
+
+    test('a zero-length moment has nothing to clamp to, so is null', () {
+      final DateTime at = DateTime(2026, 9, 28, 8, 15);
+      expect(clampToDay(_timed('a', at, at), day), isNull);
+    });
+  });
 }

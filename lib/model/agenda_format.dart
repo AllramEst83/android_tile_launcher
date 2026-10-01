@@ -24,6 +24,25 @@ bool occursOn(CalendarEvent event, DateTime day) {
           (event.end == event.start && !event.start.isBefore(day)));
 }
 
+/// The portion of [event] that falls within the day starting at [day]: its
+/// start and end clamped to that day's bounds (`day` to `day` + 1 day).
+/// `null` when [event] does not occur on [day] at all, or occurs on it for
+/// zero length (it merely touches the boundary — ends exactly at [day]'s
+/// start, or starts exactly at its end). For a view that draws one block per
+/// day (the agenda week grid) rather than the agenda list's own text span
+/// (`formatSpan`), since a multi-day event needs its own start/end on each
+/// day it touches, not just the one day its own `CalendarEvent.start` is on.
+({DateTime start, DateTime end})? clampToDay(
+  CalendarEvent event,
+  DateTime day,
+) {
+  final DateTime next = addDays(day, 1);
+  final DateTime start = event.start.isBefore(day) ? day : event.start;
+  final DateTime end = event.end.isAfter(next) ? next : event.end;
+  if (!end.isAfter(start)) return null;
+  return (start: start, end: end);
+}
+
 /// One day of an agenda and what happens on it.
 class AgendaDay {
   const AgendaDay({required this.day, required this.events});

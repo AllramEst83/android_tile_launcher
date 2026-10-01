@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:android_tile_launcher/model/agenda_format.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/weather_format.dart';
@@ -104,17 +105,30 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
     }
   }
 
+  // `calendar_view`'s own `CalendarEventData` expects `startTime`/`endTime`
+  // on the same day as `date` — an event that runs past midnight (a ferry
+  // booked from Saturday evening to Sunday afternoon, say) needs one entry
+  // per day it touches, each clamped to that day's bounds, or the package
+  // either drops it from every day but its first or draws a nonsense-sized
+  // block from a negative/huge same-day duration. The agenda list already
+  // does the equivalent per-day split (`occursOn`/`formatSpan`); this is
+  // that same idea for a view that draws a block instead of a line of text.
   void _fill() {
     _controller.addAll(<CalendarEventData<CalendarEvent>>[
       for (final CalendarEvent event in widget.events)
         if (!event.allDay)
-          CalendarEventData<CalendarEvent>(
-            title: event.title,
-            date: _dateOnly(event.start),
-            startTime: event.start,
-            endTime: event.end,
-            event: event,
-          ),
+          for (int i = 0; i < 7; i++)
+            if (clampToDay(event, addDays(widget.weekStart, i)) case (
+              :final DateTime start,
+              :final DateTime end,
+            ))
+              CalendarEventData<CalendarEvent>(
+                title: event.title,
+                date: addDays(widget.weekStart, i),
+                startTime: start,
+                endTime: end,
+                event: event,
+              ),
     ]);
   }
 
@@ -239,8 +253,6 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
     );
   }
 }
-
-DateTime _dateOnly(DateTime t) => DateTime(t.year, t.month, t.day);
 
 /// One day's column header: weekday and day number, the day number boxed
 /// (flat, square) rather than circled when it is [now]'s own day — a bordered
