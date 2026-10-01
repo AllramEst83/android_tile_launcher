@@ -1,4 +1,3 @@
-import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/settings.dart';
@@ -17,7 +16,6 @@ Future<void> _pump(
   WidgetTester tester, {
   required TileSize size,
   required int columns,
-  ValueChanged<TileSize>? onSizeSelected,
 }) async {
   tester.view
     ..physicalSize = const Size(400, 900)
@@ -36,7 +34,7 @@ Future<void> _pump(
               label: 'Clock',
               tile: PinnedTile(id: 'clock', size: size, colour: C64Colour.red),
               onApply: () {},
-              onSizeSelected: onSizeSelected ?? (TileSize _) {},
+              onSizeSelected: (TileSize _) {},
               onColourSelected: (C64Colour _) {},
             ),
           ),
@@ -75,23 +73,6 @@ void main() {
 
       expect(find.text('6 × 2'), findsOneWidget);
       expect(_filled(tester, 6, 2), isTrue);
-    });
-
-    testWidgets('FLIP turns the drawn shape, not the stored one', (
-      WidgetTester tester,
-    ) async {
-      TileSize? picked;
-      await _pump(
-        tester,
-        size: TileSize.wide,
-        columns: 6,
-        onSizeSelected: (TileSize s) => picked = s,
-      );
-
-      await tester.tap(find.text(Messages.tileSizeFlip));
-      await tester.pump();
-
-      expect(picked, TileSize.size2x6);
     });
   });
 }

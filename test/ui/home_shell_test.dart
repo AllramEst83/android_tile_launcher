@@ -447,42 +447,6 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('FLIP swaps the columns and rows of a resized tile', (
-      WidgetTester tester,
-    ) async {
-      final GridState gridState = await pinTwo(tester);
-
-      await tester.longPress(_onHome(find.text('CLOCK')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(sizeGridCellKey(3, 2)));
-      await tester.pump();
-      await tester.tap(find.text(Messages.tileSizeFlip));
-      await tester.pump();
-      await tester.tap(find.text(Messages.apply));
-      await tester.pumpAndSettle();
-
-      final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
-      expect(clock.size, TileSize.size2x3);
-    });
-
-    testWidgets('FLIP does nothing once a tile is taller than 4 rows', (
-      WidgetTester tester,
-    ) async {
-      final GridState gridState = await pinTwo(tester);
-
-      await tester.longPress(_onHome(find.text('CLOCK')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(sizeGridCellKey(2, 5)));
-      await tester.pump();
-      await tester.tap(find.text(Messages.tileSizeFlip));
-      await tester.pump();
-      await tester.tap(find.text(Messages.apply));
-      await tester.pumpAndSettle();
-
-      final clock = gridState.pinned.firstWhere((p) => p.id == 'pkg.clock');
-      expect(clock.size, TileSize.size2x5);
-    });
-
     testWidgets('apply commits a recolour', (WidgetTester tester) async {
       final GridState gridState = await pinTwo(tester);
 

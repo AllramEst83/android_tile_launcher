@@ -2,7 +2,6 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/tile_size.dart';
-import 'package:android_tile_launcher/ui/pad_key.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_size_grid_picker.dart';
@@ -33,10 +32,10 @@ class TileInspector extends StatelessWidget {
     final TextTheme text = Theme.of(context).textTheme;
     final PinnedTile? selected = tile;
     // The live mosaic's own column count (4 or 6), not a fixed constant —
-    // both the size grid and FLIP need it below.
+    // the size grid needs it below.
     final int columns = SettingsScope.of(context).columns;
     // What the grid really draws: a tile stored wider than this mosaic (or a
-    // full-width wide/large) shows, reads and flips at that width, so the
+    // full-width wide/large) shows and reads at that width, so the
     // panel never disagrees with the tile above it after a column switch.
     final int? span = selected?.size.spanIn(columns);
     return DecoratedBox(
@@ -76,31 +75,14 @@ class TileInspector extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: TileMetrics.gutter),
-              // Full width, not squeezed beside FLIP: a fixed-size block off
-              // to one side of a much wider panel (the user's own complaint,
-              // from testing Phase 37 on a phone) is exactly what this was.
-              // The grid picker fills whatever width it is actually given.
-              // (`IntrinsicHeight` would let FLIP stretch to match it
-              // exactly instead of sitting in its own row below, but the
-              // grid's own `LayoutBuilder` cannot report intrinsic
-              // dimensions — a real Flutter limitation, not a style choice.)
+              // The grid picker fills whatever width it is actually given,
+              // not a fixed-size block off to one side of a much wider panel
+              // (the user's own complaint, from testing Phase 37 on a phone).
+              // It reaches every shape directly, so there is no FLIP button.
               TileSizeGridPicker(
                 size: selected.size,
                 maxColumns: columns,
                 onSizeSelected: onSizeSelected,
-              ),
-              const SizedBox(height: TileMetrics.gutter),
-              PadKey(
-                label: Messages.tileSizeFlip,
-                height: 44,
-                fontSize: 10,
-                // Flipping only ever makes sense when the result still fits
-                // the *live* mosaic's own column count — a tile taller than
-                // that has no matching width to flip into.
-                onTap: selected.size.rows <= columns
-                    ? () =>
-                          onSizeSelected(TileSize.of(selected.size.rows, span!))
-                    : null,
               ),
               const SizedBox(height: TileMetrics.gutter * 2),
               Text(Messages.tileColour, style: text.labelSmall),
