@@ -35,6 +35,10 @@ class TileInspector extends StatelessWidget {
     // The live mosaic's own column count (4 or 6), not a fixed constant —
     // both the size grid and FLIP need it below.
     final int columns = SettingsScope.of(context).columns;
+    // What the grid really draws: a tile stored wider than this mosaic (or a
+    // full-width wide/large) shows, reads and flips at that width, so the
+    // panel never disagrees with the tile above it after a column switch.
+    final int? span = selected?.size.spanIn(columns);
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: TileColors.bezel)),
@@ -64,7 +68,7 @@ class TileInspector extends StatelessWidget {
                 children: <Widget>[
                   Text(Messages.tileSize, style: text.labelSmall),
                   Text(
-                    '${selected.size.columns} × ${selected.size.rows}',
+                    '$span × ${selected.size.rows}',
                     style: text.labelSmall?.copyWith(
                       color: TileColors.highlight,
                     ),
@@ -94,9 +98,8 @@ class TileInspector extends StatelessWidget {
                 // the *live* mosaic's own column count — a tile taller than
                 // that has no matching width to flip into.
                 onTap: selected.size.rows <= columns
-                    ? () => onSizeSelected(
-                        TileSize.of(selected.size.rows, selected.size.columns),
-                      )
+                    ? () =>
+                          onSizeSelected(TileSize.of(selected.size.rows, span!))
                     : null,
               ),
               const SizedBox(height: TileMetrics.gutter * 2),
