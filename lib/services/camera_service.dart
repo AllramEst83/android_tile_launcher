@@ -1,7 +1,6 @@
 import 'package:android_tile_launcher/model/camera_access.dart';
 
-/// Camera access for the QR scanner tile, wrapping [PermissionService] the
-/// same shape [BluetoothService] wraps it for `BLUETOOTH_CONNECT` — a
+/// Camera access for the QR scanner tile, wrapping [PermissionService] in a
 /// feature-shaped interface over a generic capability, rather than exposing
 /// [PermissionService] itself to the UI.
 abstract interface class CameraService {

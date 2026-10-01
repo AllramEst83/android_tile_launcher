@@ -1,7 +1,7 @@
 /// Whether the QR scanner may use the camera, and if not, why — the same
 /// granted/denied/permanently-denied shape every other runtime permission in
-/// this app surfaces (see `BluetoothStatus`), rather than exposing
-/// [PermissionStatus] straight to the UI.
+/// this app surfaces, rather than exposing [PermissionStatus] straight to
+/// the UI.
 sealed class CameraAccess {
   const CameraAccess();
 }

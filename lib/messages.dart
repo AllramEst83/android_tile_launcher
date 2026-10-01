@@ -336,23 +336,6 @@ abstract final class Messages {
       'DELETE "$name"? THIS CAN\'T BE UNDONE.';
   static const String filesDeleteFailed = 'COULD NOT DELETE THAT.';
 
-  static const String bluetoothTitle = 'BLUETOOTH';
-  static const String bluetoothOn = '[ON]';
-  static const String bluetoothOff = '[OFF]';
-  static const String bluetoothUnsupported = 'N/A';
-  static const String bluetoothTapToAllow = 'TAP TO ALLOW BLUETOOTH ACCESS';
-  static const String bluetoothAllowInSettings =
-      'ALLOW BLUETOOTH ACCESS IN ANDROID SETTINGS.';
-  static const String bluetoothUnsupportedBody =
-      'THIS PHONE HAS NO BLUETOOTH RADIO.';
-  static const String bluetoothOffBody = 'BLUETOOTH IS OFF.';
-  static const String bluetoothToggle = 'TURN ON / OFF';
-  static const String bluetoothManage = 'MANAGE DEVICES';
-  static const String bluetoothNoDevices = 'NO PAIRED DEVICES.';
-  static const String bluetoothNoneConnected = 'NONE CONNECTED';
-  static const String bluetoothConnected = 'CONNECTED';
-  static const String bluetoothNotConnected = 'NOT CONNECTED';
-
   static const String qrScannerTitle = 'QR SCANNER';
   static const String qrScannerSubtitle = 'SCAN A CODE';
   static const String qrScannerTapToAllow = 'TAP TO ALLOW CAMERA ACCESS';
@@ -395,9 +378,7 @@ abstract final class Messages {
       'CLOCK APP.\n'
       'SOUND — CYCLES THE RINGER BETWEEN NORMAL, VIBRATE AND SILENT.\n'
       'FLASHLIGHT — TOGGLES THE TORCH.\n'
-      'FILES — BROWSES AND DELETES ANYWHERE ON THE PHONE\'S STORAGE.\n'
-      'BLUETOOTH — SHOWS PAIRED DEVICES; TURNING IT ON/OFF OR '
-      'CONNECTING ONE OPENS ANDROID\'S OWN SCREEN FOR IT.';
+      'FILES — BROWSES AND DELETES ANYWHERE ON THE PHONE\'S STORAGE.';
 
   static const String helpResizingTitle = 'RESIZING A TILE';
   static const String helpResizingBody =
@@ -423,8 +404,8 @@ abstract final class Messages {
       'WEATHER ASKS A FORECAST SERVICE FOR ROUGHLY WHERE THE PHONE IS, '
       'AND MAIL TALKS ONLY TO THE IMAP SERVER IT WAS SET UP WITH — ITS '
       'APP PASSWORD IS KEPT ENCRYPTED ON THIS PHONE ONLY, NEVER BACKED '
-      'UP. CALENDAR, CONTACTS, FILES AND BLUETOOTH ARE ALL READ '
-      'DIRECTLY FROM ANDROID ON THIS PHONE, ASKED FOR ONLY WHEN THE '
+      'UP. CALENDAR, CONTACTS AND FILES ARE ALL READ DIRECTLY FROM '
+      'ANDROID ON THIS PHONE, ASKED FOR ONLY WHEN THE '
       'TILE THAT NEEDS THEM IS FIRST ADDED OR OPENED.';
 
   // Why an expression could not be worked out: lower case, as they are said;

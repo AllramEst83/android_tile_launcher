@@ -85,8 +85,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   // Installing or uninstalling an app happens on a screen Android owns (the
   // Play Store, Settings), not this one, so the only way to see the result
-  // is to re-read once this app is in front again — the same pattern the
-  // Bluetooth sheet already uses for its own adapter/device state.
+  // is to re-read once this app is in front again.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) unawaited(_refresh());

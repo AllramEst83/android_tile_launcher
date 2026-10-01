@@ -7,7 +7,6 @@ import 'app.dart';
 import 'services/android_alarm_service.dart';
 import 'services/android_app_repository.dart';
 import 'services/android_attachment_download_service.dart';
-import 'services/android_bluetooth_service.dart';
 import 'services/android_calendar_service.dart';
 import 'services/android_camera_service.dart';
 import 'services/android_contacts_service.dart';
@@ -100,9 +99,6 @@ Future<void> main() async {
         wallpaper: const AndroidWallpaperService(),
         icons: appRepository.icon,
         files: AndroidFilesService(),
-        bluetooth: AndroidBluetoothService(
-          permissions: const AndroidPermissionService(),
-        ),
         attachmentDownload: const AndroidAttachmentDownloadService(),
         camera: AndroidCameraService(
           permissions: const AndroidPermissionService(),

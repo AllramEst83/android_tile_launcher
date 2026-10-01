@@ -19,7 +19,6 @@ class MainActivity : FlutterActivity() {
     private var shadeChannel: ShadeChannelHandler? = null
     private var wallpaperChannel: WallpaperChannelHandler? = null
     private var filesChannel: FilesChannelHandler? = null
-    private var bluetoothChannel: BluetoothChannelHandler? = null
     private var attachmentChannel: AttachmentChannelHandler? = null
     private var linkChannel: LinkChannelHandler? = null
 
@@ -43,7 +42,6 @@ class MainActivity : FlutterActivity() {
         shadeChannel = ShadeChannelHandler(applicationContext, messenger)
         wallpaperChannel = WallpaperChannelHandler(applicationContext, messenger)
         filesChannel = FilesChannelHandler(applicationContext, messenger)
-        bluetoothChannel = BluetoothChannelHandler(applicationContext, messenger)
         attachmentChannel = AttachmentChannelHandler(applicationContext, messenger)
         linkChannel = LinkChannelHandler(applicationContext, messenger)
     }
@@ -91,8 +89,6 @@ class MainActivity : FlutterActivity() {
         wallpaperChannel = null
         filesChannel?.dispose()
         filesChannel = null
-        bluetoothChannel?.dispose()
-        bluetoothChannel = null
         attachmentChannel?.dispose()
         attachmentChannel = null
         linkChannel?.dispose()

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
-import 'package:android_tile_launcher/model/bluetooth_status.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
@@ -14,8 +13,6 @@ import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/alarm_tile_source.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/attachment_download_service.dart';
-import 'package:android_tile_launcher/services/bluetooth_service.dart';
-import 'package:android_tile_launcher/services/bluetooth_tile_source.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
@@ -34,8 +31,6 @@ import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
 import 'package:android_tile_launcher/ui/alarm_sheet.dart';
 import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_icon.dart';
-import 'package:android_tile_launcher/ui/bluetooth_sheet.dart';
-import 'package:android_tile_launcher/ui/bluetooth_tile_view.dart';
 import 'package:android_tile_launcher/ui/calc_sheet.dart';
 import 'package:android_tile_launcher/ui/calc_tile_view.dart';
 import 'package:android_tile_launcher/ui/clock_tile_view.dart';
@@ -432,32 +427,6 @@ Widget tileContent(
             onTap: interactive
                 ? () => unawaited(
                     _act(() => systemControl.setOn(tile.kind, !on), refreshNow),
-                  )
-                : null,
-          );
-        },
-      );
-    case TileKind.bluetooth:
-      final BluetoothService bluetooth = services.bluetooth;
-      return TilePoller(
-        source: BluetoothTileSource(service: bluetooth),
-        interval: const Duration(seconds: 10),
-        trigger: bluetooth.changes,
-        builder: (context, content, refreshNow) {
-          final BluetoothStatus status =
-              (content as BluetoothTileContent).status;
-          return BluetoothTileContentView(
-            status: status,
-            ink: tile.colour.ink,
-            // Turning it on/off and managing a device both happen inside the
-            // sheet (or the system screens it opens), never here directly, so
-            // the tile re-reads once it closes rather than waiting on the poll.
-            onTap: interactive
-                ? () => unawaited(
-                    showBluetoothSheet(
-                      context,
-                      bluetooth: bluetooth,
-                    ).then((_) => refreshNow()),
                   )
                 : null,
           );

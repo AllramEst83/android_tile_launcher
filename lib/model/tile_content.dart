@@ -1,5 +1,4 @@
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
-import 'package:android_tile_launcher/model/bluetooth_status.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
@@ -145,15 +144,4 @@ class WeatherContent extends TileContent {
 
   @override
   String toString() => 'WeatherContent($snapshot)';
-}
-
-/// The Bluetooth tile's content: the adapter's state and, when it is on, its
-/// paired devices.
-class BluetoothTileContent extends TileContent {
-  const BluetoothTileContent({required this.status});
-
-  final BluetoothStatus status;
-
-  @override
-  String toString() => 'BluetoothTileContent($status)';
 }

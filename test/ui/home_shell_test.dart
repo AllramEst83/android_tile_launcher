@@ -28,7 +28,6 @@ import 'package:android_tile_launcher/ui/alarm_tile_view.dart';
 import 'package:android_tile_launcher/ui/app_drawer.dart';
 import 'package:android_tile_launcher/ui/app_icon.dart';
 import 'package:android_tile_launcher/ui/app_tile_grid.dart';
-import 'package:android_tile_launcher/ui/bluetooth_sheet.dart';
 import 'package:android_tile_launcher/ui/boot_screen.dart';
 import 'package:android_tile_launcher/ui/calc_pad.dart';
 import 'package:android_tile_launcher/ui/calc_sheet.dart';
@@ -1127,26 +1126,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(qrScannerCloseKey), findsNothing);
-    });
-
-    testWidgets('the bluetooth tile opens the bluetooth sheet', (
-      WidgetTester tester,
-    ) async {
-      final GridState gridState = _gridState();
-      await pumpShell(tester, FakeAppRepository(), gridState: gridState);
-      await tester.pump();
-      await gridState.pinSystemTile(TileKind.bluetooth);
-      await tester.pumpAndSettle();
-
-      await tester.tap(_onHome(find.byType(StateTileContentView)));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(bluetoothCloseKey), findsOneWidget);
-
-      await tester.tap(find.byKey(bluetoothCloseKey));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(bluetoothCloseKey), findsNothing);
     });
 
     testWidgets('the scene tile opens the animation picker sheet', (

@@ -33,7 +33,7 @@ Future<void> showAddTileSheet(
     // Without this the sheet's own surface (not just its content, which the
     // inner `SafeArea` already keeps clear) could still extend up under the
     // status bar and a camera cutout once the list was long enough to reach
-    // that high — the same fix the mail and Bluetooth sheets already use.
+    // that high — the same fix the mail sheet already uses.
     useSafeArea: true,
     builder: (BuildContext sheetContext) {
       final List<TileKind> available = <TileKind>[

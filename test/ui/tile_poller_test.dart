@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:android_tile_launcher/model/tile_content.dart';
 import 'package:android_tile_launcher/services/tile_source.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
@@ -17,22 +15,17 @@ class _CountingSource implements TileSource {
       ClockContent(time: '${calls++}', date: '');
 }
 
-Future<void> _pump(
-  WidgetTester tester,
-  TileSource source,
-  Duration interval, {
-  Stream<void>? trigger,
-}) => tester.pumpWidget(
-  MaterialApp(
-    home: TilePoller(
-      source: source,
-      interval: interval,
-      trigger: trigger,
-      builder: (context, content, refreshNow) =>
-          Text((content as ClockContent).time),
-    ),
-  ),
-);
+Future<void> _pump(WidgetTester tester, TileSource source, Duration interval) =>
+    tester.pumpWidget(
+      MaterialApp(
+        home: TilePoller(
+          source: source,
+          interval: interval,
+          builder: (context, content, refreshNow) =>
+              Text((content as ClockContent).time),
+        ),
+      ),
+    );
 
 void main() {
   testWidgets('shows the source\'s first read immediately', (
@@ -73,57 +66,5 @@ void main() {
     expect(source.calls, 2);
     await tester.pump();
     expect(find.text('1'), findsOneWidget);
-  });
-
-  group('trigger', () {
-    testWidgets('re-reads at once when it fires, without waiting for the '
-        'interval', (WidgetTester tester) async {
-      final source = _CountingSource();
-      final controller = StreamController<void>.broadcast();
-      addTearDown(controller.close);
-      await _pump(
-        tester,
-        source,
-        const Duration(minutes: 1),
-        trigger: controller.stream,
-      );
-      expect(source.calls, 1);
-
-      controller.add(null);
-      await tester.pump();
-
-      expect(source.calls, 2);
-      expect(find.text('1'), findsOneWidget);
-    });
-
-    testWidgets('a poller given none still works exactly as before', (
-      WidgetTester tester,
-    ) async {
-      final source = _CountingSource();
-
-      await _pump(tester, source, const Duration(seconds: 1));
-      await tester.pump(const Duration(seconds: 1));
-
-      expect(find.text('1'), findsOneWidget);
-    });
-
-    testWidgets('is unsubscribed on dispose, not left listening', (
-      WidgetTester tester,
-    ) async {
-      final source = _CountingSource();
-      final controller = StreamController<void>.broadcast();
-      addTearDown(controller.close);
-      await _pump(
-        tester,
-        source,
-        const Duration(minutes: 1),
-        trigger: controller.stream,
-      );
-      expect(controller.hasListener, isTrue);
-
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-
-      expect(controller.hasListener, isFalse);
-    });
   });
 }
