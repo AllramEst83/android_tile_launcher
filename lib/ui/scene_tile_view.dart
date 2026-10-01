@@ -34,7 +34,14 @@ class SceneTileContentView extends StatelessWidget {
     final Widget art = Padding(
       key: sceneTileArtKey,
       padding: const EdgeInsets.all(TileMetrics.gutter / 2),
-      child: SizedBox.expand(child: build(animation)),
+      // DotLottieView is a real platform view (AndroidView/UiKitView) and
+      // claims every touch inside its own bounds directly, with nothing
+      // declared in its `gestureRecognizers` for Flutter's gesture arena to
+      // share — without this, the GestureDetector below never sees the tap
+      // that is meant to open the picker sheet. The animation itself has no
+      // interactive parts of its own, so ignoring its pointer events costs
+      // nothing.
+      child: IgnorePointer(child: SizedBox.expand(child: build(animation))),
     );
     final VoidCallback? tap = onTap;
     if (tap == null) return art;
