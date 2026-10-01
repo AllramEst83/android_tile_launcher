@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/model/clock_format.dart';
+import 'package:android_tile_launcher/model/mail.dart';
 
 /// The IMAP server most likely to belong to [email], to save typing it: the
 /// big providers' own, else `imap.` plus the domain. Empty when [email] has no
@@ -85,6 +86,48 @@ const int mailTextLimit = 20000;
   return (text: text.trimRight(), truncated: true);
 }
 
+/// [raw] split into addresses on a comma, semicolon or newline (whatever a
+/// To/Cc field is typed with), trimmed and with the empty pieces a trailing
+/// separator leaves behind dropped. Order is kept; duplicates are not removed
+/// (the server does not mind, and a compose field should show what was typed).
+List<String> parseAddressList(String raw) => raw
+    // A stray zero-width space (the compose fields' own invisible
+    // placeholder for an otherwise-empty chip field) is never part of an
+    // address.
+    .replaceAll('​', '')
+    .split(RegExp(r'[,;\n]'))
+    .map((String part) => part.trim())
+    .where((String part) => part.isNotEmpty)
+    .toList();
+
+/// Whether [text] looks like a finished email address — something, an `@`,
+/// something, a dot, something — just enough to tell a completed address
+/// from one still being typed, for the compose fields' chip-as-you-type
+/// behaviour. Not full RFC validation: the server is the real judge of
+/// whether it exists.
+bool looksLikeCompleteEmail(String text) =>
+    RegExp(r'^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$').hasMatch(text.trim());
+
+/// The Cc line for "reply all": every address [body] was sent To or Cc'd to,
+/// except [selfEmail] (the account reading it) and [body]'s own sender (who
+/// becomes the reply's To, not its Cc, the same as a plain REPLY). Order is
+/// kept, case-insensitive duplicates dropped.
+List<String> replyAllCcAddresses(MailBody body, String? selfEmail) {
+  final String self = (selfEmail ?? '').trim().toLowerCase();
+  final String sender = body.fromAddress.trim().toLowerCase();
+  final List<String> result = <String>[];
+  final Set<String> seen = <String>{};
+  for (final MailParticipant p in <MailParticipant>[...body.to, ...body.cc]) {
+    final String address = p.address.trim();
+    final String key = address.toLowerCase();
+    if (address.isEmpty || key == self || key == sender || !seen.add(key)) {
+      continue;
+    }
+    result.add(address);
+  }
+  return result;
+}
+
 /// Whether [text] looks like HTML markup rather than plain prose: some
 /// senders' mail clients fill the "plain text" alternative with the markup
 /// itself by mistake, and that should still be shown as a rich view rather
@@ -98,11 +141,33 @@ bool looksLikeHtml(String text) {
   ).hasMatch(sample);
 }
 
-/// [html] with every `<img>` tag removed. Pictures are counted, never shown
-/// ([MailBody.attachments]); an `<img>` left in a rich view would fetch a
-/// remote file behind the scenes just to render the message.
+/// [html] with every `<img>` tag removed, for the default view: an `<img>`
+/// left in would fetch a remote file (or reveal an inline one) behind the
+/// scenes just to render the message. SHOW IMAGES shows
+/// [MailBody.htmlWithImages] instead.
 String stripImagesFromHtml(String html) =>
     html.replaceAll(RegExp(r'<img\b[^>]*>', caseSensitive: false), '');
+
+/// [html] with every `cid:xxx` image source in [dataUriByCid] (keyed by the
+/// content id, lower-cased, angle brackets stripped) replaced by its data
+/// URI; a `cid:` this message never attached, and every remote
+/// `http(s)://` image, is left exactly as the sender wrote it — a remote one
+/// is fetched by whatever renders the html, once SHOW IMAGES is tapped.
+String resolveCidImages(String html, Map<String, String> dataUriByCid) {
+  if (dataUriByCid.isEmpty) return html;
+  return html.replaceAllMapped(RegExp('''cid:([^"'\\s>]+)'''), (Match m) {
+    final String id = m.group(1)!.toLowerCase();
+    return dataUriByCid[id] ?? m.group(0)!;
+  });
+}
+
+/// A file size for a person to read: bytes under a kilobyte as-is, otherwise
+/// KB or MB to one decimal place.
+String formatAttachmentSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
 
 /// The readable text of an HTML message: what is between the tags, with
 /// paragraphs, line breaks, list items and table rows kept as lines, and

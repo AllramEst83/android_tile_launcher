@@ -252,6 +252,148 @@ void main() {
     });
   });
 
+  group('search', () {
+    tearDown(() => server.stop());
+
+    const inbox = [
+      FakeImapMessage(
+        uid: 101,
+        subject: '"Lunch tomorrow?"',
+        date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+        address: 'anna@example.com',
+        name: 'Anna Berg',
+        seen: true,
+      ),
+      FakeImapMessage(
+        uid: 102,
+        subject: '"Invoice"',
+        date: 'Sat, 26 Sep 2026 08:30:00 +0200',
+        address: 'noreply@shop.example',
+      ),
+    ];
+
+    test('without an account is not set up, and never connects', () async {
+      await boot(inbox);
+
+      expect(
+        await mail.search(const MailFilter(text: 'x')),
+        isA<MailNotSetUp>(),
+      );
+      expect(server.connections, 0);
+    });
+
+    test('an empty filter searches ALL', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {101, 102};
+
+      await mail.search(const MailFilter());
+
+      expect(server.received, contains(contains('UID SEARCH ALL')));
+    });
+
+    test('free text searches subject or body', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {};
+
+      await mail.search(const MailFilter(text: 'lunch'));
+
+      expect(
+        server.received,
+        contains(contains('OR SUBJECT "lunch" BODY "lunch"')),
+      );
+    });
+
+    test('from and to narrow it further', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {};
+
+      await mail.search(
+        const MailFilter(from: 'anna@example.com', to: 'kay@example.com'),
+      );
+
+      final sent = server.received.firstWhere((c) => c.contains('UID SEARCH'));
+      expect(sent, contains('FROM "anna@example.com"'));
+      expect(sent, contains('TO "kay@example.com"'));
+    });
+
+    test('older than sends a BEFORE cutoff from the injected clock', () async {
+      await boot(inbox);
+      final searchMail = ImapMailService(
+        accounts: MailAccountStore(secrets),
+        secure: false,
+        timeout: const Duration(seconds: 5),
+        clock: () => DateTime(2026, 9, 30),
+      );
+      await searchMail.setUp(
+        email: 'kay@example.com',
+        host: '127.0.0.1:${server.port}',
+        password: _password,
+      );
+      server.searchResults = {};
+
+      await searchMail.search(
+        const MailFilter(olderThan: MailOlderThan(3, MailAgeUnit.days)),
+      );
+
+      expect(server.received, contains(contains('BEFORE "27-Sep-2026"')));
+    });
+
+    test('every set field combines into one query', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {};
+
+      await mail.search(
+        const MailFilter(text: 'x', from: 'a@b.com', to: 'c@d.com'),
+      );
+
+      final sent = server.received.firstWhere((c) => c.contains('UID SEARCH'));
+      expect(sent, contains('OR SUBJECT "x" BODY "x"'));
+      expect(sent, contains('FROM "a@b.com"'));
+      expect(sent, contains('TO "c@d.com"'));
+    });
+
+    test('the matching messages, newest first', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {101, 102};
+
+      final result = await mail.search(const MailFilter(text: 'x'));
+
+      final found = result as MailMessages;
+      expect([for (final m in found.messages) m.uid], [102, 101]);
+      expect(found.total, 2);
+      expect(found.unread, 1);
+    });
+
+    test('no matches is an empty list, not an error', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {};
+
+      final result = await mail.search(const MailFilter(text: 'nope'));
+
+      final found = result as MailMessages;
+      expect(found.messages, isEmpty);
+      expect(found.total, 0);
+    });
+
+    test('caps at count, but total is every match', () async {
+      await boot(inbox);
+      await setUp();
+      server.searchResults = {101, 102};
+
+      final result = await mail.search(const MailFilter(text: 'x'), count: 1);
+
+      final found = result as MailMessages;
+      expect(found.messages, hasLength(1));
+      expect(found.total, 2);
+    });
+  });
+
   group('moveToTrash', () {
     tearDown(() => server.stop());
 
@@ -469,7 +611,40 @@ void main() {
       expect(opened.body.date, DateTime.utc(2026, 9, 25, 10).toLocal());
       expect(opened.body.text, 'Hi!\n\nShall we meet at noon?\n\n/Anna');
       expect(opened.body.truncated, isFalse);
-      expect(opened.body.attachments, 0);
+      expect(opened.body.attachments, isEmpty);
+    });
+
+    test('reads To and Cc from the message headers', () async {
+      await boot([
+        const FakeImapMessage(
+          uid: 20,
+          subject: '"Team lunch"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'anna@example.com',
+          name: 'Anna Berg',
+          raw:
+              'From: Anna Berg <anna@example.com>\r\n'
+              'To: Kay <kay@example.com>, cesar@example.com\r\n'
+              'Cc: Bo Berg <bo@example.com>\r\n'
+              'Subject: Team lunch\r\n'
+              'Date: Fri, 25 Sep 2026 10:00:00 +0000\r\n'
+              'Message-ID: <20@example.com>\r\n'
+              'MIME-Version: 1.0\r\n'
+              'Content-Type: text/plain; charset=utf-8\r\n\r\n'
+              'Hi!\r\n',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(20) as MailOpened;
+
+      expect(opened.body.to.map((p) => (p.name, p.address)).toList(), [
+        ('Kay', 'kay@example.com'),
+        ('', 'cesar@example.com'),
+      ]);
+      expect(opened.body.cc.map((p) => (p.name, p.address)).toList(), [
+        ('Bo Berg', 'bo@example.com'),
+      ]);
     });
 
     test('marks it read, on the server, and says so', () async {
@@ -575,6 +750,52 @@ void main() {
       expect(opened.body.html, '<p>Rich <b>news</b></p>');
     });
 
+    test('an inline image is resolved to a data URI for SHOW IMAGES', () async {
+      await boot([
+        FakeImapMessage(
+          uid: 15,
+          subject: '"Photo"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          raw:
+              'From: a@example.com\r\nTo: kay@example.com\r\nSubject: Photo\r\n'
+              'Date: Fri, 25 Sep 2026 10:00:00 +0000\r\nMIME-Version: 1.0\r\n'
+              'Content-Type: multipart/related; boundary="m1"\r\n\r\n'
+              '--m1\r\nContent-Type: text/html; charset=utf-8\r\n\r\n'
+              '<p>Look</p><img src="cid:img1">\r\n'
+              '--m1\r\nContent-Type: image/png\r\nContent-ID: <img1>\r\n'
+              'Content-Disposition: inline\r\n'
+              'Content-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n'
+              '--m1--\r\n',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(15) as MailOpened;
+
+      expect(opened.body.html, '<p>Look</p>');
+      expect(opened.body.htmlWithImages, startsWith('<p>Look</p><img src='));
+      expect(opened.body.htmlWithImages, contains('data:image/png;base64,'));
+      expect(opened.body.htmlWithImages, isNot(contains('cid:')));
+    });
+
+    test('html with no img tag at all has nothing for SHOW IMAGES', () async {
+      await boot([
+        FakeImapMessage(
+          uid: 16,
+          subject: '"No pictures"',
+          date: 'Fri, 25 Sep 2026 10:00:00 +0000',
+          address: 'a@example.com',
+          html: '<p>No pictures here</p>',
+        ),
+      ]);
+      await setUp();
+
+      final opened = await mail.read(16) as MailOpened;
+
+      expect(opened.body.htmlWithImages, isNull);
+    });
+
     test('a "plain" part that is really markup is shown rich too', () async {
       await boot(const [
         FakeImapMessage(
@@ -611,7 +832,7 @@ void main() {
       expect(opened.body.text, 'Just a normal note.');
     });
 
-    test('counts attachments without showing them', () async {
+    test('reads attachments whole, name, size and bytes', () async {
       await boot([
         FakeImapMessage(
           uid: 9,
@@ -637,7 +858,16 @@ void main() {
       final opened = await mail.read(9) as MailOpened;
 
       expect(opened.body.text, 'See attached.');
-      expect(opened.body.attachments, 2);
+      expect(opened.body.attachments, hasLength(2));
+      final png = opened.body.attachments[0];
+      expect(png.name, 'a.png');
+      expect(png.mimeType, 'image/png');
+      expect(png.bytes, isNotEmpty);
+      expect(png.sizeBytes, png.bytes.length);
+      final pdf = opened.body.attachments[1];
+      expect(pdf.name, 'b.pdf');
+      expect(pdf.mimeType, 'application/pdf');
+      expect(pdf.bytes, isNotEmpty);
     });
 
     test('cuts a very long message', () async {
@@ -862,7 +1092,7 @@ void main() {
       await bootSmtp(account: false);
 
       expect(
-        await smtpMail.send(to: 'a@b.com', subject: 'Hi', text: 'Hi'),
+        await smtpMail.send(to: <String>['a@b.com'], subject: 'Hi', text: 'Hi'),
         isA<MailSendNotSetUp>(),
       );
       expect(smtp.sent, isEmpty);
@@ -872,7 +1102,7 @@ void main() {
       await bootSmtp();
 
       final result = await smtpMail.send(
-        to: 'anna@example.com',
+        to: <String>['anna@example.com'],
         subject: 'Lunch?',
         text: 'Same place as usual?',
       );
@@ -896,7 +1126,7 @@ void main() {
       );
 
       final result = await smtpMail.send(
-        to: 'a@b.com',
+        to: <String>['a@b.com'],
         subject: 'Hi',
         text: 'Hi',
       );
@@ -912,7 +1142,7 @@ void main() {
       smtp.rejectRecipient = true;
 
       final result = await smtpMail.send(
-        to: 'nobody@example.com',
+        to: <String>['nobody@example.com'],
         subject: 'Hi',
         text: 'Hi',
       );
@@ -926,7 +1156,7 @@ void main() {
       await smtp.stop();
 
       final result = await smtpMail.send(
-        to: 'a@b.com',
+        to: <String>['a@b.com'],
         subject: 'Hi',
         text: 'Hi',
       );
@@ -939,7 +1169,7 @@ void main() {
       smtpSecrets.data['mailAccount'] = 'not json';
 
       final result = await smtpMail.send(
-        to: 'a@b.com',
+        to: <String>['a@b.com'],
         subject: 'Hi',
         text: 'Hi',
       );

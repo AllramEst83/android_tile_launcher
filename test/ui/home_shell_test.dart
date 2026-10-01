@@ -2,6 +2,7 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/model/camera_access.dart';
 import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
@@ -43,6 +44,8 @@ import 'package:android_tile_launcher/ui/home_shell.dart';
 import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
+import 'package:android_tile_launcher/ui/qr_scanner_screen.dart';
+import 'package:android_tile_launcher/ui/qr_scanner_tile_view.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
@@ -59,6 +62,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../fakes/fake_agenda_repository.dart';
 import '../fakes/fake_alarm_service.dart';
 import '../fakes/fake_app_repository.dart';
+import '../fakes/fake_camera_service.dart';
 import '../fakes/fake_contacts.dart';
 import '../fakes/fake_device_repository.dart';
 import '../fakes/fake_mail_service.dart';
@@ -97,6 +101,7 @@ Future<void> pumpShell(
   FakeAlarmService? alarmService,
   SettingsState? settingsState,
   FakeShadeService? shadeService,
+  FakeCameraService? cameraService,
   FirstRun? firstRun,
   LaunchStats? launchStats,
   AppIconLoader? icons,
@@ -123,6 +128,7 @@ Future<void> pumpShell(
           textTv: textTvRepository,
           alarm: alarmService,
           shade: shadeService,
+          camera: cameraService,
           icons: icons,
         ),
       ),
@@ -1089,6 +1095,35 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(filesCloseKey), findsNothing);
+    });
+
+    testWidgets('the QR scanner tile opens the scanner', (
+      WidgetTester tester,
+    ) async {
+      final GridState gridState = _gridState();
+      // Denied, so the screen shows "tap to allow" rather than a real
+      // camera preview, which this test harness cannot provide.
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        gridState: gridState,
+        cameraService: FakeCameraService(
+          result: const CameraDenied(permanent: false),
+        ),
+      );
+      await tester.pump();
+      await gridState.pinSystemTile(TileKind.qrScanner);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_onHome(find.byType(QrScannerTileContentView)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.qrScannerTapToAllow), findsOneWidget);
+
+      await tester.tap(find.byKey(qrScannerCloseKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(qrScannerCloseKey), findsNothing);
     });
 
     testWidgets('the bluetooth tile opens the bluetooth sheet', (

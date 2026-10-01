@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
+import android.provider.ContactsContract.CommonDataKinds.Email
 import android.provider.ContactsContract.CommonDataKinds.Phone
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
@@ -16,11 +17,13 @@ import java.util.concurrent.Executors
  * Reads the phone book for the Dart `AndroidContactsService`.
  *
  * `all` replies one `{key, name, number, label}` per phone number, sorted by
- * name; `key` is Android's lookup key for the person, which is what a pinned
- * tile remembers them by. Grouping the rows into people, and matching a typed
- * name, are done in Dart where they are tested. Permission is asked for in Dart first;
- * this only checks it and replies `NO_PERMISSION` or `QUERY_FAILED`. Never
- * throws into Flutter.
+ * name; `emails` replies one `{key, email}` per email address, in no
+ * particular order (compose's autocomplete is the only reader, and it sorts
+ * nothing). `key` is Android's lookup key for the person, which is what a
+ * pinned tile remembers them by. Grouping the rows into people, and matching
+ * a typed name, are done in Dart where they are tested. Permission is asked
+ * for in Dart first; this only checks it and replies `NO_PERMISSION` or
+ * `QUERY_FAILED`. Never throws into Flutter.
  */
 class ContactsChannelHandler(
     private val context: Context,
@@ -37,6 +40,7 @@ class ContactsChannelHandler(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "all" -> all(result)
+            "emails" -> emails(result)
             else -> result.notImplemented()
         }
     }
@@ -90,6 +94,43 @@ class ContactsChannelHandler(
                             "name" to cursor.getString(0),
                             "number" to cursor.getString(1),
                             "label" to label.toString(),
+                        ),
+                    )
+                }
+            }
+        return rows
+    }
+
+    private fun emails(result: MethodChannel.Result) {
+        if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            result.error("NO_PERMISSION", "contacts permission not granted", null)
+            return
+        }
+        executor.execute {
+            try {
+                val rows = queryEmails()
+                mainHandler.post { result.success(rows) }
+            } catch (e: SecurityException) {
+                mainHandler.post { result.error("NO_PERMISSION", e.message, null) }
+            } catch (e: Exception) {
+                mainHandler.post { result.error("QUERY_FAILED", e.message, null) }
+            }
+        }
+    }
+
+    private fun queryEmails(): List<Map<String, String?>> {
+        val projection = arrayOf(Email.LOOKUP_KEY, Email.ADDRESS)
+        val rows = mutableListOf<Map<String, String?>>()
+        context.contentResolver
+            .query(Email.CONTENT_URI, projection, null, null, null)
+            ?.use { cursor ->
+                while (cursor.moveToNext() && rows.size < MAX_ROWS) {
+                    rows.add(
+                        mapOf(
+                            "key" to cursor.getString(0),
+                            "email" to cursor.getString(1),
                         ),
                     )
                 }

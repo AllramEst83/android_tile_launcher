@@ -32,6 +32,8 @@ class AgendaWeekGrid extends StatefulWidget {
     required this.now,
     required this.repository,
     required this.onChanged,
+    required this.initialHeightPerMinute,
+    required this.onHeightPerMinuteChanged,
   });
 
   final List<CalendarEvent> events;
@@ -48,6 +50,16 @@ class AgendaWeekGrid extends StatefulWidget {
   /// sheet's own snapshot can be reloaded.
   final VoidCallback onChanged;
 
+  /// What `heightPerMinute` (see below) starts at: the sheet's own saved
+  /// zoom, so stepping to another week (which rebuilds this widget fresh)
+  /// keeps whatever the last pinch here left it at.
+  final double initialHeightPerMinute;
+
+  /// Called once a pinch ends, with the new `heightPerMinute`, so the sheet
+  /// can save it — not on every frame of the gesture, which would be a lot
+  /// of writes for something only ever read back at the next rebuild.
+  final ValueChanged<double> onHeightPerMinuteChanged;
+
   @override
   State<AgendaWeekGrid> createState() => _AgendaWeekGridState();
 }
@@ -58,10 +70,14 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
 
   /// How tall an hour is drawn, as `WeekView`'s own `heightPerMinute` (its
   /// height for one minute; an hour is 60 of them) — `1` is the package's
-  /// own default (a 60px hour). Pinch to zoom changes this, clamped so an
-  /// hour never shrinks to where its own indicator lines would not fit, nor
-  /// grows past showing only a couple of hours at once.
-  double _heightPerMinute = 1;
+  /// own default (a 60px hour), [AgendaWeekGrid.initialHeightPerMinute] is
+  /// this launcher's own remembered one. Pinch to zoom changes this, clamped
+  /// so an hour never shrinks to where its own indicator lines would not
+  /// fit, nor grows past showing only a couple of hours at once.
+  late double _heightPerMinute = widget.initialHeightPerMinute.clamp(
+    _minHeightPerMinute,
+    _maxHeightPerMinute,
+  );
   static const double _minHeightPerMinute = 0.4;
   static const double _maxHeightPerMinute = 2.5;
 
@@ -154,6 +170,11 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
   void _onPointerUp(PointerEvent event) {
     _pointers.remove(event.pointer);
     if (_pointers.length < 2) {
+      // A pinch was actually in progress (not just a stray second finger):
+      // save where it ended.
+      if (_pinchStartDistance != null) {
+        widget.onHeightPerMinuteChanged(_heightPerMinute);
+      }
       _pinchStartDistance = null;
       _pinchStartHeightPerMinute = null;
     }

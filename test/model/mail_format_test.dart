@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -201,6 +202,188 @@ void main() {
         stripImagesFromHtml('<p>No pictures here</p>'),
         '<p>No pictures here</p>',
       );
+    });
+  });
+
+  group('resolveCidImages', () {
+    test('replaces a cid reference with its data URI', () {
+      expect(
+        resolveCidImages('<p>Hi</p><img src="cid:abc123">', <String, String>{
+          'abc123': 'data:image/png;base64,xyz',
+        }),
+        '<p>Hi</p><img src="data:image/png;base64,xyz">',
+      );
+    });
+
+    test('matches the cid case-insensitively', () {
+      expect(
+        resolveCidImages('<img src="cid:ABC123">', <String, String>{
+          'abc123': 'data:image/png;base64,xyz',
+        }),
+        '<img src="data:image/png;base64,xyz">',
+      );
+    });
+
+    test('a cid not in the map is left as-is, and so is a remote image', () {
+      const String html =
+          '<img src="cid:unknown"><img src="http://example.com/x.png">';
+      expect(resolveCidImages(html, <String, String>{}), html);
+    });
+
+    test('an empty map changes nothing', () {
+      const String html = '<img src="cid:abc123">';
+      expect(resolveCidImages(html, <String, String>{}), html);
+    });
+  });
+
+  group('formatAttachmentSize', () {
+    test('bytes under a kilobyte are shown as-is', () {
+      expect(formatAttachmentSize(0), '0 B');
+      expect(formatAttachmentSize(512), '512 B');
+    });
+
+    test('kilobytes to one decimal place', () {
+      expect(formatAttachmentSize(2048), '2.0 KB');
+      expect(formatAttachmentSize(1536), '1.5 KB');
+    });
+
+    test('megabytes to one decimal place', () {
+      expect(formatAttachmentSize(1024 * 1024 * 3), '3.0 MB');
+    });
+  });
+
+  group('parseAddressList', () {
+    test('splits on comma, semicolon or newline, trimmed', () {
+      expect(parseAddressList('a@b.com, c@d.com;  e@f.com\ng@h.com'), <String>[
+        'a@b.com',
+        'c@d.com',
+        'e@f.com',
+        'g@h.com',
+      ]);
+    });
+
+    test('drops the empty pieces a trailing separator leaves', () {
+      expect(parseAddressList('a@b.com, ,c@d.com,'), <String>[
+        'a@b.com',
+        'c@d.com',
+      ]);
+    });
+
+    test('one address with nothing to split on is itself', () {
+      expect(parseAddressList('a@b.com'), <String>['a@b.com']);
+    });
+
+    test('blank text is no addresses', () {
+      expect(parseAddressList('   '), <String>[]);
+    });
+
+    test('a stray zero-width space is never an address of its own', () {
+      expect(parseAddressList('​'), <String>[]);
+      expect(parseAddressList('a@b.com,​'), <String>['a@b.com']);
+    });
+  });
+
+  group('looksLikeCompleteEmail', () {
+    test('something, an @, something, a dot, something is complete', () {
+      expect(looksLikeCompleteEmail('a@b.com'), isTrue);
+      expect(looksLikeCompleteEmail('  a@b.com  '), isTrue);
+    });
+
+    test('missing a dot in the domain is not complete', () {
+      expect(looksLikeCompleteEmail('a@b'), isFalse);
+    });
+
+    test('no @ at all is not complete', () {
+      expect(looksLikeCompleteEmail('abc'), isFalse);
+    });
+
+    test('a trailing dot with nothing after it is not complete', () {
+      expect(looksLikeCompleteEmail('a@b.'), isFalse);
+    });
+
+    test('a space inside is not one address', () {
+      expect(looksLikeCompleteEmail('a b@c.com'), isFalse);
+    });
+
+    test('empty text is not complete', () {
+      expect(looksLikeCompleteEmail(''), isFalse);
+    });
+  });
+
+  group('replyAllCcAddresses', () {
+    MailBody body({
+      String fromAddress = 'anna@example.com',
+      List<MailParticipant> to = const <MailParticipant>[],
+      List<MailParticipant> cc = const <MailParticipant>[],
+    }) => MailBody(
+      uid: 1,
+      from: 'Anna',
+      fromAddress: fromAddress,
+      to: to,
+      cc: cc,
+      subject: 'Hi',
+      text: 'Hi',
+    );
+
+    test('every other To and Cc address, sender and self left out', () {
+      final result = replyAllCcAddresses(
+        body(
+          to: const <MailParticipant>[
+            MailParticipant(address: 'kay@gmail.com'),
+            MailParticipant(address: 'cesar@example.com'),
+          ],
+          cc: const <MailParticipant>[
+            MailParticipant(address: 'bo@example.com'),
+          ],
+        ),
+        'kay@gmail.com',
+      );
+
+      expect(result, <String>['cesar@example.com', 'bo@example.com']);
+    });
+
+    test('case-insensitive, and duplicates dropped', () {
+      final result = replyAllCcAddresses(
+        body(
+          to: const <MailParticipant>[
+            MailParticipant(address: 'Kay@Gmail.com'),
+            MailParticipant(address: 'bo@example.com'),
+          ],
+          cc: const <MailParticipant>[
+            MailParticipant(address: 'BO@example.com'),
+          ],
+        ),
+        'kay@gmail.com',
+      );
+
+      expect(result, <String>['bo@example.com']);
+    });
+
+    test('nobody left over is an empty list', () {
+      final result = replyAllCcAddresses(
+        body(
+          to: const <MailParticipant>[
+            MailParticipant(address: 'kay@gmail.com'),
+          ],
+        ),
+        'kay@gmail.com',
+      );
+
+      expect(result, isEmpty);
+    });
+
+    test('no self address known still drops the sender', () {
+      final result = replyAllCcAddresses(
+        body(
+          to: const <MailParticipant>[
+            MailParticipant(address: 'anna@example.com'),
+            MailParticipant(address: 'bo@example.com'),
+          ],
+        ),
+        null,
+      );
+
+      expect(result, <String>['bo@example.com']);
     });
   });
 }

@@ -81,7 +81,9 @@ class LauncherSettings {
     this.appIcons = true,
     this.agendaWeekView = false,
     this.agendaGridView = false,
+    this.agendaGridZoom = 1,
     this.lastUsedCalendarId,
+    this.mailSignature = '',
   });
 
   final ThemeVariant theme;
@@ -116,12 +118,23 @@ class LauncherSettings {
   /// UI state the same way that is.
   final bool agendaGridView;
 
+  /// How tall an hour is drawn in the Week:Grid view (`WeekView`'s own
+  /// `heightPerMinute`), last set by a pinch there. Saved so it survives
+  /// stepping between weeks — the grid widget is recreated on every reload,
+  /// so without this its own zoom would reset each time. Remembered UI
+  /// state, the same as [agendaWeekView] and [agendaGridView].
+  final double agendaGridZoom;
+
   /// The calendar last saved an event to, so `+ ADD EVENT`'s own calendar
   /// field defaults to it rather than always the account's primary — `null`
   /// until an event has ever been saved. Remembered UI state, the same as
   /// [agendaWeekView] and [agendaGridView]; not offered on the settings
   /// screen.
   final int? lastUsedCalendarId;
+
+  /// Appended to every new message, reply and forward, with a blank line
+  /// above it; empty (the default) adds nothing. Set on the settings screen.
+  final String mailSignature;
 
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
@@ -151,7 +164,9 @@ class LauncherSettings {
     bool? appIcons,
     bool? agendaWeekView,
     bool? agendaGridView,
+    double? agendaGridZoom,
     int? lastUsedCalendarId,
+    String? mailSignature,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -164,7 +179,9 @@ class LauncherSettings {
     appIcons: appIcons ?? this.appIcons,
     agendaWeekView: agendaWeekView ?? this.agendaWeekView,
     agendaGridView: agendaGridView ?? this.agendaGridView,
+    agendaGridZoom: agendaGridZoom ?? this.agendaGridZoom,
     lastUsedCalendarId: lastUsedCalendarId ?? this.lastUsedCalendarId,
+    mailSignature: mailSignature ?? this.mailSignature,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -179,7 +196,9 @@ class LauncherSettings {
     'appIcons': appIcons,
     'agendaWeekView': agendaWeekView,
     'agendaGridView': agendaGridView,
+    'agendaGridZoom': agendaGridZoom,
     'lastUsedCalendarId': lastUsedCalendarId,
+    'mailSignature': mailSignature,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -230,9 +249,15 @@ class LauncherSettings {
       agendaGridView: json['agendaGridView'] is bool
           ? json['agendaGridView']! as bool
           : defaults.agendaGridView,
+      agendaGridZoom: json['agendaGridZoom'] is num
+          ? (json['agendaGridZoom']! as num).toDouble()
+          : defaults.agendaGridZoom,
       lastUsedCalendarId: json['lastUsedCalendarId'] is int
           ? json['lastUsedCalendarId']! as int
           : defaults.lastUsedCalendarId,
+      mailSignature: json['mailSignature'] is String
+          ? json['mailSignature']! as String
+          : defaults.mailSignature,
     );
   }
 
@@ -250,7 +275,9 @@ class LauncherSettings {
       other.appIcons == appIcons &&
       other.agendaWeekView == agendaWeekView &&
       other.agendaGridView == agendaGridView &&
-      other.lastUsedCalendarId == lastUsedCalendarId;
+      other.agendaGridZoom == agendaGridZoom &&
+      other.lastUsedCalendarId == lastUsedCalendarId &&
+      other.mailSignature == mailSignature;
 
   @override
   int get hashCode => Object.hash(
@@ -265,10 +292,12 @@ class LauncherSettings {
     appIcons,
     agendaWeekView,
     agendaGridView,
+    agendaGridZoom,
     lastUsedCalendarId,
+    mailSignature,
   );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, lastUsedCalendarId: $lastUsedCalendarId)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, agendaGridZoom: $agendaGridZoom, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature)';
 }

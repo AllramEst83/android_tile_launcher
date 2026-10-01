@@ -1,12 +1,15 @@
 import 'package:android_tile_launcher/services/agenda_repository.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/services/bluetooth_service.dart';
+import 'package:android_tile_launcher/services/camera_service.dart';
 import 'package:android_tile_launcher/services/clipboard_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_repository.dart';
 import 'package:android_tile_launcher/services/files_service.dart';
 import 'package:android_tile_launcher/services/home_role_service.dart';
+import 'package:android_tile_launcher/services/link_service.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
 import 'package:android_tile_launcher/services/rates_repository.dart';
@@ -42,6 +45,9 @@ class TileServices {
     required this.icons,
     required this.files,
     required this.bluetooth,
+    required this.attachmentDownload,
+    required this.camera,
+    required this.link,
   });
 
   final SystemControlService systemControl;
@@ -72,4 +78,13 @@ class TileServices {
 
   final FilesService files;
   final BluetoothService bluetooth;
+
+  /// Where a mail attachment's DOWNLOAD button saves it.
+  final AttachmentDownloadService attachmentDownload;
+
+  /// The QR scanner tile's own CAMERA permission.
+  final CameraService camera;
+
+  /// The QR scanner's OPEN action on a decoded web link.
+  final LinkService link;
 }

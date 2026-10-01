@@ -23,6 +23,10 @@ abstract interface class MailService {
   /// log in to the server every time); [fresh] insists on asking the server.
   Future<MailResult> latest({int count = 20, bool fresh = false});
 
+  /// The [count] newest messages matching [filter], always fresh from the
+  /// server. Never throws; an empty [filter] behaves like [latest].
+  Future<MailResult> search(MailFilter filter, {int count = 20});
+
   /// Moves the inbox message with [uid] to the server's Trash folder: never
   /// deletes it outright, so it can be got back. If [validity] is given and
   /// the server's differs, the ids have been renumbered since the list was
@@ -43,10 +47,12 @@ abstract interface class MailService {
   /// nothing unless it returns [MailMarked].
   Future<MailMarkResult> mark(int uid, {required bool read, int? validity});
 
-  /// Sends a new message from the set-up account. Never throws; nothing is
-  /// sent unless it returns [MailSent].
+  /// Sends a new message from the set-up account to every address in [to],
+  /// copying every address in [cc]. Never throws; nothing is sent unless it
+  /// returns [MailSent].
   Future<MailSendResult> send({
-    required String to,
+    required List<String> to,
+    List<String> cc = const <String>[],
     required String subject,
     required String text,
   });

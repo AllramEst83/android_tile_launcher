@@ -26,10 +26,17 @@ class FakeContactsRepository implements ContactsRepository {
 
   ContactsResult result;
   int calls = 0;
+  int peeks = 0;
 
   @override
   Future<ContactsResult> all() async {
     calls++;
+    return result;
+  }
+
+  @override
+  Future<ContactsResult> peek() async {
+    peeks++;
     return result;
   }
 }

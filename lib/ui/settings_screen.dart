@@ -81,6 +81,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   ThemeVariant? _paperTheme;
   WallpaperTarget _paperTarget = WallpaperTarget.lock;
 
+  late final TextEditingController _signature = TextEditingController(
+    text: widget.settings.settings.mailSignature,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -91,6 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _signature.dispose();
     super.dispose();
   }
 
@@ -234,6 +239,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         _feelSection(),
                         _wallpaperSection(),
                         _systemSection(),
+                        _mailSection(),
                         _layoutSection(),
                         const SizedBox(height: 24),
                       ],
@@ -524,6 +530,38 @@ class _SettingsScreenState extends State<SettingsScreen>
           fontSize: 10,
           onTap: () => widget.services.homeRole.openSettings(),
         ),
+      ],
+    );
+  }
+
+  Widget _mailSection() {
+    return SectionBox(
+      title: Messages.settingsMail,
+      children: <Widget>[
+        _Label(text: Messages.settingsSignature),
+        TextField(
+          key: settingsKey('signature'),
+          controller: _signature,
+          maxLines: 3,
+          style: TextStyle(
+            fontFamily: kPixelFontFamily,
+            fontSize: 12,
+            color: TileColors.textBright,
+          ),
+          cursorColor: TileColors.textBright,
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: TileColors.bezel),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: TileColors.textBright),
+            ),
+          ),
+          onChanged: (String value) =>
+              widget.settings.update(_current.copyWith(mailSignature: value)),
+        ),
+        const _Note(text: Messages.settingsSignatureNote),
       ],
     );
   }

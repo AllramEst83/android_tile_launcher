@@ -125,6 +125,9 @@ class FakeImapServer {
   /// Uids marked `\Deleted` by a `STORE`, until an `EXPUNGE` removes them.
   final Set<int> _deleted = {};
 
+  /// What `UID SEARCH` replies with, regardless of the criteria given.
+  Set<int> searchResults = {};
+
   late final ServerSocket _server;
   final List<Socket> _sockets = [];
 
@@ -214,33 +217,56 @@ class FakeImapServer {
     }
   }
 
+  /// A sequence set (`101`, `101,102` or `101:103`) as the uids it names, in
+  /// order — enough for what a search result's `UID FETCH` sends, without
+  /// implementing the full grammar (`*` as an open end is not needed here).
+  List<int> _parseSequenceSet(String text) {
+    final ids = <int>[];
+    for (final part in text.split(',')) {
+      final colon = part.indexOf(':');
+      if (colon < 0) {
+        final id = int.tryParse(part);
+        if (id != null) ids.add(id);
+        continue;
+      }
+      final start = int.tryParse(part.substring(0, colon));
+      final end = int.tryParse(part.substring(colon + 1));
+      if (start == null || end == null) continue;
+      for (var i = start; i <= end; i++) {
+        ids.add(i);
+      }
+    }
+    return ids;
+  }
+
   /// `UID FETCH|MOVE|COPY|STORE|EXPUNGE <uid> ...`.
   void _handleUid(Socket socket, String tag, List<String> words) {
     final uid = int.tryParse(words[2]);
     final index = inbox.indexWhere((m) => m.uid == uid);
     switch (words[1].toUpperCase()) {
       case 'FETCH':
-        if (index < 0) {
-          socket.write('$tag OK UID FETCH completed\r\n');
-          return;
-        }
-        final message = inbox[index];
         final items = words.skip(3).join(' ').toUpperCase();
-        final flags = 'FLAGS (${seen.contains(uid) ? r'\Seen' : ''})';
-        final out = StringBuffer('* ${index + 1} FETCH (UID $uid');
-        if (items.contains('FLAGS')) out.write(' $flags');
-        if (items.contains('RFC822.SIZE')) {
-          out.write(
-            ' RFC822.SIZE ${message.size ?? utf8.encode(message.rfc822()).length}',
-          );
+        final out = StringBuffer();
+        for (final id in _parseSequenceSet(words[2])) {
+          final i = inbox.indexWhere((m) => m.uid == id);
+          if (i < 0) continue;
+          final message = inbox[i];
+          final flags = 'FLAGS (${seen.contains(id) ? r'\Seen' : ''})';
+          out.write('* ${i + 1} FETCH (UID $id');
+          if (items.contains('FLAGS')) out.write(' $flags');
+          if (items.contains('RFC822.SIZE')) {
+            out.write(
+              ' RFC822.SIZE ${message.size ?? utf8.encode(message.rfc822()).length}',
+            );
+          }
+          if (items.contains('ENVELOPE')) out.write(' ${_envelope(message)}');
+          if (items.contains('BODY.PEEK[]') || items.contains('BODY[]')) {
+            final whole = message.rfc822();
+            // A literal: its length in bytes, then exactly that many.
+            out.write(' BODY[] {${utf8.encode(whole).length}}\r\n$whole');
+          }
+          out.write(')\r\n');
         }
-        if (items.contains('ENVELOPE')) out.write(' ${_envelope(message)}');
-        if (items.contains('BODY.PEEK[]') || items.contains('BODY[]')) {
-          final whole = message.rfc822();
-          // A literal: its length in bytes, then exactly that many.
-          out.write(' BODY[] {${utf8.encode(whole).length}}\r\n$whole');
-        }
-        out.write(')\r\n');
         socket.write('$out$tag OK UID FETCH completed\r\n');
       case 'MOVE':
         if (index < 0) {
@@ -278,6 +304,13 @@ class FakeImapServer {
           socket.write('* ${index + 1} EXPUNGE\r\n');
         }
         socket.write('$tag OK UID EXPUNGE completed\r\n');
+      case 'SEARCH':
+        // Whatever `searchResults` is set to, regardless of the actual
+        // criteria — a test checks those separately, via `received`.
+        final ids = searchResults.toList()..sort();
+        socket.write(
+          '* SEARCH ${ids.join(' ')}\r\n$tag OK UID SEARCH completed\r\n',
+        );
       default:
         socket.write('$tag BAD unknown command\r\n');
     }

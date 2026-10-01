@@ -22,11 +22,12 @@ class AndroidContactsService implements ContactsService {
 
   @override
   Future<ContactsResult> all() async {
+    final List<Contact> contacts;
     try {
       final List<Map<Object?, Object?>>? raw = await channel
           .invokeListMethod<Map<Object?, Object?>>('all')
           .timeout(timeout);
-      return ContactsRead(_group(raw ?? const <Map<Object?, Object?>>[]));
+      contacts = _group(raw ?? const <Map<Object?, Object?>>[]);
     } on PlatformException catch (error) {
       return switch (error.code) {
         'NO_PERMISSION' => const ContactsNoAccess(),
@@ -37,6 +38,48 @@ class AndroidContactsService implements ContactsService {
     } on TimeoutException {
       return const ContactsUnavailable('the contacts did not answer');
     }
+    // Best effort: compose's autocomplete is the only reader of emails, and a
+    // phone book that reads fine otherwise should not fail just because that
+    // second query did not.
+    try {
+      final List<Map<Object?, Object?>>? raw = await channel
+          .invokeListMethod<Map<Object?, Object?>>('emails')
+          .timeout(timeout);
+      return ContactsRead(
+        _withEmails(contacts, raw ?? const <Map<Object?, Object?>>[]),
+      );
+    } on Object {
+      return ContactsRead(contacts);
+    }
+  }
+
+  /// [contacts], each carrying the emails [rows] gave for its own key (only
+  /// ever attached to a contact who already has a number).
+  static List<Contact> _withEmails(
+    List<Contact> contacts,
+    List<Map<Object?, Object?>> rows,
+  ) {
+    final Map<String, List<String>> byKey = <String, List<String>>{};
+    for (final Map<Object?, Object?> row in rows) {
+      final String? key = _text(row['key']);
+      final String? email = _text(row['email']);
+      if (key == null || email == null) continue;
+      final List<String> emails = byKey.putIfAbsent(key, () => <String>[]);
+      if (!emails.contains(email)) emails.add(email);
+    }
+    if (byKey.isEmpty) return contacts;
+    return List<Contact>.unmodifiable(<Contact>[
+      for (final Contact c in contacts)
+        if (byKey.containsKey(c.key))
+          Contact(
+            key: c.key,
+            name: c.name,
+            numbers: c.numbers,
+            emails: List<String>.unmodifiable(byKey[c.key]!),
+          )
+        else
+          c,
+    ]);
   }
 
   /// One row per number in, one [Contact] per lookup key out, in the order the

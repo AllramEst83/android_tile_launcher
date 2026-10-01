@@ -22,6 +22,7 @@ enum TileKind {
   files,
   bluetooth,
   orientationLock,
+  qrScanner,
 }
 
 /// The app package [tile] launches when tapped, or `null` for a tile with no
@@ -49,6 +50,7 @@ String displayNameOf(TileKind kind) => switch (kind) {
   TileKind.files => 'FILES',
   TileKind.bluetooth => 'BLUETOOTH',
   TileKind.orientationLock => 'ROTATION',
+  TileKind.qrScanner => 'QR SCANNER',
 };
 
 /// The id of the tile for the contact with lookup [key]. Unlike a system kind

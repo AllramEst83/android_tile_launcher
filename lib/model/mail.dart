@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// One message in the inbox, as far as a list needs it: no body.
 class MailMessage {
   const MailMessage({
@@ -31,6 +33,89 @@ class MailMessage {
     date: date,
     unread: unread ?? this.unread,
   );
+}
+
+/// A unit "older than" counts in.
+enum MailAgeUnit {
+  days('DAYS'),
+  weeks('WEEKS'),
+  months('MONTHS'),
+  years('YEARS');
+
+  const MailAgeUnit(this.label);
+
+  final String label;
+}
+
+/// How far back an "older than" filter reaches, e.g. 3 weeks.
+class MailOlderThan {
+  const MailOlderThan(this.amount, this.unit);
+
+  final int amount;
+  final MailAgeUnit unit;
+
+  /// The cutoff date, given [now]: a message sent before this passes the
+  /// filter.
+  DateTime before(DateTime now) => switch (unit) {
+    MailAgeUnit.days => now.subtract(Duration(days: amount)),
+    MailAgeUnit.weeks => now.subtract(Duration(days: amount * 7)),
+    MailAgeUnit.months => DateTime(now.year, now.month - amount, now.day),
+    MailAgeUnit.years => DateTime(now.year - amount, now.month, now.day),
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is MailOlderThan && other.amount == amount && other.unit == unit;
+
+  @override
+  int get hashCode => Object.hash(amount, unit);
+
+  @override
+  String toString() => 'MailOlderThan($amount ${unit.label})';
+}
+
+/// A filter over the inbox listing: free text (matches the subject or the
+/// body), the sender's address, the recipient's address, and/or an "older
+/// than" cutoff. Every field that is set narrows the results further (AND);
+/// [isEmpty] means no filtering — the plain inbox listing.
+class MailFilter {
+  const MailFilter({
+    this.text = '',
+    this.from = '',
+    this.to = '',
+    this.olderThan,
+  });
+
+  final String text;
+  final String from;
+  final String to;
+  final MailOlderThan? olderThan;
+
+  bool get isEmpty =>
+      text.isEmpty && from.isEmpty && to.isEmpty && olderThan == null;
+
+  MailFilter withoutText() =>
+      MailFilter(from: from, to: to, olderThan: olderThan);
+  MailFilter withoutFrom() =>
+      MailFilter(text: text, to: to, olderThan: olderThan);
+  MailFilter withoutTo() =>
+      MailFilter(text: text, from: from, olderThan: olderThan);
+  MailFilter withoutOlderThan() => MailFilter(text: text, from: from, to: to);
+
+  @override
+  bool operator ==(Object other) =>
+      other is MailFilter &&
+      other.text == text &&
+      other.from == from &&
+      other.to == to &&
+      other.olderThan == olderThan;
+
+  @override
+  int get hashCode => Object.hash(text, from, to, olderThan);
+
+  @override
+  String toString() =>
+      'MailFilter(text: $text, from: $from, to: $to, olderThan: $olderThan)';
 }
 
 sealed class MailResult {
@@ -104,20 +189,57 @@ class MailMoveFailed extends MailMoveResult {
   final String reason;
 }
 
+/// One address on a message's To or Cc line: a display name (may be empty)
+/// and the address itself (never empty — an entry with no address is left
+/// out by whoever builds the list).
+class MailParticipant {
+  const MailParticipant({required this.address, this.name = ''});
+
+  final String name;
+  final String address;
+
+  /// What a chip shows: the name if there is one, else the bare address.
+  String get label => name.isNotEmpty ? name : address;
+}
+
+/// One file attached to a message, held whole: this launcher fetches a
+/// message's full body to read it at all, so the bytes are already at hand
+/// once the reader is open — a DOWNLOAD button costs no extra trip to the
+/// server.
+class MailAttachment {
+  const MailAttachment({
+    required this.name,
+    required this.sizeBytes,
+    required this.mimeType,
+    required this.bytes,
+  });
+
+  /// Never empty: an attachment with no name from the sender is given one.
+  final String name;
+  final int sizeBytes;
+
+  /// What to save it as, e.g. `image/png`; `application/octet-stream` when
+  /// the message did not say.
+  final String mimeType;
+  final Uint8List bytes;
+}
+
 /// One message in full, as far as this launcher shows one: who, when, what,
 /// and its text (plain text, or the readable part of an HTML-only message).
-/// Attachments and pictures are counted, never downloaded to the screen.
 class MailBody {
   const MailBody({
     required this.uid,
     required this.from,
     this.fromAddress = '',
+    this.to = const <MailParticipant>[],
+    this.cc = const <MailParticipant>[],
     required this.subject,
     required this.text,
     this.html,
+    this.htmlWithImages,
     this.date,
     this.truncated = false,
-    this.attachments = 0,
+    this.attachments = const <MailAttachment>[],
     this.markedRead = true,
   });
 
@@ -128,6 +250,12 @@ class MailBody {
   /// the sender to compose a fresh message (never shown itself: [from] is
   /// what the reader shows). Empty if the message gave none.
   final String fromAddress;
+
+  /// Who the message was addressed to and copied to, in the order the
+  /// message itself gave them. Either may be empty.
+  final List<MailParticipant> to;
+  final List<MailParticipant> cc;
+
   final String subject;
   final DateTime? date;
 
@@ -140,11 +268,17 @@ class MailBody {
   /// the message was plain text to begin with (then [text] is shown as-is).
   final String? html;
 
+  /// [html] with its pictures put back — inline ones as data URIs, remote
+  /// ones left as the `<img>` tag the sender wrote — for SHOW IMAGES. Null
+  /// when [html] is null or had no pictures to begin with (then there is
+  /// nothing for the button to reveal).
+  final String? htmlWithImages;
+
   /// Whether [text] was cut short because the message is very long.
   final bool truncated;
 
-  /// How many attachments the message carries.
-  final int attachments;
+  /// The message's attachments, whole (see [MailAttachment]).
+  final List<MailAttachment> attachments;
 
   /// Whether opening it marked it read on the server (it should; when that one
   /// step failed the message is still shown, and this is false).

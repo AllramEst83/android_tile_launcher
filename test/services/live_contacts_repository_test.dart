@@ -72,6 +72,20 @@ void main() {
     expect(await repository.all(), isA<ContactsUnavailable>());
   });
 
+  test('peek reads straight from the service, and never asks', () async {
+    service.result = const ContactsRead(<Contact>[_anna]);
+
+    final ContactsResult result = await repository.peek();
+
+    expect((result as ContactsRead).contacts, <Contact>[_anna]);
+    expect(permissions.requested, isEmpty);
+  });
+
+  test('peek with no access is ContactsNoAccess, not a prompt', () async {
+    expect(await repository.peek(), isA<ContactsNoAccess>());
+    expect(permissions.requested, isEmpty);
+  });
+
   test('a phone book that cannot be read says so', () async {
     service.result = const ContactsUnavailable('the contacts did not answer');
 

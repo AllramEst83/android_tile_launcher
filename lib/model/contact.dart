@@ -21,13 +21,23 @@ class PhoneNumber {
 
 /// One person with at least one phone number.
 class Contact {
-  const Contact({required this.key, required this.name, required this.numbers});
+  const Contact({
+    required this.key,
+    required this.name,
+    required this.numbers,
+    this.emails = const <String>[],
+  });
 
   /// Android's lookup key: what a pinned tile remembers the person by. It
   /// survives a rename, and Android keeps it resolving when contacts merge.
   final String key;
   final String name;
   final List<PhoneNumber> numbers;
+
+  /// This person's email addresses, if any — only ever attached to a contact
+  /// who also has a number (see `AndroidContactsService`); for compose's
+  /// autocomplete, not shown anywhere else.
+  final List<String> emails;
 
   /// The number to offer first: a mobile one if there is one (a text or a
   /// WhatsApp message goes nowhere on a landline), else the first.
@@ -41,16 +51,26 @@ class Contact {
       other is Contact &&
       other.key == key &&
       other.name == name &&
-      _sameNumbers(other.numbers, numbers);
+      _sameNumbers(other.numbers, numbers) &&
+      _sameStrings(other.emails, emails);
 
   @override
-  int get hashCode => Object.hash(key, name, Object.hashAll(numbers));
+  int get hashCode =>
+      Object.hash(key, name, Object.hashAll(numbers), Object.hashAll(emails));
 
   @override
   String toString() => 'Contact($name, $key, ${numbers.length} numbers)';
 }
 
 bool _sameNumbers(List<PhoneNumber> a, List<PhoneNumber> b) {
+  if (a.length != b.length) return false;
+  for (int i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+bool _sameStrings(List<String> a, List<String> b) {
   if (a.length != b.length) return false;
   for (int i = 0; i < a.length; i++) {
     if (a[i] != b[i]) return false;

@@ -126,6 +126,7 @@ abstract final class Messages {
   static const String mailPrev = '< PREV';
   static const String mailNext = 'NEXT >';
   static const String mailReply = 'REPLY';
+  static const String mailReplyAll = 'REPLY ALL';
   static const String mailForward = 'FORWARD';
   static const String mailMarkRead = 'MARK AS READ';
   static const String mailMarkUnread = 'MARK AS UNREAD';
@@ -134,12 +135,19 @@ abstract final class Messages {
   static const String mailMarkedUnread = 'MARKED AS UNREAD.';
   static const String mailNotMarked = 'OPENED, BUT COULD NOT MARK IT READ.';
   static const String mailFrom = 'FROM';
+  static const String mailTo = 'TO';
+  static const String mailCc = 'CC';
   static const String mailDate = 'DATE';
   static const String mailNoText = '(NOTHING TO SHOW: NO TEXT IN THIS MESSAGE)';
   static const String mailCutOff =
       '... CUT SHORT. OPEN IT IN YOUR MAIL APP FOR THE REST.';
   static String mailAttachments(int n) =>
-      '$n ${n == 1 ? 'ATTACHMENT' : 'ATTACHMENTS'} NOT SHOWN.';
+      '$n ${n == 1 ? 'ATTACHMENT' : 'ATTACHMENTS'}';
+  static const String mailDownload = 'DOWNLOAD';
+  static const String mailDownloading = 'SAVING...';
+  static const String mailDownloaded = 'SAVED TO DOWNLOADS.';
+  static const String mailDownloadFailed = 'COULD NOT SAVE IT.';
+  static const String mailShowImages = 'SHOW IMAGES';
   static const String mailTrashAsk = 'MOVE TO TRASH?';
   static const String mailYes = 'YES';
   static const String mailNo = 'NO';
@@ -149,6 +157,7 @@ abstract final class Messages {
   static const String mailForgetAsk = 'FORGET THIS ACCOUNT AND ITS PASSWORD?';
   static const String mailRefresh = 'REFRESH';
   static const String mailSelect = 'SELECT';
+  static const String mailSelectAll = 'SELECT ALL';
   static const String mailCancelSelect = 'CANCEL';
   static String mailSelectedCount(int n) => '$n SELECTED';
   static String mailDeleteSelected(int n) => 'DELETE ($n)';
@@ -166,7 +175,6 @@ abstract final class Messages {
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS UNREAD.';
   static const String mailCompose = 'COMPOSE';
   static const String mailComposeTitle = 'NEW MESSAGE';
-  static const String mailTo = 'TO';
   static const String mailSubject = 'SUBJECT';
   static const String mailBody = 'MESSAGE';
   static const String mailSend = 'SEND';
@@ -174,6 +182,23 @@ abstract final class Messages {
   static const String mailSent = 'SENT.';
   static const String mailSendNeedsTo = 'GIVE IT A RECIPIENT.';
   static const String mailSendNeedsText = 'GIVE IT SOMETHING TO SAY.';
+
+  static const String mailFilter = 'FILTER';
+  static const String mailFilterTitle = 'FILTER MAIL';
+  static const String mailFilterText = 'TEXT (SUBJECT OR BODY)';
+  static const String mailFilterFrom = 'FROM ADDRESS';
+  static const String mailFilterTo = 'TO ADDRESS';
+  static const String mailFilterOlderThan = 'OLDER THAN';
+  static const String mailFilterApply = 'APPLY';
+  static const String mailFilterClear = 'CLEAR ALL';
+  static String mailFilterTextChip(String text) =>
+      'TEXT: ${text.toUpperCase()}';
+  static String mailFilterFromChip(String from) =>
+      'FROM: ${from.toUpperCase()}';
+  static String mailFilterToChip(String to) => 'TO: ${to.toUpperCase()}';
+  static String mailFilterOlderThanChip(int amount, String unit) =>
+      'OLDER THAN $amount $unit';
+  static const String mailNoMatches = 'NOTHING MATCHES THESE FILTERS.';
 
   static const String calcTitle = 'CALC';
   static const String calcTabCalc = 'CALC';
@@ -262,6 +287,10 @@ abstract final class Messages {
   static const String settingsHomeUnknown = 'COULD NOT FIND OUT.';
   static const String settingsHomeChecking = 'CHECKING...';
   static const String settingsOpenHome = 'CHOOSE HOME APP';
+  static const String settingsMail = 'MAIL';
+  static const String settingsSignature = 'SIGNATURE';
+  static const String settingsSignatureNote =
+      'ADDED TO THE END OF NEW MESSAGES, REPLIES AND FORWARDS.';
   static const String settingsLayout = 'LAYOUT';
   static const String settingsExport = 'EXPORT';
   static const String settingsImport = 'IMPORT';
@@ -318,6 +347,18 @@ abstract final class Messages {
   static const String bluetoothNoneConnected = 'NONE CONNECTED';
   static const String bluetoothConnected = 'CONNECTED';
   static const String bluetoothNotConnected = 'NOT CONNECTED';
+
+  static const String qrScannerTitle = 'QR SCANNER';
+  static const String qrScannerSubtitle = 'SCAN A CODE';
+  static const String qrScannerTapToAllow = 'TAP TO ALLOW CAMERA ACCESS';
+  static const String qrScannerAllowInSettings =
+      'ALLOW CAMERA ACCESS IN ANDROID SETTINGS.';
+  static const String qrScannerAim = 'AIM AT A QR CODE.';
+  static const String qrScannerOpen = 'OPEN';
+  static const String qrScannerCopy = 'COPY';
+  static const String qrScannerCopied = 'COPIED.';
+  static const String qrScannerScanAgain = 'SCAN AGAIN';
+  static const String qrScannerOpenFailed = 'COULD NOT OPEN THAT LINK.';
 
   static const String helpTitle = 'HELP';
 

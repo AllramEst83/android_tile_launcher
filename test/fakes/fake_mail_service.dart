@@ -68,6 +68,16 @@ class FakeMailService implements MailService {
     return result;
   }
 
+  /// What `search` answers, and every filter it was given, in order.
+  MailResult? searchResult;
+  final List<MailFilter> searches = <MailFilter>[];
+
+  @override
+  Future<MailResult> search(MailFilter filter, {int count = 20}) async {
+    searches.add(filter);
+    return searchResult ?? result;
+  }
+
   /// What `read` answers, and every `(uid, validity)` it was given.
   MailReadResult readResult = const MailReadGone();
 
@@ -99,17 +109,19 @@ class FakeMailService implements MailService {
     return markResult ?? MailMarked(read: read);
   }
 
-  /// What `send` answers, and every `(to, subject, text)` it was given.
+  /// What `send` answers, and every `(to, cc, subject, text)` it was given.
   MailSendResult sendResult = const MailSent();
-  final List<(String, String, String)> sent = <(String, String, String)>[];
+  final List<(List<String>, List<String>, String, String)> sent =
+      <(List<String>, List<String>, String, String)>[];
 
   @override
   Future<MailSendResult> send({
-    required String to,
+    required List<String> to,
+    List<String> cc = const <String>[],
     required String subject,
     required String text,
   }) async {
-    sent.add((to, subject, text));
+    sent.add((to, cc, subject, text));
     return sendResult;
   }
 }

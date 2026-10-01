@@ -4,8 +4,12 @@ import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
+import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_filter_sheet.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
@@ -16,6 +20,7 @@ Key mailCheckboxKey(int uid) => ValueKey<String>('mail-checkbox-$uid');
 const Key mailComposeKey = ValueKey<String>('mail-compose');
 const Key mailFromComposeKey = ValueKey<String>('mail-from-compose');
 const Key mailReplyKey = ValueKey<String>('mail-reply');
+const Key mailReplyAllKey = ValueKey<String>('mail-reply-all');
 const Key mailForwardKey = ValueKey<String>('mail-forward');
 const Key mailPrevKey = ValueKey<String>('mail-prev');
 const Key mailNextKey = ValueKey<String>('mail-next');
@@ -31,12 +36,18 @@ const Key mailBodyKey = ValueKey<String>('mail-body');
 const Key mailForgetYesKey = ValueKey<String>('mail-forget-yes');
 const Key mailForgetNoKey = ValueKey<String>('mail-forget-no');
 const Key mailSelectKey = ValueKey<String>('mail-select');
+const Key mailSelectAllKey = ValueKey<String>('mail-select-all');
 const Key mailCancelSelectKey = ValueKey<String>('mail-cancel-select');
 const Key mailBulkDeleteKey = ValueKey<String>('mail-bulk-delete');
 const Key mailBulkReadKey = ValueKey<String>('mail-bulk-read');
 const Key mailBulkUnreadKey = ValueKey<String>('mail-bulk-unread');
 const Key mailBulkYesKey = ValueKey<String>('mail-bulk-yes');
 const Key mailBulkNoKey = ValueKey<String>('mail-bulk-no');
+const Key mailShowImagesKey = ValueKey<String>('mail-show-images');
+const Key mailFilterKey = ValueKey<String>('mail-filter');
+Key mailFilterChipKey(String field) =>
+    ValueKey<String>('mail-filter-chip-$field');
+Key mailDownloadKey(String name) => ValueKey<String>('mail-download-$name');
 
 /// `RE: <subject>`, unless [subject] already reads as a reply.
 String _replySubject(String subject) {
@@ -54,8 +65,9 @@ String _forwardSubject(String subject) {
 
 /// [body]'s own text, quoted under an "on ... wrote:" line and led by two
 /// blank lines for the reply or forward itself — the compose sheet puts the
-/// cursor above it, so typing starts there, not inside the quote.
-String _quotedOriginal(MailBody body) {
+/// cursor above it, so typing starts there, not inside the quote. [signature],
+/// when set, sits in that same leading space, above the quote.
+String _quotedOriginal(MailBody body, {String signature = ''}) {
   final String who = body.date == null
       ? '${body.from} wrote:'
       : 'On ${formatClockDate(body.date!)} '
@@ -64,7 +76,8 @@ String _quotedOriginal(MailBody body) {
       .split('\n')
       .map((String line) => '> $line')
       .join('\n');
-  return '\n\n$who\n$quoted';
+  final String sig = signature.isEmpty ? '' : '$signature\n\n';
+  return '\n\n$sig$who\n$quoted';
 }
 
 DateTime _systemNow() => DateTime.now();
@@ -81,6 +94,8 @@ DateTime _systemNow() => DateTime.now();
 Future<void> showMailSheet(
   BuildContext context, {
   required MailService mail,
+  required AttachmentDownloadService attachmentDownload,
+  required ContactsRepository contacts,
   DateTime Function() clock = _systemNow,
 }) {
   return showModalBottomSheet<void>(
@@ -96,16 +111,28 @@ Future<void> showMailSheet(
           media.size.height * 0.85,
           media.size.height - media.padding.top - TileMetrics.margin,
         ),
-        child: _MailSheet(mail: mail, clock: clock),
+        child: _MailSheet(
+          mail: mail,
+          attachmentDownload: attachmentDownload,
+          contacts: contacts,
+          clock: clock,
+        ),
       );
     },
   );
 }
 
 class _MailSheet extends StatefulWidget {
-  const _MailSheet({required this.mail, required this.clock});
+  const _MailSheet({
+    required this.mail,
+    required this.attachmentDownload,
+    required this.contacts,
+    required this.clock,
+  });
 
   final MailService mail;
+  final AttachmentDownloadService attachmentDownload;
+  final ContactsRepository contacts;
   final DateTime Function() clock;
 
   @override
@@ -124,6 +151,11 @@ class _MailSheetState extends State<_MailSheet> {
   MailBody? _opened;
   String? _readError;
 
+  /// Whether the open message's pictures are revealed (SHOW IMAGES), and
+  /// which attachment names are mid-save.
+  bool _showImages = false;
+  final Set<String> _downloading = <String>{};
+
   int? _confirmingTrash;
   bool _confirmingForget = false;
   bool _busy = false;
@@ -136,6 +168,9 @@ class _MailSheetState extends State<_MailSheet> {
   bool _bulkDeleting = false;
   int _bulkDone = 0;
   int _bulkTotal = 0;
+
+  /// What FILTER narrowed the list to; empty is no filtering at all.
+  MailFilter _filter = const MailFilter();
 
   @override
   void initState() {
@@ -155,7 +190,9 @@ class _MailSheetState extends State<_MailSheet> {
     });
     final MailAccountInfo? account = await widget.mail.account();
     // Always from the server: the sheet is for looking at what is there now.
-    final MailResult result = await widget.mail.latest(count: 20, fresh: true);
+    final MailResult result = _filter.isEmpty
+        ? await widget.mail.latest(count: 20, fresh: true)
+        : await widget.mail.search(_filter, count: 20);
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -165,6 +202,21 @@ class _MailSheetState extends State<_MailSheet> {
           ? List<MailMessage>.of(result.messages)
           : <MailMessage>[];
     });
+  }
+
+  Future<void> _openFilter() async {
+    final MailFilter? next = await showMailFilterSheet(
+      context,
+      initial: _filter,
+    );
+    if (next == null || next == _filter) return;
+    setState(() => _filter = next);
+    await _load();
+  }
+
+  void _clearFilterField(MailFilter Function(MailFilter) without) {
+    setState(() => _filter = without(_filter));
+    _load();
   }
 
   int? get _validity {
@@ -195,6 +247,8 @@ class _MailSheetState extends State<_MailSheet> {
       _reading = true;
       _confirmingTrash = null;
       _status = null;
+      _showImages = false;
+      _downloading.clear();
     });
     final MailReadResult result = await widget.mail.read(
       m.uid,
@@ -229,6 +283,8 @@ class _MailSheetState extends State<_MailSheet> {
     _readError = null;
     _confirmingTrash = null;
     _status = null;
+    _showImages = false;
+    _downloading.clear();
   });
 
   /// Flips the open message between read and unread.
@@ -311,6 +367,12 @@ class _MailSheetState extends State<_MailSheet> {
     if (!_selected.remove(uid)) _selected.add(uid);
   });
 
+  void _selectAll() => setState(() {
+    _selected
+      ..clear()
+      ..addAll(_messages.map((MailMessage m) => m.uid));
+  });
+
   /// Moves every selected message to Trash, one at a time (so
   /// [_bulkTrash]'s own progress line means something), then reloads from
   /// the server — the same "look at what is actually there now" reasoning
@@ -358,12 +420,49 @@ class _MailSheetState extends State<_MailSheet> {
     Navigator.pop(context);
   }
 
-  Future<void> _compose() => showComposeSheet(context, mail: widget.mail);
+  void _revealImages() => setState(() => _showImages = true);
+
+  /// Saves [attachment] to the phone's Downloads folder.
+  Future<void> _download(MailAttachment attachment) async {
+    setState(() {
+      _downloading.add(attachment.name);
+      _status = null;
+    });
+    final AttachmentSaveResult result = await widget.attachmentDownload.save(
+      attachment.bytes,
+      fileName: attachment.name,
+      mimeType: attachment.mimeType,
+    );
+    if (!mounted) return;
+    setState(() {
+      _downloading.remove(attachment.name);
+      _status = switch (result) {
+        AttachmentSaveResult.saved => Messages.mailDownloaded,
+        AttachmentSaveResult.refused || AttachmentSaveResult.failed =>
+          '${Messages.failedPrefix}${Messages.mailDownloadFailed}',
+      };
+    });
+  }
+
+  /// Appended to every new message, reply and forward; empty adds nothing.
+  String get _signature => SettingsScope.of(context).mailSignature;
+
+  Future<void> _compose() => showComposeSheet(
+    context,
+    mail: widget.mail,
+    contacts: widget.contacts,
+    body: _signature.isEmpty ? null : '\n\n$_signature',
+  );
 
   /// Opens a blank message addressed to [address]: what tapping the sender's
   /// own chip does, rather than a reply (REPLY is its own button now).
-  Future<void> _composeTo(String address) =>
-      showComposeSheet(context, mail: widget.mail, to: address);
+  Future<void> _composeTo(String address) => showComposeSheet(
+    context,
+    mail: widget.mail,
+    contacts: widget.contacts,
+    to: address,
+    body: _signature.isEmpty ? null : '\n\n$_signature',
+  );
 
   /// Opens a reply to [body]'s own sender: addressed to them, the subject
   /// prefixed `RE:` unless it already is one, and the original text quoted
@@ -371,9 +470,10 @@ class _MailSheetState extends State<_MailSheet> {
   Future<void> _reply(MailBody body) => showComposeSheet(
     context,
     mail: widget.mail,
+    contacts: widget.contacts,
     to: body.fromAddress,
     subject: _replySubject(body.subject),
-    body: _quotedOriginal(body),
+    body: _quotedOriginal(body, signature: _signature),
   );
 
   /// Opens a forward of [body]: the same quoted text as a reply, but with TO
@@ -381,8 +481,27 @@ class _MailSheetState extends State<_MailSheet> {
   Future<void> _forward(MailBody body) => showComposeSheet(
     context,
     mail: widget.mail,
+    contacts: widget.contacts,
     subject: _forwardSubject(body.subject),
-    body: _quotedOriginal(body),
+    body: _quotedOriginal(body, signature: _signature),
+  );
+
+  /// Whether [body] had more than one recipient (besides this account),
+  /// so REPLY and REPLY ALL would actually differ.
+  bool _hasOtherRecipients(MailBody body) =>
+      replyAllCcAddresses(body, _email).isNotEmpty;
+
+  /// Opens a reply to everyone [body] went to: addressed to the original
+  /// sender, same as REPLY, but copying every other To/Cc address too (never
+  /// this account's own, never the sender twice).
+  Future<void> _replyAll(MailBody body) => showComposeSheet(
+    context,
+    mail: widget.mail,
+    contacts: widget.contacts,
+    to: body.fromAddress,
+    cc: replyAllCcAddresses(body, _email).join(', '),
+    subject: _replySubject(body.subject),
+    body: _quotedOriginal(body, signature: _signature),
   );
 
   /// Where the open message sits in [_messages] (newest first), for PREV/NEXT.
@@ -479,6 +598,14 @@ class _MailSheetState extends State<_MailSheet> {
                     ),
                   ),
                   _Button(
+                    key: mailSelectAllKey,
+                    label: Messages.mailSelectAll,
+                    onTap: _busy || _selected.length == _messages.length
+                        ? null
+                        : _selectAll,
+                  ),
+                  const SizedBox(width: 8),
+                  _Button(
                     key: mailCancelSelectKey,
                     label: Messages.mailCancelSelect,
                     onTap: _busy ? null : _cancelSelecting,
@@ -527,12 +654,22 @@ class _MailSheetState extends State<_MailSheet> {
                   else
                     const Spacer(),
                   _Button(
+                    key: mailFilterKey,
+                    label: Messages.mailFilter,
+                    onTap: _busy || _loading ? null : _openFilter,
+                  ),
+                  const SizedBox(width: 8),
+                  _Button(
                     key: mailComposeKey,
                     label: Messages.mailCompose,
                     onTap: _busy ? null : _compose,
                   ),
                 ],
               ),
+              if (!_filter.isEmpty) ...<Widget>[
+                const SizedBox(height: TileMetrics.gutter),
+                _filterChips(),
+              ],
             ],
             // READ/UNREAD/DELETE wrap onto a second line on a narrow phone,
             // rather than a fixed row that would overflow.
@@ -659,25 +796,29 @@ class _MailSheetState extends State<_MailSheet> {
         children: <Widget>[
           Text(Messages.mailFrom, style: label),
           if (body.fromAddress.isNotEmpty)
-            InkWell(
+            _AddressChip(
               key: mailFromComposeKey,
+              text: body.from,
               onTap: _busy ? null : () => _composeTo(body.fromAddress),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: TileColors.accent,
-                    width: TileMetrics.bevel,
-                  ),
-                ),
-                child: Text(
-                  body.from.toUpperCase(),
-                  style: value?.copyWith(color: TileColors.accent),
-                ),
-              ),
             )
           else
             Text(body.from.toUpperCase(), style: value),
+          if (body.to.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(Messages.mailTo, style: label),
+            _AddressChipRow(
+              participants: body.to,
+              onTap: _busy ? null : _composeTo,
+            ),
+          ],
+          if (body.cc.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(Messages.mailCc, style: label),
+            _AddressChipRow(
+              participants: body.cc,
+              onTap: _busy ? null : _composeTo,
+            ),
+          ],
           if (body.date != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(Messages.mailDate, style: label),
@@ -699,14 +840,33 @@ class _MailSheetState extends State<_MailSheet> {
           const SizedBox(height: 8),
           Container(height: 2, color: TileColors.bezel),
           const SizedBox(height: TileMetrics.gutter),
+          if (body.htmlWithImages != null && !_showImages) ...<Widget>[
+            _Button(
+              key: mailShowImagesKey,
+              label: Messages.mailShowImages,
+              onTap: _revealImages,
+            ),
+            const SizedBox(height: TileMetrics.gutter),
+          ],
           _bodyContent(body, text),
           if (body.truncated) ...<Widget>[
             const SizedBox(height: 8),
             Text(Messages.mailCutOff, style: label),
           ],
-          if (body.attachments > 0) ...<Widget>[
+          if (body.attachments.isNotEmpty) ...<Widget>[
+            const SizedBox(height: TileMetrics.gutter),
+            Container(height: 2, color: TileColors.bezel),
             const SizedBox(height: 8),
-            Text(Messages.mailAttachments(body.attachments), style: label),
+            Text(
+              Messages.mailAttachments(body.attachments.length),
+              style: label,
+            ),
+            for (final MailAttachment attachment in body.attachments)
+              _AttachmentRow(
+                attachment: attachment,
+                saving: _downloading.contains(attachment.name),
+                onDownload: _busy ? null : () => _download(attachment),
+              ),
           ],
         ],
       ),
@@ -714,9 +874,11 @@ class _MailSheetState extends State<_MailSheet> {
   }
 
   /// The whole message: rendered rich when it has real markup ([MailBody.html]),
-  /// else its plain text as-is.
+  /// else its plain text as-is. SHOW IMAGES swaps in [MailBody.htmlWithImages].
   Widget _bodyContent(MailBody body, TextTheme text) {
-    final String? html = body.html;
+    final String? html = _showImages
+        ? body.htmlWithImages ?? body.html
+        : body.html;
     if (html != null && html.trim().isNotEmpty) {
       return HtmlWidget(
         html,
@@ -785,6 +947,12 @@ class _MailSheetState extends State<_MailSheet> {
           label: Messages.mailReply,
           onTap: _busy || opened == null ? null : () => _reply(opened),
         ),
+        if (opened != null && _hasOtherRecipients(opened))
+          _Button(
+            key: mailReplyAllKey,
+            label: Messages.mailReplyAll,
+            onTap: _busy ? null : () => _replyAll(opened),
+          ),
         _Button(
           key: mailForwardKey,
           label: Messages.mailForward,
@@ -799,6 +967,44 @@ class _MailSheetState extends State<_MailSheet> {
     );
   }
 
+  /// One removable chip per filter field that is set, above the list and
+  /// below the account/COMPOSE row.
+  Widget _filterChips() {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: <Widget>[
+        if (_filter.text.isNotEmpty)
+          _FilterChip(
+            key: mailFilterChipKey('text'),
+            label: Messages.mailFilterTextChip(_filter.text),
+            onRemove: () => _clearFilterField((f) => f.withoutText()),
+          ),
+        if (_filter.from.isNotEmpty)
+          _FilterChip(
+            key: mailFilterChipKey('from'),
+            label: Messages.mailFilterFromChip(_filter.from),
+            onRemove: () => _clearFilterField((f) => f.withoutFrom()),
+          ),
+        if (_filter.to.isNotEmpty)
+          _FilterChip(
+            key: mailFilterChipKey('to'),
+            label: Messages.mailFilterToChip(_filter.to),
+            onRemove: () => _clearFilterField((f) => f.withoutTo()),
+          ),
+        if (_filter.olderThan != null)
+          _FilterChip(
+            key: mailFilterChipKey('olderThan'),
+            label: Messages.mailFilterOlderThanChip(
+              _filter.olderThan!.amount,
+              _filter.olderThan!.unit.label,
+            ),
+            onRemove: () => _clearFilterField((f) => f.withoutOlderThan()),
+          ),
+      ],
+    );
+  }
+
   Widget _body(TextTheme text, MailResult? result) {
     if (_loading) {
       return Text(Messages.contactsLoading, style: text.bodyMedium);
@@ -806,7 +1012,10 @@ class _MailSheetState extends State<_MailSheet> {
     switch (result) {
       case MailMessages():
         if (_messages.isEmpty) {
-          return Text(Messages.mailInboxEmpty, style: text.bodyMedium);
+          return Text(
+            _filter.isEmpty ? Messages.mailInboxEmpty : Messages.mailNoMatches,
+            style: text.bodyMedium,
+          );
         }
         final DateTime now = widget.clock();
         return ListView(
@@ -928,6 +1137,147 @@ class _MailSheetState extends State<_MailSheet> {
           onTap: () => setState(() => _confirmingForget = false),
         ),
       ],
+    );
+  }
+}
+
+/// One address as a small bordered chip — the badge look From, To and Cc all
+/// share. A `null` [onTap] leaves it inert rather than hiding the border, so
+/// a busy reader still reads the same.
+class _AddressChip extends StatelessWidget {
+  const _AddressChip({super.key, required this.text, required this.onTap});
+
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: TileColors.accent,
+            width: TileMetrics.bevel,
+          ),
+        ),
+        child: Text(
+          text.toUpperCase(),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(fontSize: 13, color: TileColors.accent),
+        ),
+      ),
+    );
+  }
+}
+
+/// One applied filter, with its own X to clear just that one.
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({super.key, required this.label, required this.onRemove});
+
+  final String label;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextStyle? style = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(fontSize: 11, color: TileColors.accent);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: TileColors.accent, width: TileMetrics.bevel),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(label, style: style),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: onRemove,
+            child: Text('X', style: style),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Every address on a To or Cc line, each its own chip, wrapping onto as many
+/// lines as a narrow phone needs. Tapping one composes a fresh message to it,
+/// the same as tapping the From chip does.
+class _AddressChipRow extends StatelessWidget {
+  const _AddressChipRow({required this.participants, required this.onTap});
+
+  final List<MailParticipant> participants;
+  final void Function(String address)? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: <Widget>[
+        for (final MailParticipant p in participants)
+          _AddressChip(
+            text: p.label,
+            onTap: onTap == null ? null : () => onTap!(p.address),
+          ),
+      ],
+    );
+  }
+}
+
+/// One attachment: its name and size, with its own DOWNLOAD button.
+class _AttachmentRow extends StatelessWidget {
+  const _AttachmentRow({
+    required this.attachment,
+    required this.saving,
+    required this.onDownload,
+  });
+
+  final MailAttachment attachment;
+  final bool saving;
+  final VoidCallback? onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  attachment.name.toUpperCase(),
+                  style: text.bodySmall?.copyWith(
+                    fontSize: 12,
+                    color: TileColors.textBright,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  formatAttachmentSize(attachment.sizeBytes),
+                  style: text.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: TileColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _Button(
+            key: mailDownloadKey(attachment.name),
+            label: saving ? Messages.mailDownloading : Messages.mailDownload,
+            onTap: saving ? null : onDownload,
+          ),
+        ],
+      ),
     );
   }
 }

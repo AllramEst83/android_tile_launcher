@@ -127,6 +127,10 @@ class PermissionsChannelHandler(
             // without a dialog, the same way `MANAGE_EXTERNAL_STORAGE` reads
             // as meaningless (never checked) on Android older than 11.
             "bluetooth" to arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
+            // The QR scanner: reads a frame from the camera to decode a code,
+            // never records or takes a picture. Asked for only when the tile
+            // opens the scanner.
+            "camera" to arrayOf(Manifest.permission.CAMERA),
         )
     }
 }

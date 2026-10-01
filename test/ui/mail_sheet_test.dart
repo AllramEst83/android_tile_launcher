@@ -1,14 +1,23 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
+import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_filter_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
+import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 
+import '../fakes/fake_attachment_download_service.dart';
+import '../fakes/fake_contacts.dart';
 import '../fakes/fake_mail_service.dart';
+import '../fakes/in_memory_local_store.dart';
 
 // Monday 28 September 2026, half past ten.
 final DateTime _now = DateTime(2026, 9, 28, 10, 30);
@@ -48,10 +57,14 @@ MailOpened _opened(
   String from,
   String subject, {
   String fromAddress = '',
+  List<MailParticipant> to = const <MailParticipant>[],
+  List<MailParticipant> cc = const <MailParticipant>[],
   String text = 'Hello, this is the whole message.',
   String? html,
+  String? htmlWithImages,
   bool truncated = false,
   int attachments = 0,
+  List<MailAttachment>? attachmentList,
   bool markedRead = true,
   DateTime? date,
 }) => MailOpened(
@@ -59,11 +72,24 @@ MailOpened _opened(
     uid: uid,
     from: from,
     fromAddress: fromAddress,
+    to: to,
+    cc: cc,
     subject: subject,
     text: text,
     html: html,
+    htmlWithImages: htmlWithImages,
     truncated: truncated,
-    attachments: attachments,
+    attachments:
+        attachmentList ??
+        List<MailAttachment>.generate(
+          attachments,
+          (int i) => MailAttachment(
+            name: 'file-${i + 1}.bin',
+            sizeBytes: 1024,
+            mimeType: 'application/octet-stream',
+            bytes: Uint8List(0),
+          ),
+        ),
     markedRead: markedRead,
     date: date,
   ),
@@ -93,14 +119,33 @@ Future<void> _read(WidgetTester tester, int uid) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _open(WidgetTester tester, FakeMailService mail) async {
+/// A compose field's own text, ignoring the invisible placeholder it carries
+/// while empty with chips already in it.
+String _visibleField(WidgetTester tester, Key key) => tester
+    .widget<TextField>(find.byKey(key))
+    .controller!
+    .text
+    .replaceAll('​', '');
+
+Future<void> _open(
+  WidgetTester tester,
+  FakeMailService mail, {
+  FakeAttachmentDownloadService? attachmentDownload,
+  FakeContactsRepository? contacts,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: tileLauncherTheme(),
       home: Builder(
         builder: (BuildContext context) => TextButton(
-          onPressed: () =>
-              showMailSheet(context, mail: mail, clock: () => _now),
+          onPressed: () => showMailSheet(
+            context,
+            mail: mail,
+            attachmentDownload:
+                attachmentDownload ?? FakeAttachmentDownloadService(),
+            contacts: contacts ?? FakeContactsRepository(),
+            clock: () => _now,
+          ),
           child: const Text('open'),
         ),
       ),
@@ -267,7 +312,7 @@ void main() {
 
       await _read(tester, 11);
 
-      expect(find.text('1 ATTACHMENT NOT SHOWN.'), findsOneWidget);
+      expect(find.text('1 ATTACHMENT'), findsOneWidget);
     });
 
     testWidgets('a long message scrolls', (WidgetTester tester) async {
@@ -663,6 +708,19 @@ void main() {
       expect(find.text(Messages.mailSelectedCount(1)), findsOneWidget);
     });
 
+    testWidgets('SELECT ALL checks every message', (WidgetTester tester) async {
+      await _open(tester, _service());
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailSelectAllKey));
+      await tester.pump();
+
+      expect(find.text(Messages.mailSelectedCount(2)), findsOneWidget);
+      expect(find.byKey(mailCheckboxKey(12)), findsOneWidget);
+      expect(find.byKey(mailCheckboxKey(11)), findsOneWidget);
+    });
+
     testWidgets('DELETE is disabled until something is selected', (
       WidgetTester tester,
     ) async {
@@ -883,9 +941,12 @@ void main() {
       await tester.tap(find.byKey(composeSendKey));
       await tester.pumpAndSettle();
 
-      expect(mail.sent, <(String, String, String)>[
-        ('anna@example.com', 'Hello', 'Hi there'),
-      ]);
+      expect(mail.sent, hasLength(1));
+      final (to, cc, subject, text) = mail.sent.single;
+      expect(to, <String>['anna@example.com']);
+      expect(cc, isEmpty);
+      expect(subject, 'Hello');
+      expect(text, 'Hi there');
       expect(find.text(Messages.mailComposeTitle), findsNothing);
     });
 
@@ -900,9 +961,10 @@ void main() {
 
       expect(find.text(Messages.mailComposeTitle), findsOneWidget);
       expect(
-        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
-        'anna@example.com',
+        find.byKey(composeChipKey('to', 'anna@example.com')),
+        findsOneWidget,
       );
+      expect(_visibleField(tester, composeToKey), '');
       expect(
         tester
             .widget<TextField>(find.byKey(composeSubjectKey))
@@ -931,9 +993,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        tester.widget<TextField>(find.byKey(composeToKey)).controller?.text,
-        'anna@example.com',
+        find.byKey(composeChipKey('to', 'anna@example.com')),
+        findsOneWidget,
       );
+      expect(_visibleField(tester, composeToKey), '');
       expect(
         tester
             .widget<TextField>(find.byKey(composeSubjectKey))
@@ -983,6 +1046,179 @@ void main() {
     });
   });
 
+  group('signature', () {
+    Future<void> openWithSignature(
+      WidgetTester tester,
+      FakeMailService mail,
+      String signature,
+    ) async {
+      final SettingsState settingsState = SettingsState(
+        store: InMemoryLocalStore(),
+      );
+      await settingsState.update(
+        settingsState.settings.copyWith(mailSignature: signature),
+      );
+      await tester.pumpWidget(
+        SettingsScope(
+          state: settingsState,
+          // Above MaterialApp, not inside it: showMailSheet opens a modal
+          // route on the app's own Navigator, a sibling of `home`'s route
+          // rather than a descendant of it, so the scope must be an ancestor
+          // of the whole app to reach that route too.
+          child: MaterialApp(
+            theme: tileLauncherTheme(),
+            home: Builder(
+              builder: (BuildContext context) => TextButton(
+                onPressed: () => showMailSheet(
+                  context,
+                  mail: mail,
+                  attachmentDownload: FakeAttachmentDownloadService(),
+                  contacts: FakeContactsRepository(),
+                  clock: () => _now,
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('appended to a new blank message', (WidgetTester tester) async {
+      final FakeMailService mail = _service();
+      await openWithSignature(tester, mail, 'Sent from my launcher');
+
+      await tester.tap(find.byKey(mailComposeKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byKey(composeBodyKey)).controller?.text,
+        contains('Sent from my launcher'),
+      );
+    });
+
+    testWidgets('appended above the quote in a reply', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await openWithSignature(tester, mail, 'Kay');
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailReplyKey));
+      await tester.pumpAndSettle();
+
+      final String? text = tester
+          .widget<TextField>(find.byKey(composeBodyKey))
+          .controller
+          ?.text;
+      expect(text, contains('Kay'));
+      // Above the quote, not mixed into it.
+      expect(
+        text!.indexOf('Kay'),
+        lessThan(text.indexOf('On MON 28 SEP 09:05')),
+      );
+    });
+
+    testWidgets('no signature set adds nothing extra', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+
+      await tester.tap(find.byKey(mailComposeKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byKey(composeBodyKey)).controller?.text,
+        '',
+      );
+    });
+  });
+
+  group('to/cc and reply all', () {
+    testWidgets('shows To and Cc as tappable chips', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        fromAddress: 'anna@example.com',
+        to: const <MailParticipant>[
+          MailParticipant(address: 'kay@gmail.com', name: 'Kay'),
+        ],
+        cc: const <MailParticipant>[
+          MailParticipant(address: 'bo@example.com', name: 'Bo Berg'),
+        ],
+      );
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      expect(find.text('KAY'), findsOneWidget);
+      expect(find.text('BO BERG'), findsOneWidget);
+
+      await tester.tap(find.text('BO BERG'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.mailComposeTitle), findsOneWidget);
+      expect(
+        find.byKey(composeChipKey('to', 'bo@example.com')),
+        findsOneWidget,
+      );
+      expect(_visibleField(tester, composeToKey), '');
+    });
+
+    testWidgets('REPLY ALL is hidden with only one recipient', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      await _read(tester, 12);
+
+      expect(find.byKey(mailReplyAllKey), findsNothing);
+    });
+
+    testWidgets('REPLY ALL addresses the sender and copies the rest', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        fromAddress: 'anna@example.com',
+        to: const <MailParticipant>[
+          MailParticipant(address: 'kay@gmail.com', name: 'Kay'),
+          MailParticipant(address: 'cesar@example.com', name: 'Cesar'),
+        ],
+        cc: const <MailParticipant>[
+          MailParticipant(address: 'bo@example.com', name: 'Bo Berg'),
+        ],
+      );
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      expect(find.byKey(mailReplyAllKey), findsOneWidget);
+      await tester.tap(find.byKey(mailReplyAllKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(composeChipKey('to', 'anna@example.com')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(composeChipKey('cc', 'cesar@example.com')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(composeChipKey('cc', 'bo@example.com')),
+        findsOneWidget,
+      );
+      expect(_visibleField(tester, composeCcKey), '');
+    });
+  });
+
   group('rich body', () {
     testWidgets('a message with markup renders it rich, not as raw tags', (
       WidgetTester tester,
@@ -1013,6 +1249,124 @@ void main() {
 
       expect(find.byKey(mailBodyKey), findsOneWidget);
       expect(tester.widget(find.byKey(mailBodyKey)), isA<SelectableText>());
+    });
+  });
+
+  group('attachments and images', () {
+    testWidgets('lists each attachment with its size, and downloads it', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      final Uint8List bytes = Uint8List.fromList(List<int>.filled(2048, 1));
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        attachmentList: <MailAttachment>[
+          MailAttachment(
+            name: 'menu.pdf',
+            sizeBytes: bytes.length,
+            mimeType: 'application/pdf',
+            bytes: bytes,
+          ),
+        ],
+      );
+      final FakeAttachmentDownloadService downloads =
+          FakeAttachmentDownloadService();
+      await _open(tester, mail, attachmentDownload: downloads);
+      await _read(tester, 12);
+
+      expect(find.text('1 ATTACHMENT'), findsOneWidget);
+      expect(find.text('MENU.PDF'), findsOneWidget);
+      expect(find.text('2.0 KB'), findsOneWidget);
+
+      await tester.tap(find.byKey(mailDownloadKey('menu.pdf')));
+      await tester.pumpAndSettle();
+
+      expect(downloads.saves, <(int, String, String)>[
+        (2048, 'menu.pdf', 'application/pdf'),
+      ]);
+      expect(find.text(Messages.mailDownloaded), findsOneWidget);
+    });
+
+    testWidgets('a failed download says so', (WidgetTester tester) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        attachmentList: <MailAttachment>[
+          MailAttachment(
+            name: 'menu.pdf',
+            sizeBytes: 10,
+            mimeType: 'application/pdf',
+            bytes: Uint8List(10),
+          ),
+        ],
+      );
+      await _open(
+        tester,
+        mail,
+        attachmentDownload: FakeAttachmentDownloadService(
+          AttachmentSaveResult.failed,
+        ),
+      );
+      await _read(tester, 12);
+
+      await tester.tap(find.byKey(mailDownloadKey('menu.pdf')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('${Messages.failedPrefix}${Messages.mailDownloadFailed}'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('SHOW IMAGES reveals pictures, hidden until then', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        html: '<p>See the menu</p>',
+        htmlWithImages:
+            '<p>See the menu</p><img src="data:image/png;base64,x">',
+      );
+      await _open(tester, mail);
+      await _read(tester, 12);
+
+      expect(find.byKey(mailShowImagesKey), findsOneWidget);
+      final HtmlWidget before = tester.widget(find.byKey(mailBodyKey));
+      expect(before.html, '<p>See the menu</p>');
+
+      await tester.tap(find.byKey(mailShowImagesKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailShowImagesKey), findsNothing);
+      final HtmlWidget after = tester.widget(find.byKey(mailBodyKey));
+      expect(
+        after.html,
+        '<p>See the menu</p><img src="data:image/png;base64,x">',
+      );
+    });
+
+    testWidgets('no pictures to reveal: no SHOW IMAGES button', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.readResults[12] = _opened(
+        12,
+        'Anna Andersson',
+        'Lunch on Friday?',
+        html: '<p>No pictures here</p>',
+      );
+      await _open(tester, mail);
+
+      await _read(tester, 12);
+
+      expect(find.byKey(mailShowImagesKey), findsNothing);
     });
   });
 
@@ -1070,6 +1424,175 @@ void main() {
           .getRect(find.byKey(mailRefreshKey))
           .right;
       expect(nextRight, closeTo(refreshRight, 0.5));
+    });
+  });
+
+  group('filter', () {
+    testWidgets('FILTER opens the pane', (WidgetTester tester) async {
+      await _open(tester, _service());
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.mailFilterTitle), findsOneWidget);
+    });
+
+    testWidgets('applying a text filter searches, and shows a chip', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'lunch');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.searches, <MailFilter>[const MailFilter(text: 'lunch')]);
+      expect(find.byKey(mailFilterChipKey('text')), findsOneWidget);
+      expect(find.text(Messages.mailFilterTextChip('lunch')), findsOneWidget);
+    });
+
+    testWidgets('an older-than filter chips with its amount and unit', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterOlderThanAmountKey), '3');
+      await tester.tap(find.byKey(mailFilterUnitKey(MailAgeUnit.weeks)));
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.searches, <MailFilter>[
+        const MailFilter(olderThan: MailOlderThan(3, MailAgeUnit.weeks)),
+      ]);
+      expect(
+        find.text(Messages.mailFilterOlderThanChip(3, MailAgeUnit.weeks.label)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('no matches says so, distinct from an empty inbox', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'nope');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.mailNoMatches), findsOneWidget);
+      expect(find.text(Messages.mailInboxEmpty), findsNothing);
+    });
+
+    testWidgets("a chip's own X clears just that filter", (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'lunch');
+      await tester.enterText(find.byKey(mailFilterFromKey), 'anna@example.com');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+      mail.searches.clear();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(mailFilterChipKey('text')),
+          matching: find.text('X'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailFilterChipKey('text')), findsNothing);
+      expect(find.byKey(mailFilterChipKey('from')), findsOneWidget);
+      expect(mail.searches, <MailFilter>[
+        const MailFilter(from: 'anna@example.com'),
+      ]);
+    });
+
+    testWidgets('CLEAR ALL removes every filter and goes back to latest', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'lunch');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+      final int countsBefore = mail.counts.length;
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(mailFilterClearKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailFilterChipKey('text')), findsNothing);
+      expect(mail.counts.length, countsBefore + 1);
+      expect(find.text('* ANNA ANDERSSON'), findsOneWidget);
+    });
+
+    testWidgets('reopening the pane shows the filter already applied', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterTextKey), 'lunch');
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(mailFilterTextKey))
+            .controller
+            ?.text,
+        'lunch',
+      );
     });
   });
 

@@ -13,9 +13,11 @@ import 'package:android_tile_launcher/services/agenda_tile_source.dart';
 import 'package:android_tile_launcher/services/alarm_service.dart';
 import 'package:android_tile_launcher/services/alarm_tile_source.dart';
 import 'package:android_tile_launcher/services/app_repository.dart';
+import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/services/bluetooth_service.dart';
 import 'package:android_tile_launcher/services/bluetooth_tile_source.dart';
 import 'package:android_tile_launcher/services/clock_tile_source.dart';
+import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/mail_tile_source.dart';
@@ -46,6 +48,8 @@ import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
 import 'package:android_tile_launcher/ui/press_listener.dart';
+import 'package:android_tile_launcher/ui/qr_scanner_screen.dart';
+import 'package:android_tile_launcher/ui/qr_scanner_tile_view.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/state_tile_view.dart';
 import 'package:android_tile_launcher/ui/text_tv_screen.dart';
@@ -295,7 +299,14 @@ Widget tileContent(
             ink: tile.colour.ink,
             onTap: interactive
                 ? () => unawaited(
-                    _mailTap(context, mail, mailContent.result, refreshNow),
+                    _mailTap(
+                      context,
+                      mail,
+                      mailContent.result,
+                      refreshNow,
+                      attachmentDownload: services.attachmentDownload,
+                      contacts: services.contacts,
+                    ),
                   )
                 : null,
           );
@@ -341,6 +352,24 @@ Widget tileContent(
           onTap: interactive
               ? () =>
                     unawaited(showFilesSheet(context, service: services.files))
+              : null,
+        ),
+      );
+    case TileKind.qrScanner:
+      // Nothing to read from outside either: it opens the scanner, and that
+      // is all it does.
+      return Builder(
+        builder: (context) => QrScannerTileContentView(
+          ink: tile.colour.ink,
+          onTap: interactive
+              ? () => unawaited(
+                  showQrScannerScreen(
+                    context,
+                    camera: services.camera,
+                    link: services.link,
+                    clipboard: services.clipboard,
+                  ),
+                )
               : null,
         ),
       );
@@ -499,13 +528,20 @@ Future<void> _mailTap(
   BuildContext context,
   MailService mail,
   MailResult result,
-  VoidCallback refreshNow,
-) async {
+  VoidCallback refreshNow, {
+  required AttachmentDownloadService attachmentDownload,
+  required ContactsRepository contacts,
+}) async {
   switch (result) {
     case MailNotSetUp():
       await showMailSetupSheet(context, mail: mail);
     case MailMessages():
-      await showMailSheet(context, mail: mail);
+      await showMailSheet(
+        context,
+        mail: mail,
+        attachmentDownload: attachmentDownload,
+        contacts: contacts,
+      );
     case MailUnavailable():
       // A saved account that cannot be read (its key is gone) never will be:
       // set it up again. Anything else is worth another try.

@@ -39,15 +39,15 @@ void main() {
       ((await service.all()) as ContactsRead).contacts;
 
   test('asks for all, and never for permission', () async {
-    MethodCall? seen;
+    final List<String> seen = <String>[];
     _mockChannel((call) async {
-      seen = call;
+      seen.add(call.method);
       return <Object?>[];
     });
 
     await service.all();
 
-    expect(seen?.method, 'all');
+    expect(seen, contains('all'));
   });
 
   test('one contact per lookup key, numbers in the order given', () async {
@@ -130,5 +130,71 @@ void main() {
     _mockChannel((call) => throw MissingPluginException());
 
     expect(await service.all(), isA<ContactsUnavailable>());
+  });
+
+  group('emails', () {
+    test('attaches emails to the matching contact, by key', () async {
+      _mockChannel((call) async {
+        if (call.method == 'emails') {
+          return <Object?>[
+            <String, Object?>{'key': 'k1', 'email': 'anna@example.com'},
+            <String, Object?>{'key': 'k1', 'email': 'anna@work.com'},
+          ];
+        }
+        return <Object?>[
+          _row('k1', 'Anna', '070-1'),
+          _row('k2', 'Bo', '070-2'),
+        ];
+      });
+
+      final List<Contact> found = await read();
+
+      expect(found.firstWhere((c) => c.key == 'k1').emails, <String>[
+        'anna@example.com',
+        'anna@work.com',
+      ]);
+      expect(found.firstWhere((c) => c.key == 'k2').emails, isEmpty);
+    });
+
+    test('an email with no matching contact is dropped', () async {
+      _mockChannel((call) async {
+        if (call.method == 'emails') {
+          return <Object?>[
+            <String, Object?>{'key': 'unknown', 'email': 'x@example.com'},
+          ];
+        }
+        return <Object?>[_row('k1', 'Anna', '070-1')];
+      });
+
+      expect((await read()).single.emails, isEmpty);
+    });
+
+    test('a duplicate email is kept once', () async {
+      _mockChannel((call) async {
+        if (call.method == 'emails') {
+          return <Object?>[
+            <String, Object?>{'key': 'k1', 'email': 'anna@example.com'},
+            <String, Object?>{'key': 'k1', 'email': 'anna@example.com'},
+          ];
+        }
+        return <Object?>[_row('k1', 'Anna', '070-1')];
+      });
+
+      expect((await read()).single.emails, <String>['anna@example.com']);
+    });
+
+    test('emails failing is no reason to fail the whole read', () async {
+      _mockChannel((call) async {
+        if (call.method == 'emails') {
+          throw PlatformException(code: 'QUERY_FAILED');
+        }
+        return <Object?>[_row('k1', 'Anna', '070-1')];
+      });
+
+      final List<Contact> found = await read();
+
+      expect(found.single.name, 'Anna');
+      expect(found.single.emails, isEmpty);
+    });
   });
 }

@@ -385,6 +385,15 @@ void main() {
     expect(repository.betweenCalls, greaterThan(before));
   });
 
+  testWidgets('the close key closes the sheet', (WidgetTester tester) async {
+    await _open(tester, withEvents());
+
+    await tester.tap(find.byKey(agendaCloseKey));
+    await tester.pumpAndSettle();
+
+    expect(find.text(Messages.agendaTitle), findsNothing);
+  });
+
   group('week grid', () {
     testWidgets('WEEK:GRID shows the week as a time grid', (
       WidgetTester tester,
@@ -540,6 +549,49 @@ void main() {
           .widget<WeekView<CalendarEvent>>(find.byType(WeekView<CalendarEvent>))
           .heightPerMinute;
       expect(after, before);
+    });
+
+    testWidgets('the zoom a pinch leaves is saved, and offered next time', (
+      WidgetTester tester,
+    ) async {
+      final SettingsState settings = SettingsState(store: InMemoryLocalStore());
+      await _open(tester, withEvents(), settings: settings);
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+      expect(settings.settings.agendaGridZoom, 1);
+
+      final Offset center = tester.getCenter(find.byKey(agendaGridKey));
+      final TestGesture finger1 = await tester.startGesture(
+        center + const Offset(0, -20),
+      );
+      final TestGesture finger2 = await tester.startGesture(
+        center + const Offset(0, 20),
+      );
+      await tester.pump();
+      await finger1.moveBy(const Offset(0, -40));
+      await finger2.moveBy(const Offset(0, 40));
+      await tester.pump();
+      await finger1.up();
+      await finger2.up();
+      await tester.pumpAndSettle();
+
+      final double zoomed = settings.settings.agendaGridZoom;
+      expect(zoomed, greaterThan(1));
+
+      // Stepping to another week tears the grid down and rebuilds it fresh
+      // (this is what used to reset the zoom): it should come back at the
+      // saved level, not the package's own default.
+      await tester.tap(find.byKey(agendaNavForwardKey));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<WeekView<CalendarEvent>>(
+              find.byType(WeekView<CalendarEvent>),
+            )
+            .heightPerMinute,
+        zoomed,
+      );
     });
   });
 
