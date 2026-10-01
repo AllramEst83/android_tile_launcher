@@ -327,6 +327,7 @@ abstract final class Messages {
 
   static const String filesTitle = 'FILES';
   static const String filesSubtitle = 'BROWSE STORAGE';
+  static const String filesRoot = 'STORAGE';
   static const String filesTapToAllow = 'TAP TO ALLOW FILE ACCESS';
   static const String filesLoading = 'LOADING...';
   static const String filesEmpty = 'NOTHING HERE.';
@@ -335,6 +336,39 @@ abstract final class Messages {
   static String filesDeleteAsk(String name) =>
       'DELETE "$name"? THIS CAN\'T BE UNDONE.';
   static const String filesDeleteFailed = 'COULD NOT DELETE THAT.';
+
+  static const String filesColumnName = 'NAME';
+  static const String filesColumnModified = 'MODIFIED';
+  static const String filesColumnSize = 'SIZE';
+  static String filesItemCount(int n) => '$n ITEMS';
+
+  static const String filesSearch = 'SEARCH';
+
+  static const String filesSelect = 'SELECT';
+  static const String filesSelectAll = 'SELECT ALL';
+  static const String filesCancelSelect = 'CANCEL';
+  static String filesSelectedCount(int n) => '$n SELECTED';
+  static String filesDeleteSelected(int n) => 'DELETE ($n)';
+  static String filesBulkTrashAsk(int n) =>
+      'DELETE $n ITEMS? THIS CAN\'T BE UNDONE.';
+  static String filesBulkDeleting(int done, int total) =>
+      'DELETING $done OF $total...';
+  static String filesBulkDeleted(int n) => '$n DELETED';
+
+  static const String filesFilter = 'FILTER';
+  static const String filesFilterTitle = 'FILTER FILES';
+  static const String filesFilterText = 'NAME CONTAINS';
+  static const String filesFilterType = 'TYPE';
+  static const String filesFilterOlderThan = 'OLDER THAN';
+  static const String filesFilterNewerThan = 'NEWER THAN';
+  static const String filesFilterApply = 'APPLY';
+  static const String filesFilterClear = 'CLEAR ALL';
+  static String filesFilterTextChip(String text) =>
+      'NAME: ${text.toUpperCase()}';
+  static String filesFilterTypeChip(String type) => 'TYPE: $type';
+  static String filesFilterAgeChip(bool older, int amount, String unit) =>
+      '${older ? 'OLDER' : 'NEWER'} THAN $amount $unit';
+  static const String filesNoMatches = 'NOTHING MATCHES THESE FILTERS.';
 
   static const String qrScannerTitle = 'QR SCANNER';
   static const String qrScannerSubtitle = 'SCAN A CODE';

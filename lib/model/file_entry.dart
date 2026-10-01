@@ -8,6 +8,8 @@ class FileEntry {
     required this.path,
     required this.isDirectory,
     required this.sizeBytes,
+    this.modified,
+    this.itemCount,
   });
 
   final String name;
@@ -18,18 +20,33 @@ class FileEntry {
   final bool isDirectory;
   final int sizeBytes;
 
+  /// When it was last changed, local time; `null` only if the platform could
+  /// not be asked (an unreadable entry, or a synthetic one like a storage
+  /// root) — never left out just because this is a folder, unlike
+  /// [sizeBytes].
+  final DateTime? modified;
+
+  /// How many entries are directly inside it; `null` for a file (meaningless)
+  /// or a folder that could not be counted. Stands in for [sizeBytes], which
+  /// a folder never gets a real value for.
+  final int? itemCount;
+
   @override
   bool operator ==(Object other) =>
       other is FileEntry &&
       other.name == name &&
       other.path == path &&
       other.isDirectory == isDirectory &&
-      other.sizeBytes == sizeBytes;
+      other.sizeBytes == sizeBytes &&
+      other.modified == modified &&
+      other.itemCount == itemCount;
 
   @override
-  int get hashCode => Object.hash(name, path, isDirectory, sizeBytes);
+  int get hashCode =>
+      Object.hash(name, path, isDirectory, sizeBytes, modified, itemCount);
 
   @override
   String toString() =>
-      'FileEntry($path, ${isDirectory ? 'dir' : '$sizeBytes bytes'})';
+      'FileEntry($path, ${isDirectory ? 'dir' : '$sizeBytes bytes'}, '
+      'modified: $modified, itemCount: $itemCount)';
 }

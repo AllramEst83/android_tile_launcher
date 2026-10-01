@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/file_filter.dart';
 import 'package:android_tile_launcher/model/scene_animation.dart';
 
 /// How the launcher looks: the screen it draws on.
@@ -87,6 +88,8 @@ class LauncherSettings {
     this.lastUsedCalendarId,
     this.mailSignature = '',
     this.sceneAnimation = SceneAnimation.rocket,
+    this.fileSortKey = FileSortKey.modified,
+    this.fileSortAscending = false,
   });
 
   final ThemeVariant theme;
@@ -144,6 +147,13 @@ class LauncherSettings {
   /// to configure about it, so a whole settings section would be one field).
   final SceneAnimation sceneAnimation;
 
+  /// How the file explorer's grid is sorted, and which direction — last
+  /// chosen by tapping a column header there, not on the settings screen.
+  /// Remembered UI state, the same as [agendaGridZoom]; defaults to MODIFIED,
+  /// newest first.
+  final FileSortKey fileSortKey;
+  final bool fileSortAscending;
+
   /// The column counts the settings screen offers.
   static const List<int> columnChoices = <int>[4, 6];
 
@@ -176,6 +186,8 @@ class LauncherSettings {
     int? lastUsedCalendarId,
     String? mailSignature,
     SceneAnimation? sceneAnimation,
+    FileSortKey? fileSortKey,
+    bool? fileSortAscending,
   }) => LauncherSettings(
     theme: theme ?? this.theme,
     columns: columns ?? this.columns,
@@ -192,6 +204,8 @@ class LauncherSettings {
     lastUsedCalendarId: lastUsedCalendarId ?? this.lastUsedCalendarId,
     mailSignature: mailSignature ?? this.mailSignature,
     sceneAnimation: sceneAnimation ?? this.sceneAnimation,
+    fileSortKey: fileSortKey ?? this.fileSortKey,
+    fileSortAscending: fileSortAscending ?? this.fileSortAscending,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -210,6 +224,8 @@ class LauncherSettings {
     'lastUsedCalendarId': lastUsedCalendarId,
     'mailSignature': mailSignature,
     'sceneAnimation': sceneAnimation.name,
+    'fileSortKey': fileSortKey.name,
+    'fileSortAscending': fileSortAscending,
   };
 
   /// Settings from what [toJson] wrote. Never throws: a choice that is missing,
@@ -274,6 +290,14 @@ class LauncherSettings {
         json['sceneAnimation'],
         defaults.sceneAnimation,
       ),
+      fileSortKey: pick(
+        FileSortKey.values,
+        json['fileSortKey'],
+        defaults.fileSortKey,
+      ),
+      fileSortAscending: json['fileSortAscending'] is bool
+          ? json['fileSortAscending']! as bool
+          : defaults.fileSortAscending,
     );
   }
 
@@ -294,7 +318,9 @@ class LauncherSettings {
       other.agendaGridZoom == agendaGridZoom &&
       other.lastUsedCalendarId == lastUsedCalendarId &&
       other.mailSignature == mailSignature &&
-      other.sceneAnimation == sceneAnimation;
+      other.sceneAnimation == sceneAnimation &&
+      other.fileSortKey == fileSortKey &&
+      other.fileSortAscending == fileSortAscending;
 
   @override
   int get hashCode => Object.hash(
@@ -313,9 +339,11 @@ class LauncherSettings {
     lastUsedCalendarId,
     mailSignature,
     sceneAnimation,
+    fileSortKey,
+    fileSortAscending,
   );
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, agendaGridZoom: $agendaGridZoom, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature, sceneAnimation: $sceneAnimation)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, agendaGridZoom: $agendaGridZoom, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature, sceneAnimation: $sceneAnimation, fileSortKey: $fileSortKey, fileSortAscending: $fileSortAscending)';
 }

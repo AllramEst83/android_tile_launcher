@@ -1,3 +1,4 @@
+import 'package:android_tile_launcher/model/file_filter.dart';
 import 'package:android_tile_launcher/model/scene_animation.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,6 +52,8 @@ void main() {
         lastUsedCalendarId: 7,
         mailSignature: 'Sent from my launcher',
         sceneAnimation: SceneAnimation.flower,
+        fileSortKey: FileSortKey.name,
+        fileSortAscending: true,
       );
 
       expect(LauncherSettings.fromJson(settings.toJson()), settings);
@@ -94,6 +97,32 @@ void main() {
       );
 
       expect(settings.sceneAnimation, SceneAnimation.rocket);
+    });
+
+    test('fileSortKey defaults to MODIFIED, newest first', () {
+      expect(const LauncherSettings().fileSortKey, FileSortKey.modified);
+      expect(const LauncherSettings().fileSortAscending, isFalse);
+    });
+
+    test('a fileSortKey not one of the three is ignored, not fatal', () {
+      final LauncherSettings settings = LauncherSettings.fromJson(
+        <String, Object?>{'fileSortKey': 'date added'},
+      );
+
+      expect(settings.fileSortKey, FileSortKey.modified);
+    });
+
+    test('fileSortAscending that is not a true or false is false', () {
+      expect(
+        LauncherSettings.fromJson(<String, Object?>{'fileSortAscending': 'yes'})
+            .fileSortAscending,
+        isFalse,
+      );
+      expect(
+        LauncherSettings.fromJson(<String, Object?>{'fileSortAscending': true})
+            .fileSortAscending,
+        isTrue,
+      );
     });
 
     test('a lastUsedCalendarId of the wrong type is ignored, not fatal', () {

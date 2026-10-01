@@ -135,7 +135,7 @@ void main() {
       expect(await noAccess.list(root.path), isA<FilesNoAccess>());
     });
 
-    test('folders before files, biggest first within each', () async {
+    test('a stable base order: alphabetical by name either way', () async {
       await File('${root.path}/small.txt').writeAsString('0123456789');
       await Directory('${root.path}/Photos').create();
       await File('${root.path}/big.bin').writeAsBytes(List.filled(9000, 0));
@@ -144,16 +144,58 @@ void main() {
 
       expect(result, isA<FilesListed>());
       final entries = (result as FilesListed).entries;
+      // Case-insensitive: 'Photos' sorts with the lower-case names around it,
+      // not before them by its capital P alone.
       expect(entries.map((e) => e.name), <String>[
-        'Photos',
         'big.bin',
+        'Photos',
         'small.txt',
       ]);
-      expect(entries[0].isDirectory, isTrue);
-      expect(entries[0].sizeBytes, 0);
-      expect(entries[1].sizeBytes, 9000);
-      expect(entries[2].sizeBytes, 10);
+      final photos = entries.firstWhere((e) => e.name == 'Photos');
+      expect(photos.isDirectory, isTrue);
+      expect(photos.sizeBytes, 0);
+      expect(entries.firstWhere((e) => e.name == 'big.bin').sizeBytes, 9000);
+      expect(entries.firstWhere((e) => e.name == 'small.txt').sizeBytes, 10);
     });
+
+    test('a file carries its real modified time', () async {
+      final file = File('${root.path}/a.txt')..writeAsStringSync('x');
+      final DateTime before = DateTime.now().subtract(
+        const Duration(seconds: 5),
+      );
+
+      final entries = ((await service.list(root.path)) as FilesListed).entries;
+
+      final DateTime? modified = entries.single.modified;
+      expect(modified, isNotNull);
+      expect(modified!.isAfter(before), isTrue);
+      // `file` isn't otherwise used, besides creating the entry under test.
+      expect(file.path, isNotEmpty);
+    });
+
+    test('a folder carries its own item count, not a size', () async {
+      final dir = Directory('${root.path}/Photos')..createSync();
+      File('${dir.path}/a.jpg').writeAsStringSync('x');
+      File('${dir.path}/b.jpg').writeAsStringSync('x');
+
+      final entries = ((await service.list(root.path)) as FilesListed).entries;
+
+      final photos = entries.single;
+      expect(photos.sizeBytes, 0);
+      expect(photos.itemCount, 2);
+    });
+
+    test(
+      "a file's itemCount is null — meaningless for anything but a folder",
+      () async {
+        await File('${root.path}/a.txt').writeAsString('x');
+
+        final entries =
+            ((await service.list(root.path)) as FilesListed).entries;
+
+        expect(entries.single.itemCount, isNull);
+      },
+    );
 
     test('a path is the real filesystem path, not a synthetic one', () async {
       await File('${root.path}/a.txt').writeAsString('x');

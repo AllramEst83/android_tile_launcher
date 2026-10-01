@@ -99,12 +99,25 @@ class AndroidFilesService implements FilesService {
       await for (final FileSystemEntity child in directory.list()) {
         final bool isDirectory = child is Directory;
         int size = 0;
-        if (!isDirectory) {
+        int? itemCount;
+        DateTime? modified;
+        try {
+          modified = (await child.stat()).modified;
+        } on FileSystemException {
+          // Unreadable for whatever reason; left blank rather than dropped,
+          // so it is still there to delete.
+        }
+        if (isDirectory) {
+          try {
+            itemCount = await child.list().length;
+          } on FileSystemException {
+            // Same as above: blank, not dropped.
+          }
+        } else {
           try {
             size = await (child as File).length();
           } on FileSystemException {
-            // Unreadable for whatever reason; shown as 0 B rather than
-            // dropped, so it is still there to delete.
+            // Same as above: shown as 0 B rather than dropped.
           }
         }
         entries.add(
@@ -113,10 +126,19 @@ class AndroidFilesService implements FilesService {
             path: child.path,
             isDirectory: isDirectory,
             sizeBytes: size,
+            modified: modified,
+            itemCount: itemCount,
           ),
         );
       }
-      return FilesListed(_sorted(entries));
+      // A stable base order; sorting the way the user actually wants it
+      // (by name, MODIFIED or SIZE, either direction) is the sheet's own job
+      // now that it is interactive rather than a fixed service-side choice.
+      entries.sort(
+        (FileEntry a, FileEntry b) =>
+            a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+      return FilesListed(entries);
     } on FileSystemException catch (error) {
       return FilesUnavailable(error.osError?.message ?? error.message);
     } catch (error) {
@@ -156,18 +178,6 @@ class AndroidFilesService implements FilesService {
   static String _basename(String path) {
     final int slash = path.lastIndexOf(RegExp(r'[/\\]'));
     return slash < 0 ? path : path.substring(slash + 1);
-  }
-
-  /// Folders before files (browsing a tree reads better than a flat list
-  /// sorted purely by size), biggest first within each — the size a reader
-  /// most wants "what's taking up space" to answer.
-  static List<FileEntry> _sorted(List<FileEntry> entries) {
-    final List<FileEntry> sorted = List<FileEntry>.of(entries)
-      ..sort((FileEntry a, FileEntry b) {
-        if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
-        return b.sizeBytes.compareTo(a.sizeBytes);
-      });
-    return sorted;
   }
 
   static String _reason(Object error) =>

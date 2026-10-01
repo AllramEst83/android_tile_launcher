@@ -347,8 +347,13 @@ Widget tileContent(
         builder: (context) => FilesTileContentView(
           ink: tile.colour.ink,
           onTap: interactive
-              ? () =>
-                    unawaited(showFilesSheet(context, service: services.files))
+              ? () => unawaited(
+                  showFilesSheet(
+                    context,
+                    service: services.files,
+                    settings: SettingsScope.stateOf(context)!,
+                  ),
+                )
               : null,
         ),
       );
