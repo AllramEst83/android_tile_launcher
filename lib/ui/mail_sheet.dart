@@ -28,13 +28,10 @@ const Key mailTrashKey = ValueKey<String>('mail-trash');
 const Key mailTrashYesKey = ValueKey<String>('mail-trash-yes');
 const Key mailTrashNoKey = ValueKey<String>('mail-trash-no');
 const Key mailRefreshKey = ValueKey<String>('mail-refresh');
-const Key mailForgetKey = ValueKey<String>('mail-forget');
 const Key mailBackKey = ValueKey<String>('mail-back');
 const Key mailMarkKey = ValueKey<String>('mail-mark');
 const Key mailReaderKey = ValueKey<String>('mail-reader');
 const Key mailBodyKey = ValueKey<String>('mail-body');
-const Key mailForgetYesKey = ValueKey<String>('mail-forget-yes');
-const Key mailForgetNoKey = ValueKey<String>('mail-forget-no');
 const Key mailSelectKey = ValueKey<String>('mail-select');
 const Key mailSelectAllKey = ValueKey<String>('mail-select-all');
 const Key mailCancelSelectKey = ValueKey<String>('mail-cancel-select');
@@ -89,8 +86,8 @@ DateTime _systemNow() => DateTime.now();
 /// message is not) and TRASH, which asks again before moving it to the server's
 /// Trash (never deleting it outright); tapping the sender's own address opens
 /// a reply, addressed to them with the subject prefixed `RE:`. The list also
-/// has COMPOSE (a blank message), REFRESH, and FORGET ACCOUNT (which asks
-/// first, then removes the account and its password from the phone).
+/// has COMPOSE (a blank message) and REFRESH. FORGET ACCOUNT lives in
+/// Settings, under MAIL.
 Future<void> showMailSheet(
   BuildContext context, {
   required MailService mail,
@@ -157,7 +154,6 @@ class _MailSheetState extends State<_MailSheet> {
   final Set<String> _downloading = <String>{};
 
   int? _confirmingTrash;
-  bool _confirmingForget = false;
   bool _busy = false;
   String? _status;
 
@@ -411,13 +407,6 @@ class _MailSheetState extends State<_MailSheet> {
       _status = Messages.mailBulkMoved(moved);
     });
     await _load();
-  }
-
-  Future<void> _forget() async {
-    setState(() => _busy = true);
-    await widget.mail.forget();
-    if (!mounted) return;
-    Navigator.pop(context);
   }
 
   void _revealImages() => setState(() => _showImages = true);
@@ -760,10 +749,6 @@ class _MailSheetState extends State<_MailSheet> {
                   ),
                 ),
               ),
-            if (open == null && !_selecting) ...<Widget>[
-              const SizedBox(height: TileMetrics.gutter),
-              _forgetRow(text),
-            ],
           ],
         ),
       ),
@@ -1100,44 +1085,6 @@ class _MailSheetState extends State<_MailSheet> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _forgetRow(TextTheme text) {
-    if (!_confirmingForget) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: _Button(
-          key: mailForgetKey,
-          label: Messages.mailForget,
-          onTap: _busy ? null : () => setState(() => _confirmingForget = true),
-        ),
-      );
-    }
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: Text(
-            Messages.mailForgetAsk,
-            style: text.bodySmall?.copyWith(
-              fontSize: 11,
-              color: TileColors.highlight,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        _Button(
-          key: mailForgetYesKey,
-          label: Messages.mailYes,
-          onTap: _busy ? null : _forget,
-        ),
-        const SizedBox(width: 8),
-        _Button(
-          key: mailForgetNoKey,
-          label: Messages.mailNo,
-          onTap: () => setState(() => _confirmingForget = false),
-        ),
-      ],
     );
   }
 }

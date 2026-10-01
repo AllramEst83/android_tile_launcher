@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/layout_export.dart';
+import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/wallpaper.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
@@ -65,6 +66,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool? _isHome;
   bool _homeKnown = false;
 
+  MailAccountInfo? _mailAccount;
+  bool _mailAccountKnown = false;
+
   // A change that cannot be taken back asks first: what it will do, and the
   // action to run on YES.
   String? _ask;
@@ -90,6 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkHome();
+    _checkMailAccount();
   }
 
   @override
@@ -111,6 +116,25 @@ class _SettingsScreenState extends State<SettingsScreen>
     setState(() {
       _isHome = isHome;
       _homeKnown = true;
+    });
+  }
+
+  Future<void> _checkMailAccount() async {
+    final MailAccountInfo? account = await widget.services.mail.account();
+    if (!mounted) return;
+    setState(() {
+      _mailAccount = account;
+      _mailAccountKnown = true;
+    });
+  }
+
+  Future<void> _forgetMail() async {
+    await widget.services.mail.forget();
+    if (!mounted) return;
+    setState(() {
+      _mailAccount = null;
+      _where = 'mail';
+      _message = Messages.settingsMailForgotten;
     });
   }
 
@@ -535,6 +559,12 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Widget _mailSection() {
+    final MailAccountInfo? account = _mailAccount;
+    final String status = !_mailAccountKnown
+        ? Messages.settingsMailChecking
+        : account == null
+        ? Messages.settingsMailNotSetUp
+        : account.email.toUpperCase();
     return SectionBox(
       title: Messages.settingsMail,
       children: <Widget>[
@@ -562,6 +592,33 @@ class _SettingsScreenState extends State<SettingsScreen>
               widget.settings.update(_current.copyWith(mailSignature: value)),
         ),
         const _Note(text: Messages.settingsSignatureNote),
+        const SizedBox(height: TileMetrics.gutter),
+        _Label(text: Messages.settingsMailAccount),
+        Text(
+          status,
+          key: settingsKey('mail-account-status'),
+          style: TextStyle(
+            fontFamily: kPixelFontFamily,
+            fontSize: 12,
+            color: account != null ? TileColors.accent : TileColors.textBright,
+          ),
+        ),
+        const SizedBox(height: TileMetrics.gutter),
+        PadKey(
+          key: settingsKey('forget-mail'),
+          label: Messages.mailForget,
+          height: 44,
+          fontSize: 10,
+          accent: true,
+          onTap: account == null
+              ? null
+              : () => _askThen(
+                  Messages.mailForgetAsk,
+                  _forgetMail,
+                  where: 'mail',
+                ),
+        ),
+        ..._feedback('mail'),
       ],
     );
   }

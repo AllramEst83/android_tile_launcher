@@ -220,7 +220,6 @@ void main() {
       // The list gives way to the pane.
       expect(find.byKey(mailMessageKey(11)), findsNothing);
       expect(find.byKey(mailRefreshKey), findsNothing);
-      expect(find.byKey(mailForgetKey), findsNothing);
       expect(mail.reads, <(int, int?)>[(12, 77)]);
     });
 
@@ -642,50 +641,6 @@ void main() {
         find.text('FAILED: NO TRASH FOLDER ON IMAP.GMAIL.COM'),
         findsOneWidget,
       );
-    });
-  });
-
-  group('forget', () {
-    testWidgets('FORGET asks first, and nothing is forgotten until YES', (
-      WidgetTester tester,
-    ) async {
-      final FakeMailService mail = _service();
-      await _open(tester, mail);
-
-      await tester.tap(find.byKey(mailForgetKey));
-      await tester.pump();
-
-      expect(find.text(Messages.mailForgetAsk), findsOneWidget);
-      expect(mail.forgets, 0);
-    });
-
-    testWidgets('NO backs out', (WidgetTester tester) async {
-      final FakeMailService mail = _service();
-      await _open(tester, mail);
-      await tester.tap(find.byKey(mailForgetKey));
-      await tester.pump();
-
-      await tester.tap(find.byKey(mailForgetNoKey));
-      await tester.pump();
-
-      expect(find.byKey(mailForgetKey), findsOneWidget);
-      expect(mail.forgets, 0);
-    });
-
-    testWidgets('YES forgets the account and closes the sheet', (
-      WidgetTester tester,
-    ) async {
-      final FakeMailService mail = _service();
-      await _open(tester, mail);
-      await tester.tap(find.byKey(mailForgetKey));
-      await tester.pump();
-
-      await tester.tap(find.byKey(mailForgetYesKey));
-      await tester.pumpAndSettle();
-
-      expect(mail.forgets, 1);
-      expect(mail.saved, isNull);
-      expect(find.byKey(mailForgetKey), findsNothing);
     });
   });
 

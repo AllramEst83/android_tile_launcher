@@ -119,7 +119,7 @@ lib/
     app_icon.dart            # AppIcon: an app's icon from an AppIconLoader, with a fallback while it loads / when it has none / with APP ICONS off
     tile_gloss.dart          # TileGloss / TileGlossPainter: scanlines, a shine along the lit edges and a dithered shade along the dark ones, drawn over a tile
     settings_scope.dart      # SettingsScope: InheritedNotifier over SettingsState; SettingsScope.of(context) gives LauncherSettings (defaults without a scope)
-    settings_screen.dart     # showSettings / SettingsScreen: theme, grid, gestures, Home app, layout export/import, clear, reset
+    settings_screen.dart     # showSettings / SettingsScreen: theme, grid, gestures, Home app, mail signature + account status/FORGET ACCOUNT, layout export/import, clear, reset
     boot_screen.dart         # BootScreen: the plain loading/error screen, or the typed-out first-run C64 power-on (tap to skip)
     haptics.dart             # haptic(context, Haptic.tap/press): a buzz that honours the settings toggle
     overscroll_gestures.dart # OverscrollGestures: a long drag past the top / bottom of a scrollable fires once (swipe down / up on Home)
@@ -135,7 +135,7 @@ lib/
     text_tv_screen.dart      # showTextTv / TextTvScreen: the full-screen viewer (close, refresh, page arrows, number pad, shortcuts, links, parts, history)
     mail_tile_view.dart      # MailTileContentView: fits its size (small: unread count; medium: +newest message; wide: +as many one-line messages as fit, unread marked *)
     mail_setup_sheet.dart    # showMailSetupSheet: address, IMAP server (guessed from the address until typed over), app password (obscured); CONNECT logs in, then saves
-    mail_sheet.dart          # showMailSheet: newest 20, tap a message for TRASH (asks again), REFRESH, FORGET ACCOUNT (asks first)
+    mail_sheet.dart          # showMailSheet: newest 20, tap a message for TRASH (asks again), REFRESH (FORGET ACCOUNT lives in Settings)
     contact_picker.dart      # showContactPicker: phone book grouped like the drawer (flat while searching), tap pins the person; opening it asks for contacts
     contact_sheet.dart       # showContactSheet: numbers + CALL / SMS / WHATSAPP; every action its own tap, a text typed and SENT
     agenda_tile_view.dart    # AgendaTileContentView: fits its size (small: when+title; medium: +place, +N more; wide: as many one-line events as the height holds)

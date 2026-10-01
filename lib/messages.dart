@@ -292,6 +292,10 @@ abstract final class Messages {
   static const String settingsSignature = 'SIGNATURE';
   static const String settingsSignatureNote =
       'ADDED TO THE END OF NEW MESSAGES, REPLIES AND FORWARDS.';
+  static const String settingsMailAccount = 'ACCOUNT';
+  static const String settingsMailChecking = 'CHECKING...';
+  static const String settingsMailNotSetUp = 'NOT SET UP.';
+  static const String settingsMailForgotten = 'ACCOUNT FORGOTTEN.';
   static const String settingsLayout = 'LAYOUT';
   static const String settingsExport = 'EXPORT';
   static const String settingsImport = 'IMPORT';

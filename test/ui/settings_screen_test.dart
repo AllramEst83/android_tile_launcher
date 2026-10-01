@@ -1,5 +1,6 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/layout_export.dart';
+import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/tile.dart';
@@ -8,6 +9,7 @@ import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/services/wallpaper_service.dart';
 import 'package:android_tile_launcher/ui/help_screen.dart';
+import 'package:android_tile_launcher/ui/pad_key.dart';
 import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_clipboard_service.dart';
 import '../fakes/fake_home_role_service.dart';
+import '../fakes/fake_mail_service.dart';
 import '../fakes/fake_tile_services.dart';
 import '../fakes/fake_wallpaper_service.dart';
 import '../fakes/in_memory_local_store.dart';
@@ -24,9 +27,11 @@ class _Rig {
     FakeClipboardService? clipboard,
     FakeHomeRoleService? homeRole,
     FakeWallpaperService? wallpaper,
+    FakeMailService? mail,
   }) : clipboard = clipboard ?? FakeClipboardService(),
        homeRole = homeRole ?? FakeHomeRoleService(),
-       wallpaper = wallpaper ?? FakeWallpaperService() {
+       wallpaper = wallpaper ?? FakeWallpaperService(),
+       mail = mail ?? FakeMailService() {
     settings = SettingsState(store: InMemoryLocalStore());
     grid = GridState(store: InMemoryLocalStore());
   }
@@ -36,6 +41,7 @@ class _Rig {
   final FakeClipboardService clipboard;
   final FakeHomeRoleService homeRole;
   final FakeWallpaperService wallpaper;
+  final FakeMailService mail;
 
   Future<void> open(WidgetTester tester) async {
     tester.view
@@ -55,6 +61,7 @@ class _Rig {
                 clipboard: clipboard,
                 homeRole: homeRole,
                 wallpaper: wallpaper,
+                mail: mail,
               ),
             ),
             child: const Text('open'),
@@ -396,6 +403,83 @@ void main() {
             ?.text,
         'Kay',
       );
+    });
+  });
+
+  group('mail account', () {
+    testWidgets('not set up: says so, and FORGET ACCOUNT is disabled', (
+      WidgetTester tester,
+    ) async {
+      await _Rig().open(tester);
+
+      expect(
+        _text(tester, settingsKey('mail-account-status')),
+        Messages.settingsMailNotSetUp,
+      );
+      expect(
+        tester.widget<PadKey>(find.byKey(settingsKey('forget-mail'))).onTap,
+        isNull,
+      );
+    });
+
+    testWidgets('set up: shows the account email', (WidgetTester tester) async {
+      final FakeMailService mail = FakeMailService()
+        ..saved = const MailAccountInfo(email: 'kay@example.com', host: 'h');
+      await _Rig(mail: mail).open(tester);
+
+      expect(
+        _text(tester, settingsKey('mail-account-status')),
+        'KAY@EXAMPLE.COM',
+      );
+    });
+
+    testWidgets('FORGET ACCOUNT asks first, and nothing is forgotten until '
+        'YES', (WidgetTester tester) async {
+      final FakeMailService mail = FakeMailService()
+        ..saved = const MailAccountInfo(email: 'kay@example.com', host: 'h');
+      await _Rig(mail: mail).open(tester);
+
+      await _tap(tester, settingsKey('forget-mail'));
+
+      expect(_text(tester, settingsAskKey), Messages.mailForgetAsk);
+      expect(mail.forgets, 0);
+    });
+
+    testWidgets('NO backs out, keeping the account', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = FakeMailService()
+        ..saved = const MailAccountInfo(email: 'kay@example.com', host: 'h');
+      await _Rig(mail: mail).open(tester);
+      await _tap(tester, settingsKey('forget-mail'));
+
+      await _tap(tester, settingsNoKey);
+
+      expect(find.byKey(settingsAskKey), findsNothing);
+      expect(mail.forgets, 0);
+      expect(
+        _text(tester, settingsKey('mail-account-status')),
+        'KAY@EXAMPLE.COM',
+      );
+    });
+
+    testWidgets('YES forgets the account and says so', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = FakeMailService()
+        ..saved = const MailAccountInfo(email: 'kay@example.com', host: 'h');
+      await _Rig(mail: mail).open(tester);
+      await _tap(tester, settingsKey('forget-mail'));
+
+      await _tap(tester, settingsYesKey);
+
+      expect(mail.forgets, 1);
+      expect(mail.saved, isNull);
+      expect(
+        _text(tester, settingsKey('mail-account-status')),
+        Messages.settingsMailNotSetUp,
+      );
+      expect(_text(tester, settingsMessageKey), Messages.settingsMailForgotten);
     });
   });
 

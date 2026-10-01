@@ -906,7 +906,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(mailMessageKey(9)), findsOneWidget);
-      expect(find.byKey(mailForgetKey), findsOneWidget);
+      expect(find.byKey(mailRefreshKey), findsOneWidget);
       // Nothing was moved or forgotten by opening it.
       expect(mail.moves, isEmpty);
       expect(mail.forgets, 0);
