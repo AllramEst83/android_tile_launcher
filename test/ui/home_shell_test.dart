@@ -1131,6 +1131,17 @@ void main() {
     testWidgets('the scene tile opens the animation picker sheet', (
       WidgetTester tester,
     ) async {
+      // Not pumpAndSettle anywhere below: the tile's own art never stops
+      // animating once pinned (that is the point of it), so
+      // `hasScheduledFrame` never goes false and a settle would hang
+      // forever. A bounded pump plays out the modal sheet's own transition
+      // instead. A phone-tall viewport too, same as a couple of other tests
+      // below — the default 800×600 test surface is too short for the
+      // picker's three options to land on-screen at all.
+      tester.view
+        ..physicalSize = const Size(400, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final GridState gridState = _gridState();
       final SettingsState settingsState = SettingsState(
         store: InMemoryLocalStore(),
@@ -1143,16 +1154,18 @@ void main() {
       );
       await tester.pump();
       await gridState.pinSystemTile(TileKind.scene);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(settingsState.settings.sceneAnimation, SceneAnimation.rocket);
 
       await tester.tap(_onHome(find.byKey(sceneTileArtKey)));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1000));
 
       expect(find.byKey(sceneCloseKey), findsOneWidget);
 
       await tester.tap(find.byKey(sceneOptionKey(SceneAnimation.palmTree)));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1000));
 
       // The animation itself keeps ticking on its own timer throughout, so
       // checking the saved choice is what stays true regardless of exactly

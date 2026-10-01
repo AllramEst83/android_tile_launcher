@@ -22,6 +22,10 @@ Future<void> showSceneSheet(
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: TileColors.canvas,
+    // More animations will likely join the three this starts with; without
+    // this the sheet is capped at half the screen and, not being
+    // scrollable either, just clips whatever doesn't fit.
+    isScrollControlled: true,
     useSafeArea: true,
     builder: (BuildContext sheetContext) => _SceneSheet(settings: settings),
   );
@@ -38,52 +42,54 @@ class _SceneSheet extends StatelessWidget {
     final SceneAnimation current = settings.settings.sceneAnimation;
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.all(TileMetrics.margin),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // So the title row is not flush against the sheet's own top edge.
-            const SizedBox(height: TileMetrics.gutter),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(Messages.sceneTitle, style: text.bodyMedium),
-                ),
-                SizedBox(
-                  width: 48,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(TileMetrics.margin),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // So the title row is not flush against the sheet's own top edge.
+              const SizedBox(height: TileMetrics.gutter),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(Messages.sceneTitle, style: text.bodyMedium),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: PadKey(
+                      key: sceneCloseKey,
+                      label: 'X',
+                      height: 32,
+                      fontSize: 12,
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: TileMetrics.margin),
+              for (final SceneAnimation animation in SceneAnimation.values)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: TileMetrics.gutter),
                   child: PadKey(
-                    key: sceneCloseKey,
-                    label: 'X',
-                    height: 32,
+                    key: sceneOptionKey(animation),
+                    label: animation.label,
+                    selected: animation == current,
+                    height: 44,
                     fontSize: 12,
-                    onTap: () => Navigator.of(context).pop(),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      unawaited(
+                        settings.update(
+                          settings.settings.copyWith(sceneAnimation: animation),
+                        ),
+                      );
+                    },
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: TileMetrics.margin),
-            for (final SceneAnimation animation in SceneAnimation.values)
-              Padding(
-                padding: const EdgeInsets.only(bottom: TileMetrics.gutter),
-                child: PadKey(
-                  key: sceneOptionKey(animation),
-                  label: animation.label,
-                  selected: animation == current,
-                  height: 44,
-                  fontSize: 12,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    unawaited(
-                      settings.update(
-                        settings.settings.copyWith(sceneAnimation: animation),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -64,6 +64,11 @@ Future<void> _pumpApp(
   required FontScale fontScale,
   List<PinnedTile>? tiles,
   TileServices? services,
+  // A Scene tile (one of every kind, below) never stops animating once
+  // pinned, so `hasScheduledFrame` never goes false and pumpAndSettle would
+  // hang forever; a bounded pump plays out everything else's own settling
+  // (the boot screen, async reads, ...) well within its margin instead.
+  bool settle = true,
 }) async {
   // A phone-width canvas: on the default (much wider) test surface, an
   // overflow that would show up on a real 360-400dp phone can go unnoticed.
@@ -88,7 +93,12 @@ Future<void> _pumpApp(
       services: services ?? fakeTileServices(),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+  }
 }
 
 void main() {
@@ -126,6 +136,7 @@ void main() {
       tester,
       fontScale: FontScale.extraLarge,
       tiles: _oneOfEachKindAndSize(),
+      settle: false,
     );
 
     expect(tester.takeException(), isNull);
