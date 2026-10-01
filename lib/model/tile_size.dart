@@ -19,6 +19,11 @@
 /// [spanIn] clamps them to 4, the same as any tile wider than the mosaic
 /// showing it, already true for these two columns before this phase existed
 /// to make a size that wide reachable in the first place.
+///
+/// [size4x2] and [size4x4] share their shape with [wide] and [large] but are
+/// plain 4-column tiles: on a 6-column mosaic the picker's fourth column used
+/// to resolve to [wide]/[large], which stretch to all 6, so the tile came out
+/// full width while the picker showed 4. [of] returns these instead.
 enum TileSize {
   small(columns: 1, rows: 1),
   flat(columns: 2, rows: 1),
@@ -57,7 +62,10 @@ enum TileSize {
   size6x3(columns: 6, rows: 3),
   size6x4(columns: 6, rows: 4),
   size6x5(columns: 6, rows: 5),
-  size6x6(columns: 6, rows: 6);
+  size6x6(columns: 6, rows: 6),
+
+  size4x2(columns: 4, rows: 2),
+  size4x4(columns: 4, rows: 4);
 
   const TileSize({
     required this.columns,
@@ -82,11 +90,13 @@ enum TileSize {
   /// The size that is exactly [columns] by [rows] — every 1–6 by 1–6
   /// combination has one, Phase 37's grid picker's whole premise (widened to
   /// 6 columns in Phase 42), so this never returns `null` for an in-range
-  /// request. Out of range (a picker bug, not a real tile) falls back to
+  /// request. Never a [fullWidth] size: a picked or flipped shape must keep
+  /// the width it was picked at, whatever the mosaic's column count. Out of range (a picker bug, not a real tile) falls back to
   /// [small] rather than throwing, the same never-crash-the-editor spirit as
   /// the rest of this app's UI code.
   static TileSize of(int columns, int rows) => values.firstWhere(
-    (TileSize size) => size.columns == columns && size.rows == rows,
+    (TileSize size) =>
+        !size.fullWidth && size.columns == columns && size.rows == rows,
     orElse: () => small,
   );
 }
