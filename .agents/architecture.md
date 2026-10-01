@@ -36,6 +36,7 @@ lib/
     weather.dart             # Place, Conditions, DayForecast, Forecast; WeatherKind + weatherKind(code); describeWeather(code) (WMO codes, upper case)
     weather_snapshot.dart    # WeatherSnapshot (sealed): WeatherReady(forecast, stale) / NeedsPlace / LocationDenied / LocationUnavailable / Offline
     weather_format.dart      # formatDegrees, weekdayAbbreviation
+    media_snapshot.dart      # MediaSnapshot (sealed): MediaPlaying(title, artist, isPlaying, album?, appLabel?, artwork?) / MediaNone / MediaNeedsNotificationAccess / MediaUnavailable
     device_status.dart       # DeviceStatus: battery %, charging, storage free/total (each nullable); free/battery fractions for the bars
     device_format.dart       # formatBattery/formatStorageFree: DeviceStatus -> the tile's strings
     sound_mode.dart          # SoundMode (normal/vibrate/silent): the ringer, with its tap cycle and label
@@ -90,6 +91,9 @@ lib/
     imap_mail_service.dart   # ImapMailService on enough_mail (the only file that knows it): envelope-only listing, move to Trash, never a delete
     cached_mail_service.dart # CachedMailService: reuses a good inbox listing for 3 min; setUp / forget / moveToTrash drop it
     mail_tile_source.dart    # MailTileSource: the newest ten + the moment they were read
+    media_service.dart       # abstract MediaService: now() -> MediaSnapshot; playPause/next/previous; openAccessSettings() (no runtime dialog exists for this one)
+    android_media_service.dart  # MethodChannel implementation
+    media_tile_source.dart   # MediaTileSource: the active session's snapshot as MediaContent
     attachment_download_service.dart  # abstract: save(bytes, fileName, mimeType) -> AttachmentSaveResult (saved / refused / failed); never throws
     android_attachment_download_service.dart  # MethodChannel implementation (AttachmentChannelHandler.kt)
     contacts_service.dart    # abstract read-only: all() -> ContactsRead / ContactsNoAccess / ContactsDenied / ContactsUnavailable
@@ -137,6 +141,8 @@ lib/
     mail_tile_view.dart      # MailTileContentView: fits its size (small: unread count; medium: +newest message; wide: +as many one-line messages as fit, unread marked *)
     mail_setup_sheet.dart    # showMailSetupSheet: address, IMAP server (guessed from the address until typed over), app password (obscured); CONNECT logs in, then saves
     mail_sheet.dart          # showMailSheet: newest 20, tap a message for TRASH (asks again), REFRESH (FORGET ACCOUNT lives in Settings)
+    media_tile_view.dart     # MediaTileContentView: fits its size (small: title+artist; medium: +[PLAYING]/[PAUSED]; wide: +album art)
+    media_sheet.dart         # showMediaSheet: bigger art/title/artist/album/app, PREV/PLAY-PAUSE/NEXT, re-polled every 2s via TilePoller
     contact_picker.dart      # showContactPicker: phone book grouped like the drawer (flat while searching), tap pins the person; opening it asks for contacts
     contact_sheet.dart       # showContactSheet: numbers + CALL / SMS / WHATSAPP; every action its own tap, a text typed and SENT
     agenda_tile_view.dart    # AgendaTileContentView: fits its size (small: when+title; medium: +place, +N more; wide: as many one-line events as the height holds)
@@ -163,6 +169,8 @@ android/app/src/main/kotlin/com/codedbykay/android_tile_launcher/
   DeviceChannelHandler.kt    # battery (sticky broadcast) and storage (StatFs); no permissions
   SystemControlChannelHandler.kt  # ringer mode, torch
   AttachmentChannelHandler.kt  # saves a mail attachment's bytes to MediaStore.Downloads (API 29+); no permission needed
+  MediaChannelHandler.kt     # MediaSessionManager read + transport controls; notification-listener access checked and redirected to Settings, never asked for live
+  MediaNotificationListenerService.kt  # exists only so Android has a listener component to bind once access is granted; no callback overridden
 test/  # mirrors lib/; fakes/ holds FakeAppRepository
 ```
 

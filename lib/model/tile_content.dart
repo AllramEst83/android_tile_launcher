@@ -1,6 +1,7 @@
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/media_snapshot.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/text_tv_page.dart';
 import 'package:android_tile_launcher/model/weather_snapshot.dart';
@@ -144,4 +145,15 @@ class WeatherContent extends TileContent {
 
   @override
   String toString() => 'WeatherContent($snapshot)';
+}
+
+/// The Now Playing tile's content: the active media session, or the reason
+/// there is none.
+class MediaContent extends TileContent {
+  const MediaContent({required this.snapshot});
+
+  final MediaSnapshot snapshot;
+
+  @override
+  String toString() => 'MediaContent($snapshot)';
 }

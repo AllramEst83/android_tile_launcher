@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/media_snapshot.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_content.dart';
@@ -18,6 +19,8 @@ import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/device_tile_source.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/mail_tile_source.dart';
+import 'package:android_tile_launcher/services/media_service.dart';
+import 'package:android_tile_launcher/services/media_tile_source.dart';
 import 'package:android_tile_launcher/services/sound_mode_tile_source.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/text_tv_repository.dart';
@@ -42,6 +45,8 @@ import 'package:android_tile_launcher/ui/haptics.dart';
 import 'package:android_tile_launcher/ui/mail_setup_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_tile_view.dart';
+import 'package:android_tile_launcher/ui/media_sheet.dart';
+import 'package:android_tile_launcher/ui/media_tile_view.dart';
 import 'package:android_tile_launcher/ui/press_listener.dart';
 import 'package:android_tile_launcher/ui/qr_scanner_screen.dart';
 import 'package:android_tile_launcher/ui/qr_scanner_tile_view.dart';
@@ -457,6 +462,23 @@ Widget tileContent(
               : null,
         ),
       );
+    case TileKind.media:
+      final MediaService media = services.media;
+      return TilePoller(
+        source: MediaTileSource(service: media),
+        interval: const Duration(seconds: 5),
+        builder: (context, content, refreshNow) {
+          final MediaSnapshot snapshot = (content as MediaContent).snapshot;
+          return MediaTileContentView(
+            snapshot: snapshot,
+            ink: tile.colour.ink,
+            onTap: interactive
+                ? () =>
+                      unawaited(_mediaTap(context, media, snapshot, refreshNow))
+                : null,
+          );
+        },
+      );
   }
 }
 
@@ -545,6 +567,25 @@ Future<void> _mailTap(
       if (await mail.account() == null && context.mounted) {
         await showMailSetupSheet(context, mail: mail);
       }
+  }
+  refreshNow();
+}
+
+/// What a tap on the Now Playing tile does: open the full pane when
+/// something is playing, open Android's notification-access settings when
+/// that is what is missing (there is no runtime dialog for it to ask
+/// instead), or just read again.
+Future<void> _mediaTap(
+  BuildContext context,
+  MediaService media,
+  MediaSnapshot snapshot,
+  VoidCallback refreshNow,
+) async {
+  switch (snapshot) {
+    case MediaNeedsNotificationAccess():
+      await media.openAccessSettings();
+    case MediaPlaying() || MediaNone() || MediaUnavailable():
+      await showMediaSheet(context, media: media);
   }
   refreshNow();
 }

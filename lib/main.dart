@@ -15,6 +15,7 @@ import 'services/android_files_service.dart';
 import 'services/android_home_role_service.dart';
 import 'services/android_link_service.dart';
 import 'services/android_location_service.dart';
+import 'services/android_media_service.dart';
 import 'services/android_permission_service.dart';
 import 'services/android_phone_service.dart';
 import 'services/android_shade_service.dart';
@@ -104,6 +105,7 @@ Future<void> main() async {
           permissions: const AndroidPermissionService(),
         ),
         link: const AndroidLinkService(),
+        media: const AndroidMediaService(),
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

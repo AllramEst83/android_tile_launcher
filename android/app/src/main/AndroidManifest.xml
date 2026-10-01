@@ -105,6 +105,25 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- The Now Playing tile: reads title/artist/art and sends
+             play/pause/skip to whatever app owns the active media session
+             (Spotify, YouTube Music, a podcast app...).
+             MediaSessionManager.getActiveSessions needs the caller to name
+             an enabled NotificationListenerService of its own, even though
+             nothing here ever reads a notification's content — this
+             service exists only to satisfy that. Notification access is a
+             "special access" permission granted once from its own Settings
+             screen, never a runtime dialog. -->
+        <service
+            android:name=".MediaNotificationListenerService"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

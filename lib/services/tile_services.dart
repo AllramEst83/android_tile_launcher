@@ -10,6 +10,7 @@ import 'package:android_tile_launcher/services/files_service.dart';
 import 'package:android_tile_launcher/services/home_role_service.dart';
 import 'package:android_tile_launcher/services/link_service.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
+import 'package:android_tile_launcher/services/media_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
 import 'package:android_tile_launcher/services/rates_repository.dart';
 import 'package:android_tile_launcher/services/shade_service.dart';
@@ -46,6 +47,7 @@ class TileServices {
     required this.attachmentDownload,
     required this.camera,
     required this.link,
+    required this.media,
   });
 
   final SystemControlService systemControl;
@@ -84,4 +86,7 @@ class TileServices {
 
   /// The QR scanner's OPEN action on a decoded web link.
   final LinkService link;
+
+  /// The Now Playing tile's session read and transport controls.
+  final MediaService media;
 }

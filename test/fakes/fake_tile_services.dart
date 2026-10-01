@@ -10,6 +10,7 @@ import 'package:android_tile_launcher/services/files_service.dart';
 import 'package:android_tile_launcher/services/home_role_service.dart';
 import 'package:android_tile_launcher/services/link_service.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
+import 'package:android_tile_launcher/services/media_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
 import 'package:android_tile_launcher/services/rates_repository.dart';
 import 'package:android_tile_launcher/services/shade_service.dart';
@@ -32,6 +33,7 @@ import 'fake_files_service.dart';
 import 'fake_home_role_service.dart';
 import 'fake_link_service.dart';
 import 'fake_mail_service.dart';
+import 'fake_media_service.dart';
 import 'fake_rates_repository.dart';
 import 'fake_shade_service.dart';
 import 'fake_system_control_service.dart';
@@ -63,6 +65,7 @@ TileServices fakeTileServices({
   AttachmentDownloadService? attachmentDownload,
   CameraService? camera,
   LinkService? link,
+  MediaService? media,
 }) => TileServices(
   systemControl: systemControl ?? FakeSystemControlService(),
   device: device ?? FakeDeviceRepository(),
@@ -85,4 +88,5 @@ TileServices fakeTileServices({
   attachmentDownload: attachmentDownload ?? FakeAttachmentDownloadService(),
   camera: camera ?? FakeCameraService(),
   link: link ?? FakeLinkService(),
+  media: media ?? FakeMediaService(),
 );

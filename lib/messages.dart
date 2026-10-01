@@ -383,6 +383,15 @@ abstract final class Messages {
 
   static const String sceneTitle = 'SCENE';
 
+  static const String mediaTitle = 'NOW PLAYING';
+  static const String mediaNothingPlaying = 'NOTHING IS PLAYING.';
+  static const String mediaTapToAllow = 'TAP TO ALLOW NOTIFICATION ACCESS';
+  static const String mediaTapToRetry = 'TAP TO RETRY';
+  static const String mediaPlay = 'PLAY';
+  static const String mediaPause = 'PAUSE';
+  static const String mediaPrev = '< PREV';
+  static const String mediaNext = 'NEXT >';
+
   static const String helpTitle = 'HELP';
 
   static const String helpGettingAroundTitle = 'GETTING AROUND';
@@ -411,7 +420,9 @@ abstract final class Messages {
       'CLOCK APP.\n'
       'SOUND — CYCLES THE RINGER BETWEEN NORMAL, VIBRATE AND SILENT.\n'
       'FLASHLIGHT — TOGGLES THE TORCH.\n'
-      'FILES — BROWSES AND DELETES ANYWHERE ON THE PHONE\'S STORAGE.';
+      'FILES — BROWSES AND DELETES ANYWHERE ON THE PHONE\'S STORAGE.\n'
+      'NOW PLAYING — WHAT IS PLAYING IN SPOTIFY OR ANY OTHER MUSIC APP; '
+      'TAP FOR BIGGER ART AND FULL CONTROLS.';
 
   static const String helpResizingTitle = 'RESIZING A TILE';
   static const String helpResizingBody =
@@ -438,7 +449,10 @@ abstract final class Messages {
       'APP PASSWORD IS KEPT ENCRYPTED ON THIS PHONE ONLY, NEVER BACKED '
       'UP. CALENDAR, CONTACTS AND FILES ARE ALL READ DIRECTLY FROM '
       'ANDROID ON THIS PHONE, ASKED FOR ONLY WHEN THE '
-      'TILE THAT NEEDS THEM IS FIRST ADDED OR OPENED.';
+      'TILE THAT NEEDS THEM IS FIRST ADDED OR OPENED. NOW PLAYING READS '
+      'TITLES AND ART FROM WHATEVER MUSIC APP IS OPEN, WHICH NEEDS '
+      'NOTIFICATION ACCESS — A SETTING YOU TURN ON YOURSELF, NOT ASKED '
+      'FOR AUTOMATICALLY.';
 
   // Why an expression could not be worked out: lower case, as they are said;
   // the pad shows them in capitals.
