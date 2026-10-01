@@ -992,14 +992,15 @@ class _MailSheetState extends State<_MailSheet> {
             label: Messages.mailFilterToChip(_filter.to),
             onRemove: () => _clearFilterField((f) => f.withoutTo()),
           ),
-        if (_filter.olderThan != null)
+        if (_filter.age != null)
           _FilterChip(
-            key: mailFilterChipKey('olderThan'),
-            label: Messages.mailFilterOlderThanChip(
-              _filter.olderThan!.amount,
-              _filter.olderThan!.unit.label,
+            key: mailFilterChipKey('age'),
+            label: Messages.mailFilterAgeChip(
+              _filter.age!.direction == MailAgeDirection.older,
+              _filter.age!.amount,
+              _filter.age!.unit.label,
             ),
-            onRemove: () => _clearFilterField((f) => f.withoutOlderThan()),
+            onRemove: () => _clearFilterField((f) => f.withoutAge()),
           ),
       ],
     );

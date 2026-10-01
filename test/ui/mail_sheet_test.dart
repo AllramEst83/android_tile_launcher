@@ -1478,12 +1478,99 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(mail.searches, <MailFilter>[
-        const MailFilter(olderThan: MailOlderThan(3, MailAgeUnit.weeks)),
+        const MailFilter(
+          age: MailAgeFilter(3, MailAgeUnit.weeks, MailAgeDirection.older),
+        ),
       ]);
       expect(
-        find.text(Messages.mailFilterOlderThanChip(3, MailAgeUnit.weeks.label)),
+        find.text(Messages.mailFilterAgeChip(true, 3, MailAgeUnit.weeks.label)),
         findsOneWidget,
       );
+    });
+
+    testWidgets('toggling to NEWER THAN sends a newer-than filter', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterOlderThanAmountKey), '3');
+      await tester.tap(find.byKey(mailFilterUnitKey(MailAgeUnit.weeks)));
+      await tester.tap(
+        find.byKey(mailFilterDirectionKey(MailAgeDirection.newer)),
+      );
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.searches, <MailFilter>[
+        const MailFilter(
+          age: MailAgeFilter(3, MailAgeUnit.weeks, MailAgeDirection.newer),
+        ),
+      ]);
+      expect(
+        find.text(
+          Messages.mailFilterAgeChip(false, 3, MailAgeUnit.weeks.label),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('reopening the filter pane remembers the chosen direction', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      mail.searchResult = const MailMessages(
+        <MailMessage>[],
+        total: 0,
+        unread: 0,
+      );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFilterOlderThanAmountKey), '3');
+      await tester.tap(
+        find.byKey(mailFilterDirectionKey(MailAgeDirection.newer)),
+      );
+      await tester.tap(find.byKey(mailFilterApplyKey));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(mailFilterKey));
+      await tester.pumpAndSettle();
+
+      final BoxDecoration newerDecoration =
+          tester
+                  .widget<Container>(
+                    find.descendant(
+                      of: find.byKey(
+                        mailFilterDirectionKey(MailAgeDirection.newer),
+                      ),
+                      matching: find.byType(Container),
+                    ),
+                  )
+                  .decoration
+              as BoxDecoration;
+      final BoxDecoration olderDecoration =
+          tester
+                  .widget<Container>(
+                    find.descendant(
+                      of: find.byKey(
+                        mailFilterDirectionKey(MailAgeDirection.older),
+                      ),
+                      matching: find.byType(Container),
+                    ),
+                  )
+                  .decoration
+              as BoxDecoration;
+      expect(newerDecoration.color, TileColors.accent);
+      expect(olderDecoration.color, isNot(TileColors.accent));
     });
 
     testWidgets('no matches says so, distinct from an empty inbox', (

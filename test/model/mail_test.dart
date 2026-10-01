@@ -2,34 +2,61 @@ import 'package:android_tile_launcher/model/mail.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('MailOlderThan.before', () {
+  group('MailAgeFilter.cutoff', () {
     final DateTime now = DateTime(2026, 9, 30);
 
     test('days', () {
       expect(
-        const MailOlderThan(3, MailAgeUnit.days).before(now),
+        const MailAgeFilter(
+          3,
+          MailAgeUnit.days,
+          MailAgeDirection.older,
+        ).cutoff(now),
         DateTime(2026, 9, 27),
       );
     });
 
     test('weeks', () {
       expect(
-        const MailOlderThan(2, MailAgeUnit.weeks).before(now),
+        const MailAgeFilter(
+          2,
+          MailAgeUnit.weeks,
+          MailAgeDirection.older,
+        ).cutoff(now),
         DateTime(2026, 9, 16),
       );
     });
 
     test('months', () {
       expect(
-        const MailOlderThan(2, MailAgeUnit.months).before(now),
+        const MailAgeFilter(
+          2,
+          MailAgeUnit.months,
+          MailAgeDirection.older,
+        ).cutoff(now),
         DateTime(2026, 7, 30),
       );
     });
 
     test('years', () {
       expect(
-        const MailOlderThan(1, MailAgeUnit.years).before(now),
+        const MailAgeFilter(
+          1,
+          MailAgeUnit.years,
+          MailAgeDirection.older,
+        ).cutoff(now),
         DateTime(2025, 9, 30),
+      );
+    });
+
+    test('the cutoff math does not depend on direction', () {
+      expect(
+        const MailAgeFilter(
+          3,
+          MailAgeUnit.days,
+          MailAgeDirection.newer,
+        ).cutoff(now),
+        DateTime(2026, 9, 27),
       );
     });
   });
@@ -44,7 +71,9 @@ void main() {
       expect(const MailFilter(from: 'x').isEmpty, isFalse);
       expect(const MailFilter(to: 'x').isEmpty, isFalse);
       expect(
-        const MailFilter(olderThan: MailOlderThan(1, MailAgeUnit.days)).isEmpty,
+        const MailFilter(
+          age: MailAgeFilter(1, MailAgeUnit.days, MailAgeDirection.older),
+        ).isEmpty,
         isFalse,
       );
     });
@@ -54,7 +83,7 @@ void main() {
         text: 'hi',
         from: 'a@b.com',
         to: 'c@d.com',
-        olderThan: MailOlderThan(1, MailAgeUnit.weeks),
+        age: MailAgeFilter(1, MailAgeUnit.weeks, MailAgeDirection.older),
       );
 
       expect(
@@ -62,7 +91,7 @@ void main() {
         const MailFilter(
           from: 'a@b.com',
           to: 'c@d.com',
-          olderThan: MailOlderThan(1, MailAgeUnit.weeks),
+          age: MailAgeFilter(1, MailAgeUnit.weeks, MailAgeDirection.older),
         ),
       );
       expect(
@@ -70,7 +99,7 @@ void main() {
         const MailFilter(
           text: 'hi',
           to: 'c@d.com',
-          olderThan: MailOlderThan(1, MailAgeUnit.weeks),
+          age: MailAgeFilter(1, MailAgeUnit.weeks, MailAgeDirection.older),
         ),
       );
       expect(
@@ -78,11 +107,11 @@ void main() {
         const MailFilter(
           text: 'hi',
           from: 'a@b.com',
-          olderThan: MailOlderThan(1, MailAgeUnit.weeks),
+          age: MailAgeFilter(1, MailAgeUnit.weeks, MailAgeDirection.older),
         ),
       );
       expect(
-        filter.withoutOlderThan(),
+        filter.withoutAge(),
         const MailFilter(text: 'hi', from: 'a@b.com', to: 'c@d.com'),
       );
     });

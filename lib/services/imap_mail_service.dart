@@ -25,6 +25,7 @@ import 'package:enough_mail/enough_mail.dart'
         SearchTermBody,
         SearchTermFrom,
         SearchTermOr,
+        SearchTermSince,
         SearchTermSubject,
         SearchTermTo,
         SmtpClient,
@@ -67,7 +68,7 @@ class ImapMailService implements MailService {
   /// IMAP; ports 465 and 993 both expect this.
   final int smtpPort;
 
-  /// What "now" is, for turning [MailFilter.olderThan] into a cutoff date.
+  /// What "now" is, for turning [MailFilter.age] into a cutoff date.
   /// Injectable for tests; normally the real clock.
   final DateTime Function() clock;
 
@@ -520,9 +521,13 @@ class ImapMailService implements MailService {
     }
     if (filter.from.isNotEmpty) query.add(SearchTermFrom(filter.from));
     if (filter.to.isNotEmpty) query.add(SearchTermTo(filter.to));
-    final MailOlderThan? olderThan = filter.olderThan;
-    if (olderThan != null) {
-      query.add(SearchTermBefore(olderThan.before(clock())));
+    final MailAgeFilter? age = filter.age;
+    if (age != null) {
+      query.add(
+        age.direction == MailAgeDirection.older
+            ? SearchTermBefore(age.cutoff(clock()))
+            : SearchTermSince(age.cutoff(clock())),
+      );
     }
     return query;
   }

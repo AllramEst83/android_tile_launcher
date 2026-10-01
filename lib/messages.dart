@@ -189,6 +189,7 @@ abstract final class Messages {
   static const String mailFilterFrom = 'FROM ADDRESS';
   static const String mailFilterTo = 'TO ADDRESS';
   static const String mailFilterOlderThan = 'OLDER THAN';
+  static const String mailFilterNewerThan = 'NEWER THAN';
   static const String mailFilterApply = 'APPLY';
   static const String mailFilterClear = 'CLEAR ALL';
   static String mailFilterTextChip(String text) =>
@@ -196,8 +197,8 @@ abstract final class Messages {
   static String mailFilterFromChip(String from) =>
       'FROM: ${from.toUpperCase()}';
   static String mailFilterToChip(String to) => 'TO: ${to.toUpperCase()}';
-  static String mailFilterOlderThanChip(int amount, String unit) =>
-      'OLDER THAN $amount $unit';
+  static String mailFilterAgeChip(bool older, int amount, String unit) =>
+      '${older ? mailFilterOlderThan : mailFilterNewerThan} $amount $unit';
   static const String mailNoMatches = 'NOTHING MATCHES THESE FILTERS.';
 
   static const String calcTitle = 'CALC';

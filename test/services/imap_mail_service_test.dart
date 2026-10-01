@@ -335,10 +335,36 @@ void main() {
       server.searchResults = {};
 
       await searchMail.search(
-        const MailFilter(olderThan: MailOlderThan(3, MailAgeUnit.days)),
+        const MailFilter(
+          age: MailAgeFilter(3, MailAgeUnit.days, MailAgeDirection.older),
+        ),
       );
 
       expect(server.received, contains(contains('BEFORE "27-Sep-2026"')));
+    });
+
+    test('newer than sends a SINCE cutoff from the injected clock', () async {
+      await boot(inbox);
+      final searchMail = ImapMailService(
+        accounts: MailAccountStore(secrets),
+        secure: false,
+        timeout: const Duration(seconds: 5),
+        clock: () => DateTime(2026, 9, 30),
+      );
+      await searchMail.setUp(
+        email: 'kay@example.com',
+        host: '127.0.0.1:${server.port}',
+        password: _password,
+      );
+      server.searchResults = {};
+
+      await searchMail.search(
+        const MailFilter(
+          age: MailAgeFilter(3, MailAgeUnit.days, MailAgeDirection.newer),
+        ),
+      );
+
+      expect(server.received, contains(contains('SINCE "27-Sep-2026"')));
     });
 
     test('every set field combines into one query', () async {

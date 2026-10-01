@@ -13,15 +13,17 @@ const Key mailFilterOlderThanAmountKey = ValueKey<String>(
 );
 Key mailFilterUnitKey(MailAgeUnit unit) =>
     ValueKey<String>('mail-filter-unit-${unit.name}');
+Key mailFilterDirectionKey(MailAgeDirection direction) =>
+    ValueKey<String>('mail-filter-direction-${direction.name}');
 const Key mailFilterApplyKey = ValueKey<String>('mail-filter-apply');
 const Key mailFilterClearKey = ValueKey<String>('mail-filter-clear');
 
-/// The pane FILTER opens: free text (subject or body), From, To, and an
-/// "older than" cutoff (a number and a unit). Opened with whatever filter is
-/// already applied, so reopening shows what is currently in effect. APPLY
-/// returns the filter built from what is typed and chosen; CLEAR ALL returns
-/// an empty one; the X returns null (no change, whatever was applied stays
-/// applied).
+/// The pane FILTER opens: free text (subject or body), From, To, and an age
+/// cutoff (a number, a unit, and an OLDER THAN/NEWER THAN toggle). Opened
+/// with whatever filter is already applied, so reopening shows what is
+/// currently in effect. APPLY returns the filter built from what is typed
+/// and chosen; CLEAR ALL returns an empty one; the X returns null (no
+/// change, whatever was applied stays applied).
 Future<MailFilter?> showMailFilterSheet(
   BuildContext context, {
   required MailFilter initial,
@@ -60,11 +62,11 @@ class _MailFilterSheetState extends State<_MailFilterSheet> {
     text: widget.initial.to,
   );
   late final TextEditingController _amount = TextEditingController(
-    text: widget.initial.olderThan == null
-        ? ''
-        : '${widget.initial.olderThan!.amount}',
+    text: widget.initial.age == null ? '' : '${widget.initial.age!.amount}',
   );
-  late MailAgeUnit _unit = widget.initial.olderThan?.unit ?? MailAgeUnit.days;
+  late MailAgeUnit _unit = widget.initial.age?.unit ?? MailAgeUnit.days;
+  late MailAgeDirection _direction =
+      widget.initial.age?.direction ?? MailAgeDirection.older;
 
   @override
   void dispose() {
@@ -81,9 +83,9 @@ class _MailFilterSheetState extends State<_MailFilterSheet> {
       text: _text.text.trim(),
       from: _from.text.trim(),
       to: _to.text.trim(),
-      olderThan: amount == null || amount <= 0
+      age: amount == null || amount <= 0
           ? null
-          : MailOlderThan(amount, _unit),
+          : MailAgeFilter(amount, _unit, _direction),
     );
   }
 
@@ -136,13 +138,24 @@ class _MailFilterSheetState extends State<_MailFilterSheet> {
                 controller: _to,
                 keyboardType: TextInputType.emailAddress,
               ),
-              Text(
-                Messages.mailFilterOlderThan,
-                style: text.bodySmall?.copyWith(
-                  fontSize: 8,
-                  color: TileColors.muted,
-                ),
+              Row(
+                children: <Widget>[
+                  for (final MailAgeDirection direction
+                      in MailAgeDirection.values) ...<Widget>[
+                    if (direction != MailAgeDirection.values.first)
+                      const SizedBox(width: 4),
+                    _Chip(
+                      key: mailFilterDirectionKey(direction),
+                      label: direction == MailAgeDirection.older
+                          ? Messages.mailFilterOlderThan
+                          : Messages.mailFilterNewerThan,
+                      selected: _direction == direction,
+                      onTap: () => setState(() => _direction = direction),
+                    ),
+                  ],
+                ],
               ),
+              const SizedBox(height: 4),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -179,7 +192,7 @@ class _MailFilterSheetState extends State<_MailFilterSheet> {
                         runSpacing: 4,
                         children: <Widget>[
                           for (final MailAgeUnit unit in MailAgeUnit.values)
-                            _UnitChip(
+                            _Chip(
                               key: mailFilterUnitKey(unit),
                               label: unit.label,
                               selected: _unit == unit,
@@ -304,10 +317,10 @@ class _Button extends StatelessWidget {
   }
 }
 
-/// One of the four "older than" units, boxed like the size-grid picker's own
-/// cells: filled when selected.
-class _UnitChip extends StatelessWidget {
-  const _UnitChip({
+/// One selectable option — an age unit or an OLDER/NEWER direction — boxed
+/// like the size-grid picker's own cells: filled when selected.
+class _Chip extends StatelessWidget {
+  const _Chip({
     super.key,
     required this.label,
     required this.selected,
