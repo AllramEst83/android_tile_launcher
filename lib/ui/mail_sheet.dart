@@ -9,6 +9,7 @@ import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_filter_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_folder_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:flutter/material.dart';
@@ -33,6 +34,7 @@ const Key mailTrashNoKey = ValueKey<String>('mail-trash-no');
 const Key mailRefreshKey = ValueKey<String>('mail-refresh');
 const Key mailBackKey = ValueKey<String>('mail-back');
 const Key mailStarToggleKey = ValueKey<String>('mail-star-toggle');
+const Key mailFolderKey = ValueKey<String>('mail-folder');
 const Key mailMarkKey = ValueKey<String>('mail-mark');
 const Key mailReaderKey = ValueKey<String>('mail-reader');
 const Key mailBodyKey = ValueKey<String>('mail-body');
@@ -173,10 +175,113 @@ class _MailSheetState extends State<_MailSheet> {
   /// What FILTER narrowed the list to; empty is no filtering at all.
   MailFilter _filter = const MailFilter();
 
+  /// The folder being looked at: null is the inbox, else a server path.
+  String? _folder;
+  MailFolder _folderInfo = const MailFolder(
+    name: '',
+    label: 'INBOX',
+    kind: MailFolderKind.inbox,
+  );
+  List<MailFolder> _folders = <MailFolder>[];
+
+  /// Where the next 20 start, or null when the list is complete; and whether
+  /// they are being fetched now.
+  int? _nextOffset;
+  bool _loadingMore = false;
+  final ScrollController _scroll = ScrollController();
+
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_maybeLoadMore);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Starred messages get a section of their own, but only in the plain inbox.
+  bool get _grouped => _folder == null && _filter.isEmpty;
+
+  /// Whether DELETE (a move to Trash) means anything in this folder.
+  bool get _canTrash => _folderInfo.canTrash;
+
+  void _maybeLoadMore() {
+    if (!_scroll.hasClients || _nextOffset == null) return;
+    final ScrollPosition p = _scroll.position;
+    if (p.maxScrollExtent - p.pixels < 300) _loadMore();
+  }
+
+  /// A list too short to scroll never fires the scroll listener, so look again
+  /// once it has been laid out.
+  void _checkFilled() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients || _nextOffset == null) return;
+      if (_scroll.position.maxScrollExtent <= 0) _loadMore();
+    });
+  }
+
+  List<MailMessage> _arranged(MailMessages r) => _grouped
+      ? starredFirst(<MailMessage>[...r.starred, ...r.messages])
+      : List<MailMessage>.of(r.messages);
+
+  Future<MailResult> _fetch({int offset = 0}) => _filter.isEmpty
+      ? widget.mail.latest(
+          count: 20,
+          fresh: true,
+          offset: offset,
+          folder: _folder,
+          withStarred: _folder == null,
+        )
+      : widget.mail.search(_filter, count: 20, offset: offset, folder: _folder);
+
+  /// Fetches the next 20 and adds them to the end of the list.
+  Future<void> _loadMore() async {
+    final int? at = _nextOffset;
+    if (at == null || _loadingMore || _loading || _busy) return;
+    setState(() => _loadingMore = true);
+    final MailResult result = await _fetch(offset: at);
+    if (!mounted) return;
+    setState(() {
+      _loadingMore = false;
+      switch (result) {
+        case MailMessages():
+          final Set<int> have = _messages.map((MailMessage m) => m.uid).toSet();
+          _messages = <MailMessage>[
+            ..._messages,
+            ...result.messages.where((MailMessage m) => !have.contains(m.uid)),
+          ];
+          _nextOffset = result.nextOffset;
+        case MailUnavailable(:final String reason):
+          _status = '${Messages.failedPrefix}${reason.toUpperCase()}';
+        case MailNotSetUp():
+          _nextOffset = null;
+      }
+    });
+    _checkFilled();
+  }
+
+  Future<void> _pickFolder() async {
+    if (_folders.isEmpty) {
+      _folders = await widget.mail.folders();
+      if (!mounted) return;
+    }
+    final MailFolder? picked = await showMailFolderSheet(
+      context,
+      folders: _folders,
+      current: _folderInfo,
+    );
+    if (picked == null || picked.name == _folderInfo.name) return;
+    setState(() {
+      _folderInfo = picked;
+      _folder = picked.kind == MailFolderKind.inbox ? null : picked.name;
+      _filter = const MailFilter();
+      _status = null;
+    });
+    await _load();
   }
 
   Future<void> _load() async {
@@ -191,18 +296,17 @@ class _MailSheetState extends State<_MailSheet> {
     });
     final MailAccountInfo? account = await widget.mail.account();
     // Always from the server: the sheet is for looking at what is there now.
-    final MailResult result = _filter.isEmpty
-        ? await widget.mail.latest(count: 20, fresh: true)
-        : await widget.mail.search(_filter, count: 20);
+    final MailResult result = await _fetch();
     if (!mounted) return;
     setState(() {
       _loading = false;
       _email = account?.email;
       _result = result;
-      _messages = result is MailMessages
-          ? starredFirst(result.messages)
-          : <MailMessage>[];
+      _messages = result is MailMessages ? _arranged(result) : <MailMessage>[];
+      _nextOffset = result is MailMessages ? result.nextOffset : null;
+      _loadingMore = false;
     });
+    _checkFilled();
   }
 
   Future<void> _openFilter() async {
@@ -219,6 +323,12 @@ class _MailSheetState extends State<_MailSheet> {
     setState(() => _filter = without(_filter));
     _load();
   }
+
+  /// What the server needs to address a list entry: its own id, the folder it
+  /// is in, and the folder's UIDVALIDITY (known only for the one on show).
+  int _serverUid(int uid) => _entry(uid)?.serverUid ?? uid;
+  String? _folderOf(int uid) => _entry(uid)?.folder ?? _folder;
+  int? _validityOf(int uid) => _entry(uid)?.folder == null ? _validity : null;
 
   int? get _validity {
     final MailResult? result = _result;
@@ -262,8 +372,9 @@ class _MailSheetState extends State<_MailSheet> {
       _downloading.clear();
     });
     final MailReadResult result = await widget.mail.read(
-      m.uid,
-      validity: _validity,
+      m.serverUid,
+      folder: m.folder ?? _folder,
+      validity: _validityOf(m.uid),
     );
     if (!mounted || _openUid != m.uid) return;
     setState(() {
@@ -309,9 +420,10 @@ class _MailSheetState extends State<_MailSheet> {
       _status = null;
     });
     final MailMarkResult marked = await widget.mail.mark(
-      uid,
+      _serverUid(uid),
+      folder: _folderOf(uid),
       read: makeRead,
-      validity: _validity,
+      validity: _validityOf(uid),
     );
     if (!mounted) return;
     setState(() {
@@ -342,9 +454,10 @@ class _MailSheetState extends State<_MailSheet> {
       _status = null;
     });
     final MailStarResult result = await widget.mail.star(
-      uid,
+      _serverUid(uid),
+      folder: _folderOf(uid),
       starred: starred,
-      validity: _validity,
+      validity: _validityOf(uid),
     );
     if (!mounted) return;
     setState(() {
@@ -372,8 +485,9 @@ class _MailSheetState extends State<_MailSheet> {
       _confirmingTrash = null;
     });
     final MailMoveResult moved = await widget.mail.moveToTrash(
-      uid,
-      validity: _validity,
+      _serverUid(uid),
+      folder: _folderOf(uid),
+      validity: _validityOf(uid),
     );
     if (!mounted) return;
     setState(() {
@@ -435,8 +549,9 @@ class _MailSheetState extends State<_MailSheet> {
     int moved = 0;
     for (final int uid in uids) {
       final MailMoveResult result = await widget.mail.moveToTrash(
-        uid,
-        validity: _validity,
+        _serverUid(uid),
+        folder: _folderOf(uid),
+        validity: _validityOf(uid),
       );
       if (!mounted) return;
       switch (result) {
@@ -553,7 +668,7 @@ class _MailSheetState extends State<_MailSheet> {
   bool get _canGoPrev => (_openIndex ?? -1) > 0;
   bool get _canGoNext {
     final int? i = _openIndex;
-    return i != null && i < _messages.length - 1;
+    return i != null && (i < _messages.length - 1 || _nextOffset != null);
   }
 
   Future<void> _openPrev() async {
@@ -564,7 +679,12 @@ class _MailSheetState extends State<_MailSheet> {
 
   Future<void> _openNext() async {
     final int? i = _openIndex;
-    if (i == null || i >= _messages.length - 1) return;
+    if (i == null) return;
+    if (i >= _messages.length - 1) {
+      // The last one loaded: fetch the next 20 and carry on into them.
+      await _loadMore();
+      if (!mounted || i >= _messages.length - 1) return;
+    }
     await _open(_messages[i + 1]);
   }
 
@@ -576,9 +696,10 @@ class _MailSheetState extends State<_MailSheet> {
     int marked = 0;
     for (final int uid in uids) {
       final MailMarkResult result = await widget.mail.mark(
-        uid,
+        _serverUid(uid),
+        folder: _folderOf(uid),
         read: read,
-        validity: _validity,
+        validity: _validityOf(uid),
       );
       if (!mounted) return;
       switch (result) {
@@ -612,9 +733,10 @@ class _MailSheetState extends State<_MailSheet> {
     int changed = 0;
     for (final int uid in uids) {
       final MailStarResult result = await widget.mail.star(
-        uid,
+        _serverUid(uid),
+        folder: _folderOf(uid),
         starred: starred,
-        validity: _validity,
+        validity: _validityOf(uid),
       );
       if (!mounted) return;
       switch (result) {
@@ -729,6 +851,12 @@ class _MailSheetState extends State<_MailSheet> {
                   else
                     const Spacer(),
                   _Button(
+                    key: mailFolderKey,
+                    label: _folderInfo.label,
+                    onTap: _busy || _loading ? null : _pickFolder,
+                  ),
+                  const SizedBox(width: 8),
+                  _Button(
                     key: mailFilterKey,
                     label: Messages.mailFilter,
                     onTap: _busy || _loading ? null : _openFilter,
@@ -778,7 +906,7 @@ class _MailSheetState extends State<_MailSheet> {
                   _Button(
                     key: mailBulkDeleteKey,
                     label: Messages.mailDeleteSelected(_selected.length),
-                    onTap: _busy || _selected.isEmpty
+                    onTap: _busy || _selected.isEmpty || !_canTrash
                         ? null
                         : () => setState(() => _confirmingBulkTrash = true),
                   ),
@@ -1046,7 +1174,9 @@ class _MailSheetState extends State<_MailSheet> {
         _Button(
           key: mailTrashKey,
           label: Messages.mailTrash,
-          onTap: _busy ? null : () => setState(() => _confirmingTrash = uid),
+          onTap: _busy || !_canTrash
+              ? null
+              : () => setState(() => _confirmingTrash = uid),
         ),
       ],
     );
@@ -1105,16 +1235,25 @@ class _MailSheetState extends State<_MailSheet> {
         }
         final DateTime now = widget.clock();
         return ListView(
+          controller: _scroll,
           children: <Widget>[
             // Starred messages are their own section; the plain inbox gets a
             // heading only when there is a starred section to tell it from.
             for (final (int i, MailMessage m) in _messages.indexed) ...<Widget>[
-              if (m.starred && i == 0)
+              if (_grouped && m.starred && i == 0)
                 _sectionHeader(text, Messages.mailStarredSection, starred: true)
-              else if (!m.starred && i > 0 && _messages[i - 1].starred)
+              else if (_grouped &&
+                  !m.starred &&
+                  i > 0 &&
+                  _messages[i - 1].starred)
                 _sectionHeader(text, Messages.mailInboxSection),
               _row(text, m, now),
             ],
+            if (_loadingMore)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(Messages.mailLoadingMore, style: text.bodySmall),
+              ),
           ],
         );
       case MailNotSetUp():
@@ -1149,6 +1288,17 @@ class _MailSheetState extends State<_MailSheet> {
         ),
       );
 
+  /// Who the list line names: the sender, but in Sent and Drafts the person
+  /// it went to.
+  String _who(MailMessage m) {
+    final bool outgoing =
+        _folderInfo.kind == MailFolderKind.sent ||
+        _folderInfo.kind == MailFolderKind.drafts;
+    return outgoing && m.to.isNotEmpty
+        ? '${Messages.mailToPrefix} ${m.to}'
+        : m.from;
+  }
+
   Widget _row(TextTheme text, MailMessage m, DateTime now) {
     final Color bright = m.unread ? TileColors.textBright : TileColors.muted;
     final bool selected = _selected.contains(m.uid);
@@ -1179,7 +1329,7 @@ class _MailSheetState extends State<_MailSheet> {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          '${m.unread ? '* ' : ''}${m.from.toUpperCase()}',
+                          '${m.unread ? '* ' : ''}${_who(m).toUpperCase()}',
                           style: text.bodySmall?.copyWith(
                             fontSize: 13,
                             color: bright,

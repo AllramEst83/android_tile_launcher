@@ -3,6 +3,7 @@ import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:android_tile_launcher/services/imap_mail_service.dart';
 import 'package:android_tile_launcher/services/local_store_exception.dart';
 import 'package:android_tile_launcher/services/mail_account.dart';
+import 'package:enough_mail/enough_mail.dart' show Mailbox, MailboxFlag;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_imap_server.dart';
@@ -1078,6 +1079,143 @@ void main() {
 
       await mail.mark(22, read: false);
       expect((await mail.latest() as MailMessages).unread, 1);
+    });
+  });
+
+  group('paging and stars', () {
+    tearDown(() => server.stop());
+
+    final many = [
+      for (var i = 1; i <= 7; i++)
+        FakeImapMessage(
+          uid: 100 + i,
+          subject: '"Message $i"',
+          date: 'Sat, 26 Sep 2026 08:30:00 +0000',
+          address: 'a$i@example.com',
+        ),
+    ];
+
+    test('latest pages through the inbox with offset', () async {
+      await boot(many);
+      await setUp();
+
+      final first = await mail.latest(count: 3) as MailMessages;
+      expect([for (final m in first.messages) m.uid], [107, 106, 105]);
+      expect(first.nextOffset, 3);
+
+      final second = await mail.latest(
+        count: 3,
+        offset: first.nextOffset!,
+      ) as MailMessages;
+      expect([for (final m in second.messages) m.uid], [104, 103, 102]);
+      expect(second.nextOffset, 6);
+
+      final last = await mail.latest(
+        count: 3,
+        offset: second.nextOffset!,
+      ) as MailMessages;
+      expect([for (final m in last.messages) m.uid], [101]);
+      expect(last.nextOffset, isNull);
+    });
+
+    test('search fetches only the page asked for', () async {
+      await boot(many);
+      await setUp();
+      server.searchResults = {for (var i = 101; i <= 107; i++) i};
+
+      final page = await mail.search(
+        const MailFilter(text: 'message'),
+        count: 3,
+        offset: 3,
+      ) as MailMessages;
+
+      expect([for (final m in page.messages) m.uid], [104, 103, 102]);
+      expect(page.total, 7);
+      expect(page.nextOffset, 6);
+      final fetches = server.received.where((c) => c.startsWith('UID FETCH'));
+      expect(fetches.single, contains('104'));
+      expect(fetches.single, isNot(contains('107')));
+    });
+
+    test('withStarred lists starred messages apart from the page', () async {
+      await boot(many);
+      await setUp();
+      server.flagged.addAll({101, 106});
+      server.searchResults = {101, 106};
+
+      final result =
+          await mail.latest(count: 3, withStarred: true) as MailMessages;
+
+      expect([for (final m in result.starred) m.uid], containsAll([101, 106]));
+      expect(result.starred.every((m) => m.starred), isTrue);
+      // The page holds no starred message (they are not listed twice), so it
+      // may run short; the next page still starts where this one ended.
+      expect([for (final m in result.messages) m.uid], [107, 105]);
+      expect(result.nextOffset, 3);
+    });
+
+    test('without withStarred the page is plain inbox order', () async {
+      await boot(many);
+      await setUp();
+      server.flagged.add(106);
+
+      final result = await mail.latest(count: 3) as MailMessages;
+
+      expect([for (final m in result.messages) m.uid], [107, 106, 105]);
+      expect(result.messages[1].starred, isTrue);
+      expect(result.starred, isEmpty);
+    });
+
+    test('star sets and clears the flag', () async {
+      await boot(many);
+      await setUp();
+
+      expect(await mail.star(103, starred: true), isA<MailStarred>());
+      expect(server.flagged, {103});
+      expect(await mail.star(103, starred: false), isA<MailStarred>());
+      expect(server.flagged, isEmpty);
+      expect(await mail.star(999, starred: true), isA<MailStarGone>());
+    });
+  });
+
+  group('mailFoldersFrom', () {
+    Mailbox box(String path, List<MailboxFlag> flags) => Mailbox(
+      encodedName: path.split('/').last,
+      encodedPath: path,
+      flags: flags,
+      pathSeparator: '/',
+    );
+
+    test('orders the well-known folders first and skips bare parents', () {
+      final folders = mailFoldersFrom([
+        box('Receipts', []),
+        box('[Gmail]', [MailboxFlag.noSelect]),
+        box('[Gmail]/Trash', [MailboxFlag.trash]),
+        box('[Gmail]/Starred', [MailboxFlag.flagged]),
+        box('[Gmail]/All Mail', [MailboxFlag.all]),
+        box('INBOX', [MailboxFlag.inbox]),
+        box('[Gmail]/Sent Mail', [MailboxFlag.sent]),
+        box('[Gmail]/Spam', [MailboxFlag.junk]),
+        box('[Gmail]/Drafts', [MailboxFlag.drafts]),
+      ]);
+
+      expect(
+        [for (final f in folders) f.label],
+        [
+          'INBOX',
+          'STARRED',
+          'SENT',
+          'DRAFTS',
+          'ALL MAIL',
+          'SPAM',
+          'TRASH',
+          'RECEIPTS',
+        ],
+      );
+      expect(folders.first.name, 'INBOX');
+      expect(folders[6].canTrash, isFalse);
+      expect(folders[5].canTrash, isFalse);
+      expect(folders[0].canTrash, isTrue);
     });
   });
 

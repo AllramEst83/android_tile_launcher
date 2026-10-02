@@ -35,6 +35,25 @@ void main() {
     expect(inner.counts, <int>[10]);
   });
 
+  test('other pages, folders and the starred listing are never kept', () async {
+    await mail.latest(count: 10);
+    await mail.latest(count: 10, offset: 10);
+    await mail.latest(count: 10, folder: 'Sent');
+    await mail.latest(count: 10, withStarred: true);
+    await mail.latest(count: 10, offset: 10);
+
+    // The plain first page was kept once; every other ask went through.
+    expect(inner.latestCalls, <(String?, int, bool)>[
+      (null, 0, false),
+      (null, 10, false),
+      ('Sent', 0, false),
+      (null, 0, true),
+      (null, 10, false),
+    ]);
+    await mail.latest(count: 10);
+    expect(inner.latestCalls, hasLength(5));
+  });
+
   test('a second read soon after is answered without the server', () async {
     await mail.latest(count: 10);
     now = now.add(const Duration(minutes: 2));

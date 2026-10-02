@@ -182,6 +182,10 @@ abstract final class Messages {
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS READ.';
   static String mailBulkMarkedUnread(int n) =>
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS UNREAD.';
+  static const String mailLoadingMore = 'LOADING MORE...';
+  static const String mailToPrefix = 'TO:';
+  static const String mailFolders = 'FOLDERS';
+  static const String mailNoFolders = 'NO FOLDERS FOUND.';
   static const String mailStar = 'STAR';
   static const String mailUnstar = 'UNSTAR';
   static const String mailStarred = 'STARRED.';

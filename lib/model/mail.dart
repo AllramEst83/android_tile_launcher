@@ -9,6 +9,8 @@ class MailMessage {
     this.date,
     this.unread = false,
     this.starred = false,
+    this.to = '',
+    this.folder,
   });
 
   /// The server's id for it, which never changes and is never reused, unlike
@@ -30,6 +32,20 @@ class MailMessage {
   /// Whether it carries the server's `\Flagged` flag (Gmail's star).
   final bool starred;
 
+  /// Who it was sent to (the first address: the name if there is one, else the
+  /// address), for the Sent and Drafts folders; empty if unknown.
+  final String to;
+
+  /// The folder this message lives in when that is not the one being looked at
+  /// (an archived starred message shown among the inbox's), else null. Such a
+  /// message's [uid] is the server's id made negative, so it can never be
+  /// mistaken for an inbox message with the same number; [serverUid] undoes
+  /// that.
+  final String? folder;
+
+  /// The id to give the server, whichever folder it is in.
+  int get serverUid => uid.abs();
+
   MailMessage copyWith({bool? unread, bool? starred}) => MailMessage(
     uid: uid,
     from: from,
@@ -37,7 +53,39 @@ class MailMessage {
     date: date,
     unread: unread ?? this.unread,
     starred: starred ?? this.starred,
+    to: to,
+    folder: folder,
   );
+}
+
+/// What a folder is for, as far as the sheet treats folders differently.
+enum MailFolderKind {
+  inbox,
+  starred,
+  sent,
+  drafts,
+  allMail,
+  spam,
+  trash,
+  other,
+}
+
+/// One folder on the account. [name] is the server's own path for it, what
+/// every call that takes a folder is given; [label] is what the picker shows.
+class MailFolder {
+  const MailFolder({
+    required this.name,
+    required this.label,
+    this.kind = MailFolderKind.other,
+  });
+
+  final String name;
+  final String label;
+  final MailFolderKind kind;
+
+  /// Whether DELETE (a move to Trash) means anything here.
+  bool get canTrash =>
+      kind != MailFolderKind.trash && kind != MailFolderKind.spam;
 }
 
 /// [messages] with the starred ones first, each group keeping its order
@@ -143,7 +191,18 @@ class MailMessages extends MailResult {
     required this.total,
     required this.unread,
     this.validity,
+    this.starred = const <MailMessage>[],
+    this.nextOffset,
   });
+
+  /// Starred messages from anywhere on the account, asked for with the inbox
+  /// listing (an archived one is not in the inbox itself). Never repeated in
+  /// [messages].
+  final List<MailMessage> starred;
+
+  /// Where the next page starts, to ask for with `offset`; null when this was
+  /// the last.
+  final int? nextOffset;
 
   final List<MailMessage> messages;
   final int total;

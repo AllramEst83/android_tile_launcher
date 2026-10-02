@@ -56,16 +56,45 @@ class FakeMailService implements MailService {
   }
 
   @override
-  Future<MailMoveResult> moveToTrash(int uid, {int? validity}) async {
+  Future<MailMoveResult> moveToTrash(
+    int uid, {
+    int? validity,
+    String? folder,
+  }) async {
     moves.add((uid, validity));
+    folderArgs.add(folder);
     return moveResult;
   }
 
+  /// The `folder` of every `moveToTrash`, `read`, `mark` and `star` call.
+  final List<String?> folderArgs = <String?>[];
+
+  /// What `folders` answers.
+  List<MailFolder> folderList = const <MailFolder>[];
+
   @override
-  Future<MailResult> latest({int count = 20, bool fresh = false}) async {
+  Future<List<MailFolder>> folders() async => folderList;
+
+  /// Answers for `latest` / `search` by folder (null is the inbox), before
+  /// falling back to [result]; and every `(folder, offset, withStarred)`.
+  final Map<String?, MailResult> folderResults = <String?, MailResult>{};
+  final List<(String?, int, bool)> latestCalls = <(String?, int, bool)>[];
+
+  /// Answers for `latest` by offset, before falling back (a later page).
+  final Map<int, MailResult> pageResults = <int, MailResult>{};
+
+  @override
+  Future<MailResult> latest({
+    int count = 20,
+    bool fresh = false,
+    int offset = 0,
+    String? folder,
+    bool withStarred = false,
+  }) async {
     counts.add(count);
+    latestCalls.add((folder, offset, withStarred));
     if (fresh) freshCalls++;
-    return result;
+    return pageResults[offset] ?? folderResults[folder] ?? result;
   }
 
   /// What `search` answers, and every filter it was given, in order.
@@ -73,7 +102,12 @@ class FakeMailService implements MailService {
   final List<MailFilter> searches = <MailFilter>[];
 
   @override
-  Future<MailResult> search(MailFilter filter, {int count = 20}) async {
+  Future<MailResult> search(
+    MailFilter filter, {
+    int count = 20,
+    int offset = 0,
+    String? folder,
+  }) async {
     searches.add(filter);
     return searchResult ?? result;
   }
@@ -93,8 +127,9 @@ class FakeMailService implements MailService {
   final List<(int, bool, int?)> marks = <(int, bool, int?)>[];
 
   @override
-  Future<MailReadResult> read(int uid, {int? validity}) async {
+  Future<MailReadResult> read(int uid, {int? validity, String? folder}) async {
     reads.add((uid, validity));
+    folderArgs.add(folder);
     await readGate?.future;
     return readResults[uid] ?? readResult;
   }
@@ -104,8 +139,10 @@ class FakeMailService implements MailService {
     int uid, {
     required bool read,
     int? validity,
+    String? folder,
   }) async {
     marks.add((uid, read, validity));
+    folderArgs.add(folder);
     return markResult ?? MailMarked(read: read);
   }
 
@@ -118,8 +155,10 @@ class FakeMailService implements MailService {
     int uid, {
     required bool starred,
     int? validity,
+    String? folder,
   }) async {
     stars.add((uid, starred, validity));
+    folderArgs.add(folder);
     return starResult ?? MailStarred(starred: starred);
   }
 

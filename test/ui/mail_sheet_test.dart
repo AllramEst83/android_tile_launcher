@@ -7,6 +7,7 @@ import 'package:android_tile_launcher/services/attachment_download_service.dart'
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_filter_sheet.dart';
+import 'package:android_tile_launcher/ui/mail_folder_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -1789,6 +1790,132 @@ void main() {
 
       expect(mail.stars, <(int, bool, int?)>[(5, false, 77)]);
       expect(find.byKey(mailStarKey(5)), findsNothing);
+    });
+  });
+
+  group('paging and folders', () {
+    MailMessages page(int from, int to, {int? next}) => MailMessages(
+      <MailMessage>[
+        for (int uid = to; uid >= from; uid--)
+          _mail(uid, 'Sender $uid', 'S$uid'),
+      ],
+      total: 40,
+      unread: 0,
+      validity: 77,
+      nextOffset: next,
+    );
+
+    testWidgets('scrolling to the end loads the next 20', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service(page(21, 40, next: 20))
+        ..pageResults[20] = page(1, 20);
+      await _open(tester, mail);
+      expect(find.byKey(mailMessageKey(1)), findsNothing);
+
+      await tester.drag(find.byType(ListView).first, const Offset(0, -6000));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView).first, const Offset(0, -6000));
+      await tester.pumpAndSettle();
+
+      expect(mail.latestCalls, contains((null, 20, true)));
+      expect(find.byKey(mailMessageKey(1)), findsOneWidget);
+    });
+
+    testWidgets(
+      'starred messages from the account sit in the starred section',
+      (WidgetTester tester) async {
+        final MailMessages inbox = MailMessages(
+          <MailMessage>[_mail(12, 'Anna Andersson', 'Lunch')],
+          total: 1,
+          unread: 0,
+          validity: 77,
+          starred: <MailMessage>[
+            const MailMessage(
+              uid: -5,
+              from: 'Old Friend',
+              subject: 'Keep',
+              starred: true,
+              folder: '[Gmail]/Starred',
+            ),
+          ],
+        );
+        final FakeMailService mail = _service(inbox);
+        await _open(tester, mail);
+
+        expect(find.byKey(mailStarredHeaderKey), findsOneWidget);
+        expect(find.byKey(mailInboxHeaderKey), findsOneWidget);
+
+        // Acting on it addresses the folder it lives in, by its own id.
+        await tester.tap(find.byKey(mailMessageKey(-5)));
+        await tester.pumpAndSettle();
+        expect(mail.reads.single, (5, null));
+        expect(mail.folderArgs.single, '[Gmail]/Starred');
+      },
+    );
+
+    testWidgets('FOLDER lists the folders and loads the one chosen', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service()
+        ..folderList = const <MailFolder>[
+          MailFolder(name: 'INBOX', label: 'INBOX', kind: MailFolderKind.inbox),
+          MailFolder(
+            name: '[Gmail]/Sent Mail',
+            label: 'SENT',
+            kind: MailFolderKind.sent,
+          ),
+          MailFolder(
+            name: '[Gmail]/Trash',
+            label: 'TRASH',
+            kind: MailFolderKind.trash,
+          ),
+        ]
+        ..folderResults['[Gmail]/Sent Mail'] = MailMessages(
+          const <MailMessage>[
+            MailMessage(uid: 3, from: 'Kay', subject: 'Hello', to: 'Bo Berg'),
+          ],
+          total: 1,
+          unread: 0,
+          validity: 5,
+        );
+      await _open(tester, mail);
+
+      await tester.tap(find.byKey(mailFolderKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(mailFolderChoiceKey('[Gmail]/Sent Mail')));
+      await tester.pumpAndSettle();
+
+      expect(mail.latestCalls.last, ('[Gmail]/Sent Mail', 0, false));
+      expect(find.text('TO: BO BERG'), findsOneWidget);
+      expect(find.byKey(mailStarredHeaderKey), findsNothing);
+    });
+
+    testWidgets('DELETE does nothing in the Trash folder', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service()
+        ..folderList = const <MailFolder>[
+          MailFolder(
+            name: '[Gmail]/Trash',
+            label: 'TRASH',
+            kind: MailFolderKind.trash,
+          ),
+        ];
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailFolderKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(mailFolderChoiceKey('[Gmail]/Trash')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      await tester.tap(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+      await tester.tap(find.byKey(mailBulkDeleteKey));
+      await tester.pump();
+
+      expect(find.byKey(mailBulkYesKey), findsNothing);
     });
   });
 }

@@ -48,7 +48,25 @@ class CachedMailService implements MailService {
   }
 
   @override
-  Future<MailResult> latest({int count = 20, bool fresh = false}) async {
+  Future<MailResult> latest({
+    int count = 20,
+    bool fresh = false,
+    int offset = 0,
+    String? folder,
+    bool withStarred = false,
+  }) async {
+    // Only the plain first page of the inbox is kept: it is what the tile
+    // polls. The sheet's other pages, folders and starred listing are always
+    // asked for.
+    if (folder != null || offset != 0 || withStarred) {
+      return inner.latest(
+        count: count,
+        fresh: true,
+        offset: offset,
+        folder: folder,
+        withStarred: withStarred,
+      );
+    }
     final MailMessages? kept = _kept;
     final DateTime? at = _keptAt;
     if (!fresh &&
@@ -72,24 +90,36 @@ class CachedMailService implements MailService {
   }
 
   @override
-  Future<MailResult> search(MailFilter filter, {int count = 20}) =>
+  Future<List<MailFolder>> folders() => inner.folders();
+
+  @override
+  Future<MailResult> search(
+    MailFilter filter, {
+    int count = 20,
+    int offset = 0,
+    String? folder,
+  }) =>
       // A filtered search always asks the server fresh; caching it would need
       // one cache slot per filter for a feature used far less than a plain
       // read of the inbox.
-      inner.search(filter, count: count);
+      inner.search(filter, count: count, offset: offset, folder: folder);
 
   @override
-  Future<MailMoveResult> moveToTrash(int uid, {int? validity}) async {
+  Future<MailMoveResult> moveToTrash(
+    int uid, {
+    int? validity,
+    String? folder,
+  }) async {
     // The inbox has changed, or is about to be.
     _drop();
-    return inner.moveToTrash(uid, validity: validity);
+    return inner.moveToTrash(uid, validity: validity, folder: folder);
   }
 
   @override
-  Future<MailReadResult> read(int uid, {int? validity}) async {
+  Future<MailReadResult> read(int uid, {int? validity, String? folder}) async {
     // Opening a message changes its unread state, so the counts are stale.
     _drop();
-    return inner.read(uid, validity: validity);
+    return inner.read(uid, validity: validity, folder: folder);
   }
 
   @override
@@ -97,9 +127,10 @@ class CachedMailService implements MailService {
     int uid, {
     required bool read,
     int? validity,
+    String? folder,
   }) async {
     _drop();
-    return inner.mark(uid, read: read, validity: validity);
+    return inner.mark(uid, read: read, validity: validity, folder: folder);
   }
 
   @override
@@ -107,9 +138,15 @@ class CachedMailService implements MailService {
     int uid, {
     required bool starred,
     int? validity,
+    String? folder,
   }) async {
     _drop();
-    return inner.star(uid, starred: starred, validity: validity);
+    return inner.star(
+      uid,
+      starred: starred,
+      validity: validity,
+      folder: folder,
+    );
   }
 
   @override

@@ -15,6 +15,8 @@ import 'package:enough_mail/enough_mail.dart'
         ImapClient,
         ImapException,
         MailAddress,
+        Mailbox,
+        MailboxFlag,
         MessageBuilder,
         MessageFlags,
         MessageSequence,
@@ -119,7 +121,13 @@ class ImapMailService implements MailService {
   }
 
   @override
-  Future<MailResult> latest({int count = 20, bool fresh = false}) async {
+  Future<MailResult> latest({
+    int count = 20,
+    bool fresh = false,
+    int offset = 0,
+    String? folder,
+    bool withStarred = false,
+  }) async {
     final MailAccount? saved;
     try {
       saved = await _accounts.load();
@@ -129,28 +137,44 @@ class ImapMailService implements MailService {
     if (saved == null) return const MailNotSetUp();
 
     final outcome = await _session<MailMessages>(saved, (client) async {
-      final inbox = await client.selectInbox();
-      final total = inbox.messagesExists;
-      if (total == 0) {
-        return const MailMessages([], total: 0, unread: 0);
+      final box = await _select(client, folder);
+      final total = box.messagesExists;
+      var page = <MailMessage>[];
+      var unread = 0;
+      int? next;
+      if (total > 0) {
+        final status = await client.statusMailbox(box, [StatusFlags.unseen]);
+        unread = status.messagesUnseen;
+        // The newest `count` by position, after skipping `offset` of them.
+        // (The library's own "recent" call asks for one more than it is told.)
+        final end = total - offset;
+        if (end >= 1) {
+          final first = end > count ? end - count + 1 : 1;
+          final fetched = await client.fetchMessages(
+            MessageSequence.fromRange(first, end),
+            '(UID FLAGS ENVELOPE)',
+            responseTimeout: timeout,
+          );
+          page = [
+            for (final message in fetched.messages) ?mailMessageFrom(message),
+          ]..sort((a, b) => b.uid.compareTo(a.uid));
+          if (first > 1) next = offset + (end - first + 1);
+        }
       }
-      final status = await client.statusMailbox(inbox, [StatusFlags.unseen]);
-      // The newest `count` by position. (The library's own "recent" call asks
-      // for one more than it is told.)
-      final first = total > count ? total - count + 1 : 1;
-      final fetched = await client.fetchMessages(
-        MessageSequence.fromRange(first, total),
-        '(UID FLAGS ENVELOPE)',
-        responseTimeout: timeout,
-      );
-      final messages = [
-        for (final message in fetched.messages) ?mailMessageFrom(message),
-      ]..sort((a, b) => b.uid.compareTo(a.uid));
+      final validity = box.uidValidity;
+      var starred = const <MailMessage>[];
+      if (withStarred && folder == null) {
+        // Every starred message is listed apart, so none is repeated here.
+        page = page.where((m) => !m.starred).toList();
+        if (offset == 0) starred = await _starredMessages(client);
+      }
       return MailMessages(
-        messages,
+        page,
         total: total,
-        unread: status.messagesUnseen,
-        validity: inbox.uidValidity,
+        unread: unread,
+        validity: validity,
+        starred: starred,
+        nextOffset: next,
       );
     });
     return switch (outcome) {
@@ -159,8 +183,117 @@ class ImapMailService implements MailService {
     };
   }
 
+  /// The most starred messages worth listing at once.
+  static const int _maxStarred = 200;
+
+  /// Every starred message on the account, newest first: the inbox's own
+  /// (they carry `\Flagged`; the inbox must be the selected mailbox) plus, on
+  /// a server that has a folder for them (Gmail's Starred), the ones that are
+  /// no longer in the inbox, which only that folder holds. A failure to read
+  /// the folder leaves the inbox's own.
+  Future<List<MailMessage>> _starredMessages(ImapClient client) async {
+    final inboxFound = await client.uidSearchMessages(
+      searchCriteria: 'FLAGGED',
+      responseTimeout: timeout,
+    );
+    final inboxMessages = await _fetchNewest(
+      client,
+      inboxFound.matchingSequence?.toList() ?? <int>[],
+    );
+    final starred = <MailMessage>[
+      for (final message in inboxMessages) ?mailMessageFrom(message),
+    ];
+    final inboxIds = <String>{
+      for (final message in inboxMessages)
+        if (message.envelope?.messageId case final String id) id,
+    };
+    try {
+      final boxes = await client.listMailboxes(recursive: true);
+      final box = boxes
+          .where((b) => b.hasFlag(MailboxFlag.flagged) && !b.isNotSelectable)
+          .firstOrNull;
+      if (box != null) {
+        await client.selectMailboxByPath(box.path);
+        final found = await client.uidSearchMessages(
+          searchCriteria: 'ALL',
+          responseTimeout: timeout,
+        );
+        final others = await _fetchNewest(
+          client,
+          found.matchingSequence?.toList() ?? <int>[],
+        );
+        for (final message in others) {
+          final id = message.envelope?.messageId;
+          if (id != null && inboxIds.contains(id)) continue;
+          final entry = mailMessageFrom(message, folder: box.path);
+          if (entry != null) starred.add(entry);
+        }
+      }
+    } on ImapException {
+      // The inbox's own starred messages are still worth showing.
+    }
+    starred.sort((a, b) {
+      final x = a.date;
+      final y = b.date;
+      if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+      return y.compareTo(x);
+    });
+    return starred;
+  }
+
+  /// The envelopes (with flags) of the newest [_maxStarred] of [uids] in the
+  /// selected mailbox.
+  Future<List<MimeMessage>> _fetchNewest(
+    ImapClient client,
+    List<int> uids,
+  ) async {
+    if (uids.isEmpty) return <MimeMessage>[];
+    final newest = (uids.toList()..sort((a, b) => b.compareTo(a))).take(
+      _maxStarred,
+    );
+    final sequence = MessageSequence(isUidSequence: true);
+    for (final uid in newest) {
+      sequence.add(uid);
+    }
+    final fetched = await client.uidFetchMessages(
+      sequence,
+      '(UID FLAGS ENVELOPE)',
+      responseTimeout: timeout,
+    );
+    return fetched.messages;
+  }
+
+  Future<Mailbox> _select(ImapClient client, String? folder) => folder == null
+      ? client.selectInbox()
+      : client.selectMailboxByPath(folder);
+
   @override
-  Future<MailResult> search(MailFilter filter, {int count = 20}) async {
+  Future<List<MailFolder>> folders() async {
+    final MailAccount? saved;
+    try {
+      saved = await _accounts.load();
+    } on LocalStoreException {
+      return <MailFolder>[];
+    }
+    if (saved == null) return <MailFolder>[];
+    final outcome = await _session<List<MailFolder>>(
+      saved,
+      (client) async =>
+          mailFoldersFrom(await client.listMailboxes(recursive: true)),
+    );
+    return switch (outcome) {
+      _Done(:final value) => value,
+      _Failed() => <MailFolder>[],
+    };
+  }
+
+  @override
+  Future<MailResult> search(
+    MailFilter filter, {
+    int count = 20,
+    int offset = 0,
+    String? folder,
+  }) async {
     final MailAccount? saved;
     try {
       saved = await _accounts.load();
@@ -170,7 +303,7 @@ class ImapMailService implements MailService {
     if (saved == null) return const MailNotSetUp();
 
     final outcome = await _session<MailMessages>(saved, (client) async {
-      final inbox = await client.selectInbox();
+      final box = await _select(client, folder);
       final query = _queryFor(filter);
       final found = query == null
           ? await client.uidSearchMessages(
@@ -181,35 +314,34 @@ class ImapMailService implements MailService {
               query,
               responseTimeout: timeout,
             );
-      final uids = found.matchingSequence?.toList() ?? <int>[];
+      final uids = (found.matchingSequence?.toList() ?? <int>[])
+        ..sort((a, b) => b.compareTo(a));
       if (uids.isEmpty) {
         return const MailMessages([], total: 0, unread: 0);
       }
+      // Only this page's messages are fetched, not every match.
+      final slice = uids.skip(offset).take(count).toList();
       final sequence = MessageSequence(isUidSequence: true);
-      for (final uid in uids) {
+      for (final uid in slice) {
         sequence.add(uid);
       }
-      final fetched = await client.uidFetchMessages(
-        sequence,
-        '(UID FLAGS ENVELOPE)',
-        responseTimeout: timeout,
-      );
+      final fetched = slice.isEmpty
+          ? null
+          : await client.uidFetchMessages(
+              sequence,
+              '(UID FLAGS ENVELOPE)',
+              responseTimeout: timeout,
+            );
       final messages = [
-        for (final message in fetched.messages) ?mailMessageFrom(message),
+        for (final message in fetched?.messages ?? <MimeMessage>[])
+          ?mailMessageFrom(message),
       ]..sort((a, b) => b.uid.compareTo(a.uid));
-      // The newest [count], plus any older starred message: a star keeps it
-      // in the list however far down the inbox it has sunk.
-      final capped = messages.length > count
-          ? <MailMessage>[
-              ...messages.sublist(0, count),
-              ...messages.sublist(count).where((m) => m.starred),
-            ]
-          : messages;
       return MailMessages(
-        capped,
-        total: messages.length,
+        messages,
+        total: uids.length,
         unread: messages.where((m) => m.unread).length,
-        validity: inbox.uidValidity,
+        validity: box.uidValidity,
+        nextOffset: offset + count < uids.length ? offset + count : null,
       );
     });
     return switch (outcome) {
@@ -219,7 +351,11 @@ class ImapMailService implements MailService {
   }
 
   @override
-  Future<MailMoveResult> moveToTrash(int uid, {int? validity}) async {
+  Future<MailMoveResult> moveToTrash(
+    int uid, {
+    int? validity,
+    String? folder,
+  }) async {
     final MailAccount? saved;
     try {
       saved = await _accounts.load();
@@ -230,7 +366,7 @@ class ImapMailService implements MailService {
     final host = saved.host;
 
     final outcome = await _session<MailMoveResult>(saved, (client) async {
-      final inbox = await client.selectInbox();
+      final inbox = await _select(client, folder);
       if (validity != null && inbox.uidValidity != validity) {
         return const MailMoveFailed(
           'the server renumbered the inbox; run mail again',
@@ -273,7 +409,7 @@ class ImapMailService implements MailService {
   }
 
   @override
-  Future<MailReadResult> read(int uid, {int? validity}) async {
+  Future<MailReadResult> read(int uid, {int? validity, String? folder}) async {
     final MailAccount? saved;
     try {
       saved = await _accounts.load();
@@ -283,7 +419,7 @@ class ImapMailService implements MailService {
     if (saved == null) return const MailReadNotSetUp();
 
     final outcome = await _session<MailReadResult>(saved, (client) async {
-      final inbox = await client.selectInbox();
+      final inbox = await _select(client, folder);
       if (validity != null && inbox.uidValidity != validity) {
         return const MailReadFailed(
           'the server renumbered the inbox; refresh the list',
@@ -343,6 +479,7 @@ class ImapMailService implements MailService {
     int uid, {
     required bool read,
     int? validity,
+    String? folder,
   }) async {
     final MailAccount? saved;
     try {
@@ -353,7 +490,7 @@ class ImapMailService implements MailService {
     if (saved == null) return const MailMarkNotSetUp();
 
     final outcome = await _session<MailMarkResult>(saved, (client) async {
-      final inbox = await client.selectInbox();
+      final inbox = await _select(client, folder);
       if (validity != null && inbox.uidValidity != validity) {
         return const MailMarkFailed(
           'the server renumbered the inbox; refresh the list',
@@ -381,6 +518,7 @@ class ImapMailService implements MailService {
     int uid, {
     required bool starred,
     int? validity,
+    String? folder,
   }) async {
     final MailAccount? saved;
     try {
@@ -391,7 +529,7 @@ class ImapMailService implements MailService {
     if (saved == null) return const MailStarNotSetUp();
 
     final outcome = await _session<MailStarResult>(saved, (client) async {
-      final inbox = await client.selectInbox();
+      final inbox = await _select(client, folder);
       if (validity != null && inbox.uidValidity != validity) {
         return const MailStarFailed(
           'the server renumbered the inbox; refresh the list',
@@ -639,9 +777,14 @@ class _Failed<T> extends _Outcome<T> {
 /// [message] as a list entry, or null if the server gave no UID for it (then
 /// it could never be told apart later). Kept apart from the network so it can
 /// be tested on its own.
-MailMessage? mailMessageFrom(MimeMessage message) {
-  final uid = message.uid;
-  if (uid == null) return null;
+MailMessage? mailMessageFrom(MimeMessage message, {String? folder}) {
+  final rawUid = message.uid;
+  if (rawUid == null) return null;
+  // See MailMessage.folder: a message from another folder gets a negative id.
+  final uid = folder == null ? rawUid : -rawUid;
+  final recipient = message.to?.firstOrNull;
+  final recipientName = recipient?.personalName?.trim() ?? '';
+  final recipientAddress = recipient?.email.trim() ?? '';
   final sender = message.from?.firstOrNull;
   final name = sender?.personalName?.trim() ?? '';
   final address = sender?.email.trim() ?? '';
@@ -654,7 +797,45 @@ MailMessage? mailMessageFrom(MimeMessage message) {
     date: sent?.toLocal(),
     unread: !message.isSeen,
     starred: message.isFlagged,
+    to: recipientName.isNotEmpty ? recipientName : recipientAddress,
+    folder: folder,
   );
+}
+
+/// The folders worth showing from the account's [boxes]: the ones a message
+/// can be in (not a bare parent like Gmail's `[Gmail]`), the well-known ones
+/// first in a fixed order, then the rest by name.
+List<MailFolder> mailFoldersFrom(List<Mailbox> boxes) {
+  final folders = <MailFolder>[];
+  for (final box in boxes) {
+    if (box.isNotSelectable) continue;
+    final MailFolderKind kind;
+    final String label;
+    if (box.isInbox) {
+      (kind, label) = (MailFolderKind.inbox, 'INBOX');
+    } else if (box.hasFlag(MailboxFlag.flagged)) {
+      (kind, label) = (MailFolderKind.starred, 'STARRED');
+    } else if (box.isSent) {
+      (kind, label) = (MailFolderKind.sent, 'SENT');
+    } else if (box.isDrafts) {
+      (kind, label) = (MailFolderKind.drafts, 'DRAFTS');
+    } else if (box.hasFlag(MailboxFlag.all)) {
+      (kind, label) = (MailFolderKind.allMail, 'ALL MAIL');
+    } else if (box.isJunk) {
+      (kind, label) = (MailFolderKind.spam, 'SPAM');
+    } else if (box.isTrash) {
+      (kind, label) = (MailFolderKind.trash, 'TRASH');
+    } else {
+      (kind, label) = (MailFolderKind.other, box.name.toUpperCase());
+    }
+    folders.add(MailFolder(name: box.path, label: label, kind: kind));
+  }
+  // Well-known kinds in enum order, the rest alphabetically.
+  folders.sort((a, b) {
+    final byKind = a.kind.index.compareTo(b.kind.index);
+    return byKind != 0 ? byKind : a.label.compareTo(b.label);
+  });
+  return folders;
 }
 
 /// [message] (fetched whole) as what the reader shows, given its list [entry]

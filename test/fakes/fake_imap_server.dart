@@ -119,6 +119,9 @@ class FakeImapServer {
   /// `STORE` changes it.
   final Set<int> seen = {};
 
+  /// The uids that carry `\Flagged` (starred).
+  final Set<int> flagged = {};
+
   /// Set to make the next `STORE` of `\Seen` fail with a server error.
   bool failStoreSeen = false;
 
@@ -251,7 +254,7 @@ class FakeImapServer {
           final i = inbox.indexWhere((m) => m.uid == id);
           if (i < 0) continue;
           final message = inbox[i];
-          final flags = 'FLAGS (${seen.contains(id) ? r'\Seen' : ''})';
+          final flags = 'FLAGS (${_flagList(id)})';
           out.write('* ${i + 1} FETCH (UID $id');
           if (items.contains('FLAGS')) out.write(' $flags');
           if (items.contains('RFC822.SIZE')) {
@@ -293,6 +296,11 @@ class FakeImapServer {
           if (uid != null && index >= 0) {
             adding ? seen.add(uid) : seen.remove(uid);
           }
+        } else if (flags.contains(r'\Flagged')) {
+          final adding = words[3].startsWith('+');
+          if (uid != null && index >= 0) {
+            adding ? flagged.add(uid) : flagged.remove(uid);
+          }
         } else if (uid != null && index >= 0) {
           _deleted.add(uid);
         }
@@ -316,6 +324,11 @@ class FakeImapServer {
     }
   }
 
+  String _flagList(int uid) => [
+    if (seen.contains(uid)) r'\Seen',
+    if (flagged.contains(uid)) r'\Flagged',
+  ].join(' ');
+
   String _envelope(FakeImapMessage m) {
     final at = m.address.split('@');
     final person =
@@ -326,7 +339,7 @@ class FakeImapServer {
 
   String _fetchLine(int seq, FakeImapMessage m) {
     return '* $seq FETCH (UID ${m.uid} '
-        'FLAGS (${seen.contains(m.uid) ? r'\Seen' : ''}) '
+        'FLAGS (${_flagList(m.uid)}) '
         '${_envelope(m)})\r\n';
   }
 }
