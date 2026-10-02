@@ -35,6 +35,11 @@ abstract interface class MailService {
     bool withStarred = false,
   });
 
+  /// The inbox listing last shown (headers only), kept on the phone, for the
+  /// sheet to put up at once while it asks the server for the real one; null
+  /// if there is none or it was kept for another account. Never throws.
+  Future<MailMessages?> cachedInbox();
+
   /// The account's folders worth showing, in the order to show them. Empty if
   /// there is no account or the server could not be asked. Never throws.
   Future<List<MailFolder>> folders();

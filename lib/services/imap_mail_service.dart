@@ -268,6 +268,9 @@ class ImapMailService implements MailService {
       : client.selectMailboxByPath(folder);
 
   @override
+  Future<MailMessages?> cachedInbox() async => null;
+
+  @override
   Future<List<MailFolder>> folders() async {
     final MailAccount? saved;
     try {

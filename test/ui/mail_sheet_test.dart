@@ -1918,4 +1918,52 @@ void main() {
       expect(find.byKey(mailBulkYesKey), findsNothing);
     });
   });
+
+  group('saved listing', () {
+    MailMessages listing(String from) => MailMessages(
+      <MailMessage>[_mail(40, from, 'Subject')],
+      total: 1,
+      unread: 0,
+      validity: 77,
+    );
+
+    testWidgets('shows the saved list at once, then the real one', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service(listing('Fresh Sender'))
+        ..cached = listing('Saved Sender')
+        ..latestGate = Completer<void>();
+      await _open(tester, mail);
+      // Still waiting on the server: the saved list is already up.
+      expect(find.text('SAVED SENDER'), findsOneWidget);
+      expect(find.text(Messages.mailUpdating), findsOneWidget);
+
+      mail.latestGate!.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('FRESH SENDER'), findsOneWidget);
+      expect(find.text('SAVED SENDER'), findsNothing);
+      expect(find.text(Messages.mailUpdating), findsNothing);
+    });
+
+    testWidgets('keeps the saved list when the server cannot be reached', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service(const MailUnavailable('no network'))
+        ..cached = listing('Saved Sender');
+      await _open(tester, mail);
+
+      expect(find.text('SAVED SENDER'), findsOneWidget);
+      expect(find.text(Messages.mailSavedListing), findsOneWidget);
+    });
+
+    testWidgets('with nothing saved it loads as before', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service(listing('Fresh Sender'));
+      await _open(tester, mail);
+
+      expect(find.text('FRESH SENDER'), findsOneWidget);
+    });
+  });
 }

@@ -1,4 +1,7 @@
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/mail_cache.dart';
+import 'package:android_tile_launcher/services/local_store.dart';
+import 'package:android_tile_launcher/services/local_store_exception.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 
 DateTime _systemNow() => DateTime.now();
@@ -13,15 +16,63 @@ class CachedMailService implements MailService {
     required this.inner,
     this.maxAge = const Duration(minutes: 3),
     this.clock = _systemNow,
+    this.store,
   });
 
   final MailService inner;
   final Duration maxAge;
   final DateTime Function() clock;
 
+  /// Where the inbox listing is kept between runs (headers only); null keeps
+  /// nothing.
+  final LocalStore? store;
+
+  static const String storeKey = 'mail_listing';
+
   MailMessages? _kept;
   int _keptCount = 0;
   DateTime? _keptAt;
+
+  /// Forgets the saved listing too: it belongs to an account that is changing
+  /// or going.
+  Future<void> _forgetSaved() async {
+    try {
+      await store?.delete(storeKey);
+    } on LocalStoreException {
+      // A listing that cannot be removed is only ever a head start.
+    }
+  }
+
+  Future<void> _save(MailMessages listing) async {
+    final LocalStore? target = store;
+    if (target == null) return;
+    try {
+      final MailAccountInfo? account = await inner.account();
+      if (account == null) return;
+      await target.write(
+        storeKey,
+        mailListingToJson(listing, account: account.email),
+      );
+    } on LocalStoreException {
+      // See above.
+    }
+  }
+
+  @override
+  Future<MailMessages?> cachedInbox() async {
+    final LocalStore? source = store;
+    if (source == null) return null;
+    try {
+      final MailAccountInfo? account = await inner.account();
+      if (account == null) return null;
+      return mailListingFromJson(
+        await source.read(storeKey),
+        account: account.email,
+      );
+    } on LocalStoreException {
+      return null;
+    }
+  }
 
   void _drop() {
     _kept = null;
@@ -38,12 +89,14 @@ class CachedMailService implements MailService {
     required String password,
   }) async {
     _drop();
+    await _forgetSaved();
     return inner.setUp(email: email, host: host, password: password);
   }
 
   @override
   Future<bool> forget() async {
     _drop();
+    await _forgetSaved();
     return inner.forget();
   }
 
@@ -59,13 +112,22 @@ class CachedMailService implements MailService {
     // polls. The sheet's other pages, folders and starred listing are always
     // asked for.
     if (folder != null || offset != 0 || withStarred) {
-      return inner.latest(
+      final MailResult result = await inner.latest(
         count: count,
         fresh: true,
         offset: offset,
         folder: folder,
         withStarred: withStarred,
       );
+      // The sheet's own first page of the inbox is what it shows first next
+      // time.
+      if (folder == null &&
+          offset == 0 &&
+          withStarred &&
+          result is MailMessages) {
+        await _save(result);
+      }
+      return result;
     }
     final MailMessages? kept = _kept;
     final DateTime? at = _keptAt;

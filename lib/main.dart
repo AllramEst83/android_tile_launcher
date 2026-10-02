@@ -114,6 +114,7 @@ Future<void> main() async {
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),
         mail: CachedMailService(
+          store: store,
           inner: ImapMailService(
             accounts: MailAccountStore(FlutterSecretStore()),
           ),

@@ -3,6 +3,7 @@ import 'package:android_tile_launcher/services/cached_mail_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_mail_service.dart';
+import '../fakes/in_memory_local_store.dart';
 
 MailMessages _inbox({int shown = 3, int total = 50}) => MailMessages(
   <MailMessage>[
@@ -206,5 +207,56 @@ void main() {
     // sending left untouched, not a second call to the server.
     await mail.latest(count: 10);
     expect(inner.counts, hasLength(1));
+  });
+
+  group('saved listing', () {
+    late InMemoryLocalStore store;
+    late CachedMailService saving;
+
+    setUp(() {
+      store = InMemoryLocalStore();
+      inner.saved = const MailAccountInfo(email: 'kay@gmail.com', host: 'h');
+      saving = CachedMailService(inner: inner, store: store);
+    });
+
+    test('nothing is saved before the sheet has asked', () async {
+      expect(await saving.cachedInbox(), isNull);
+      await saving.latest(count: 10);
+      expect(await saving.cachedInbox(), isNull);
+    });
+
+    test('the first inbox page of the sheet is saved and comes back', () async {
+      await saving.latest(count: 20, withStarred: true);
+
+      final MailMessages? back = await saving.cachedInbox();
+      expect(back, isNotNull);
+      expect(back!.total, (inner.result as MailMessages).total);
+    });
+
+    test('a later page or another folder is not saved over it', () async {
+      await saving.latest(count: 20, withStarred: true);
+      inner.result = const MailMessages([], total: 0, unread: 0);
+      await saving.latest(count: 20, withStarred: true, offset: 20);
+      await saving.latest(count: 20, withStarred: true, folder: 'Sent');
+
+      expect((await saving.cachedInbox())!.total, isNot(0));
+    });
+
+    test('forgetting or setting up an account drops it', () async {
+      await saving.latest(count: 20, withStarred: true);
+      await saving.forget();
+      expect(await saving.cachedInbox(), isNull);
+
+      await saving.latest(count: 20, withStarred: true);
+      inner.saved = const MailAccountInfo(email: 'kay@gmail.com', host: 'h');
+      await saving.setUp(email: 'x@y.z', host: 'h', password: 'p');
+      expect(await saving.cachedInbox(), isNull);
+    });
+
+    test('a listing kept for another account is not shown', () async {
+      await saving.latest(count: 20, withStarred: true);
+      inner.saved = const MailAccountInfo(email: 'other@gmail.com', host: 'h');
+      expect(await saving.cachedInbox(), isNull);
+    });
   });
 }

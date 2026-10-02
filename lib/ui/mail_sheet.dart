@@ -188,13 +188,17 @@ class _MailSheetState extends State<_MailSheet> {
   /// they are being fetched now.
   int? _nextOffset;
   bool _loadingMore = false;
+
+  /// Whether a saved listing is on show while the server is asked for the
+  /// real one.
+  bool _refreshing = false;
   final ScrollController _scroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _scroll.addListener(_maybeLoadMore);
-    _load();
+    _load(useCache: true);
   }
 
   @override
@@ -241,7 +245,8 @@ class _MailSheetState extends State<_MailSheet> {
   /// Fetches the next 20 and adds them to the end of the list.
   Future<void> _loadMore() async {
     final int? at = _nextOffset;
-    if (at == null || _loadingMore || _loading || _busy) return;
+    // Not while the saved list is still being replaced: its offsets are old.
+    if (at == null || _loadingMore || _loading || _busy || _refreshing) return;
     setState(() => _loadingMore = true);
     final MailResult result = await _fetch(offset: at);
     if (!mounted) return;
@@ -281,10 +286,10 @@ class _MailSheetState extends State<_MailSheet> {
       _filter = const MailFilter();
       _status = null;
     });
-    await _load();
+    await _load(useCache: true);
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool useCache = false}) async {
     setState(() {
       _loading = true;
       _openUid = null;
@@ -295,16 +300,47 @@ class _MailSheetState extends State<_MailSheet> {
       _confirmingBulkTrash = false;
     });
     final MailAccountInfo? account = await widget.mail.account();
+    // The listing last seen goes up at once, while the server is asked for the
+    // real one; what is on screen is replaced when that arrives.
+    MailMessages? shown;
+    if (useCache && _folder == null && _filter.isEmpty) {
+      shown = await widget.mail.cachedInbox();
+      if (!mounted) return;
+      if (shown != null) {
+        setState(() {
+          _loading = false;
+          _refreshing = true;
+          _status = Messages.mailUpdating;
+          _email = account?.email;
+          _result = shown;
+          _messages = _arranged(shown!);
+          _nextOffset = shown.nextOffset;
+        });
+      }
+    }
     // Always from the server: the sheet is for looking at what is there now.
     final MailResult result = await _fetch();
     if (!mounted) return;
+    if (shown != null && result is! MailMessages) {
+      // No answer (offline, say): the saved listing stays, and says so.
+      setState(() {
+        _refreshing = false;
+        _status = Messages.mailSavedListing;
+      });
+      return;
+    }
     setState(() {
       _loading = false;
+      _refreshing = false;
+      if (_status == Messages.mailUpdating) _status = null;
       _email = account?.email;
       _result = result;
       _messages = result is MailMessages ? _arranged(result) : <MailMessage>[];
       _nextOffset = result is MailMessages ? result.nextOffset : null;
       _loadingMore = false;
+      // A message opened or ticked meanwhile stays so, unless it is gone.
+      final Set<int> now = _messages.map((MailMessage m) => m.uid).toSet();
+      _selected.retainWhere(now.contains);
     });
     _checkFilled();
   }

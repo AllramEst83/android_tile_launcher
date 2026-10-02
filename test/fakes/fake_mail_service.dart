@@ -69,6 +69,15 @@ class FakeMailService implements MailService {
   /// The `folder` of every `moveToTrash`, `read`, `mark` and `star` call.
   final List<String?> folderArgs = <String?>[];
 
+  /// When set, `latest` waits for it: a server that is still answering.
+  Completer<void>? latestGate;
+
+  /// What `cachedInbox` answers.
+  MailMessages? cached;
+
+  @override
+  Future<MailMessages?> cachedInbox() async => cached;
+
   /// What `folders` answers.
   List<MailFolder> folderList = const <MailFolder>[];
 
@@ -93,6 +102,7 @@ class FakeMailService implements MailService {
   }) async {
     counts.add(count);
     latestCalls.add((folder, offset, withStarred));
+    await latestGate?.future;
     if (fresh) freshCalls++;
     return pageResults[offset] ?? folderResults[folder] ?? result;
   }
