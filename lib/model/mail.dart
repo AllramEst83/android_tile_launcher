@@ -70,8 +70,8 @@ enum MailFolderKind {
   other,
 }
 
-/// One folder on the account. [name] is the server's own path for it, what
-/// every call that takes a folder is given; [label] is what the picker shows.
+/// One folder on the account. [name] is the server's own (encoded) path for
+/// it, what every call that takes a folder is given; [label] is what the picker shows.
 class MailFolder {
   const MailFolder({
     required this.name,

@@ -213,7 +213,7 @@ class ImapMailService implements MailService {
           .where((b) => b.hasFlag(MailboxFlag.flagged) && !b.isNotSelectable)
           .firstOrNull;
       if (box != null) {
-        await client.selectMailboxByPath(box.path);
+        await client.selectMailboxByPath(box.encodedPath);
         final found = await client.uidSearchMessages(
           searchCriteria: 'ALL',
           responseTimeout: timeout,
@@ -225,7 +225,7 @@ class ImapMailService implements MailService {
         for (final message in others) {
           final id = message.envelope?.messageId;
           if (id != null && inboxIds.contains(id)) continue;
-          final entry = mailMessageFrom(message, folder: box.path);
+          final entry = mailMessageFrom(message, folder: box.encodedPath);
           if (entry != null) starred.add(entry);
         }
       }
@@ -828,7 +828,9 @@ List<MailFolder> mailFoldersFrom(List<Mailbox> boxes) {
     } else {
       (kind, label) = (MailFolderKind.other, box.name.toUpperCase());
     }
-    folders.add(MailFolder(name: box.path, label: label, kind: kind));
+    // The server's own (modified UTF-7) spelling, e.g. `Best&AOQ-llningar`:
+    // what SELECT must be given. Only the label is the readable name.
+    folders.add(MailFolder(name: box.encodedPath, label: label, kind: kind));
   }
   // Well-known kinds in enum order, the rest alphabetically.
   folders.sort((a, b) {

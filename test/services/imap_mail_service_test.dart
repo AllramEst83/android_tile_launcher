@@ -1186,6 +1186,16 @@ void main() {
       pathSeparator: '/',
     );
 
+    test('keeps the encoded server name apart from the readable label', () {
+      final folders = mailFoldersFrom([
+        box('INBOX', [MailboxFlag.inbox]),
+        box('Best&AOQ-llningar', []),
+      ]);
+
+      expect(folders.last.name, 'Best&AOQ-llningar');
+      expect(folders.last.label, 'BESTÄLLNINGAR');
+    });
+
     test('orders the well-known folders first and skips bare parents', () {
       final folders = mailFoldersFrom([
         box('Receipts', []),
