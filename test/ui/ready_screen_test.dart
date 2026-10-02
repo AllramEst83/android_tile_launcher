@@ -51,9 +51,24 @@ Future<TodoList> _pump(
 }
 
 String _text(WidgetTester tester) =>
-    tester.widget<Text>(find.byKey(readyTextKey)).data!;
+    tester.widget<Text>(find.byKey(readyTextKey)).textSpan!.toPlainText();
 
 void main() {
+  testWidgets('the text does not move while the cursor blinks', (
+    WidgetTester tester,
+  ) async {
+    await _pump(tester);
+    await tester.pump(const Duration(seconds: 30));
+    final Size size = tester.getSize(find.byKey(readyTextKey));
+    final Set<String> sizes = <String>{};
+    for (int i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 30));
+      sizes.add('${tester.getSize(find.byKey(readyTextKey))}');
+    }
+
+    expect(sizes, <String>{'$size'});
+  });
+
   testWidgets('types LOAD "TODAY",8 first', (WidgetTester tester) async {
     await _pump(tester);
     await tester.pump(const Duration(milliseconds: 300));

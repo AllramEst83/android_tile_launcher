@@ -270,6 +270,96 @@ class ImapMailService implements MailService {
   @override
   Future<MailMessages?> cachedInbox() async => null;
 
+  /// Runs [change] on the account's folders; it answers null when it went
+  /// through, else why it did not. Never throws.
+  Future<MailFolderResult> _changeFolders(
+    Future<String?> Function(ImapClient client, List<Mailbox> boxes) change,
+  ) async {
+    final MailAccount? saved;
+    try {
+      saved = await _accounts.load();
+    } on LocalStoreException catch (error) {
+      return MailFolderFailed(error.message);
+    }
+    if (saved == null) return const MailFolderNotSetUp();
+    final outcome = await _session<String?>(
+      saved,
+      (client) async =>
+          change(client, await client.listMailboxes(recursive: true)),
+    );
+    return switch (outcome) {
+      _Done(:final value) =>
+        value == null ? const MailFolderDone() : MailFolderFailed(value),
+      _Failed(:final reason) => MailFolderFailed(reason),
+    };
+  }
+
+  /// Why [name] cannot be a folder's own, or null: it is empty, or holds the
+  /// character that separates a folder from its parent.
+  static String? _badFolderName(String name) {
+    if (name.trim().isEmpty) return 'a folder needs a name';
+    if (name.contains('/')) {
+      return "a folder name can't contain a slash";
+    }
+    return null;
+  }
+
+  /// The folder at [path] if the user made it, else why it may not be
+  /// changed.
+  (Mailbox?, String?) _customFolder(List<Mailbox> boxes, String path) {
+    final box = boxes.where((b) => b.encodedPath == path).firstOrNull;
+    if (box == null) return (null, 'there is no such folder');
+    if (box.isNotSelectable || box.isSpecialUse || box.isInbox) {
+      return (null, "${box.name} is a system folder and can't be changed");
+    }
+    return (box, null);
+  }
+
+  @override
+  Future<MailFolderResult> createFolder(String name) async {
+    final clean = name.trim();
+    final bad = _badFolderName(clean);
+    if (bad != null) return MailFolderFailed(bad);
+    return _changeFolders((client, boxes) async {
+      if (boxes.any((b) => b.name.toLowerCase() == clean.toLowerCase())) {
+        return 'there is already a folder called $clean';
+      }
+      await client.createMailbox(clean);
+      return null;
+    });
+  }
+
+  @override
+  Future<MailFolderResult> renameFolder(String folder, String newName) async {
+    final clean = newName.trim();
+    final bad = _badFolderName(clean);
+    if (bad != null) return MailFolderFailed(bad);
+    return _changeFolders((client, boxes) async {
+      final (box, why) = _customFolder(boxes, folder);
+      if (box == null) return why;
+      final separator = box.pathSeparator;
+      // Stays under the same parent, if it has one.
+      final cut = box.path.lastIndexOf(separator);
+      final target = cut < 0
+          ? clean
+          : '${box.path.substring(0, cut)}$separator$clean';
+      if (boxes.any((b) => b.path.toLowerCase() == target.toLowerCase())) {
+        return 'there is already a folder called $clean';
+      }
+      await client.renameMailbox(box, target);
+      return null;
+    });
+  }
+
+  @override
+  Future<MailFolderResult> deleteFolder(String folder) =>
+      _changeFolders((client, boxes) async {
+        final (box, why) = _customFolder(boxes, folder);
+        if (box == null) return why;
+        await client.deleteMailbox(box);
+        return null;
+      });
+
   @override
   Future<List<MailFolder>> folders() async {
     final MailAccount? saved;

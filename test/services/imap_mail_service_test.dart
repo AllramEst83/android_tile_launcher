@@ -1178,6 +1178,102 @@ void main() {
     });
   });
 
+  group('folders', () {
+    tearDown(() => server.stop());
+
+    test('createFolder makes a top-level folder', () async {
+      await boot(const []);
+      await setUp();
+
+      expect(await mail.createFolder('  Skola '), isA<MailFolderDone>());
+
+      expect(server.extraFolders, ['Skola']);
+      expect(server.received, contains('CREATE Skola'));
+    });
+
+    test('createFolder sends å, ä and ö as the server spells them', () async {
+      await boot(const []);
+      await setUp();
+
+      await mail.createFolder('Beställningar');
+
+      expect(server.extraFolders, ['Best&AOQ-llningar']);
+    });
+
+    test(
+      'createFolder refuses a name that is empty, slashed or taken',
+      () async {
+        await boot(const []);
+        await setUp();
+        server.extraFolders.add('Skola');
+        final connections = server.connections;
+
+        expect(await mail.createFolder('  '), isA<MailFolderFailed>());
+        expect(await mail.createFolder('a/b'), isA<MailFolderFailed>());
+        // Not even asked of the server.
+        expect(server.connections, connections);
+        expect(await mail.createFolder('skola'), isA<MailFolderFailed>());
+        expect(server.extraFolders, ['Skola']);
+      },
+    );
+
+    test('renameFolder renames a folder the user made', () async {
+      await boot(const []);
+      await setUp();
+      server.extraFolders.add('Skola');
+
+      expect(
+        await mail.renameFolder('Skola', 'Skola 2'),
+        isA<MailFolderDone>(),
+      );
+
+      expect(server.extraFolders, ['Skola 2']);
+    });
+
+    test('a system folder is neither renamed nor deleted', () async {
+      await boot(const []);
+      await setUp();
+
+      expect(
+        await mail.renameFolder('[Gmail]/Trash', 'Bin'),
+        isA<MailFolderFailed>(),
+      );
+      expect(await mail.deleteFolder('[Gmail]/Trash'), isA<MailFolderFailed>());
+      expect(await mail.deleteFolder('INBOX'), isA<MailFolderFailed>());
+      expect(server.received.where((c) => c.startsWith('RENAME')), isEmpty);
+      expect(server.received.where((c) => c.startsWith('DELETE')), isEmpty);
+    });
+
+    test('deleteFolder removes a folder the user made', () async {
+      await boot(const []);
+      await setUp();
+      server.extraFolders.addAll(['Skola', 'Sport']);
+
+      expect(await mail.deleteFolder('Skola'), isA<MailFolderDone>());
+
+      expect(server.extraFolders, ['Sport']);
+    });
+
+    test('without an account it is not set up', () async {
+      await boot(const []);
+
+      expect(await mail.createFolder('Skola'), isA<MailFolderNotSetUp>());
+      expect(await mail.deleteFolder('Skola'), isA<MailFolderNotSetUp>());
+    });
+
+    test('folders lists them with readable labels', () async {
+      await boot(const []);
+      await setUp();
+      server.extraFolders.add('Best&AOQ-llningar');
+
+      final folders = await mail.folders();
+
+      expect([
+        for (final f in folders) f.label,
+      ], containsAll(['INBOX', 'TRASH', 'BESTÄLLNINGAR']));
+    });
+  });
+
   group('mailFoldersFrom', () {
     Mailbox box(String path, List<MailboxFlag> flags) => Mailbox(
       encodedName: path.split('/').last,

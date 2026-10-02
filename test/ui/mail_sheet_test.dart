@@ -1966,4 +1966,112 @@ void main() {
       expect(find.text('FRESH SENDER'), findsOneWidget);
     });
   });
+
+  group('managing folders', () {
+    const MailFolder skola = MailFolder(
+      name: 'Skola',
+      label: 'SKOLA',
+      kind: MailFolderKind.other,
+    );
+    const List<MailFolder> account = <MailFolder>[
+      MailFolder(name: 'INBOX', label: 'INBOX', kind: MailFolderKind.inbox),
+      MailFolder(
+        name: '[Gmail]/Trash',
+        label: 'TRASH',
+        kind: MailFolderKind.trash,
+      ),
+      skola,
+    ];
+
+    Future<FakeMailService> picker(WidgetTester tester) async {
+      final FakeMailService mail = _service()..folderList = account;
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailFolderKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(mailFolderManageKey));
+      await tester.pumpAndSettle();
+      return mail;
+    }
+
+    testWidgets('only a folder the user made can be renamed or deleted', (
+      WidgetTester tester,
+    ) async {
+      await picker(tester);
+
+      expect(find.byKey(mailFolderRenameKey('Skola')), findsOneWidget);
+      expect(find.byKey(mailFolderDeleteKey('Skola')), findsOneWidget);
+      expect(find.byKey(mailFolderRenameKey('[Gmail]/Trash')), findsNothing);
+      expect(find.byKey(mailFolderDeleteKey('INBOX')), findsNothing);
+    });
+
+    testWidgets('NEW creates a folder with the name typed', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = await picker(tester);
+
+      await tester.tap(find.byKey(mailFolderNewKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFolderFieldKey), 'Sport');
+      await tester.tap(find.byKey(mailFolderSaveKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.folderChanges, <String>['create:Sport']);
+      // Back to the list, the field gone.
+      expect(find.byKey(mailFolderFieldKey), findsNothing);
+    });
+
+    testWidgets('RENAME starts from the old name', (WidgetTester tester) async {
+      final FakeMailService mail = await picker(tester);
+
+      await tester.tap(find.byKey(mailFolderRenameKey('Skola')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(mailFolderFieldKey))
+            .controller
+            ?.text,
+        'SKOLA',
+      );
+      await tester.enterText(find.byKey(mailFolderFieldKey), 'Plugg');
+      await tester.tap(find.byKey(mailFolderSaveKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.folderChanges, <String>['rename:Skola>Plugg']);
+    });
+
+    testWidgets('DELETE asks first, and NO changes nothing', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = await picker(tester);
+
+      await tester.tap(find.byKey(mailFolderDeleteKey('Skola')));
+      await tester.pumpAndSettle();
+      expect(find.text(Messages.mailFolderDeleteAsk('SKOLA')), findsOneWidget);
+      await tester.tap(find.byKey(mailFolderNoKey));
+      await tester.pumpAndSettle();
+      expect(mail.folderChanges, isEmpty);
+
+      await tester.tap(find.byKey(mailFolderDeleteKey('Skola')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(mailFolderYesKey));
+      await tester.pumpAndSettle();
+      expect(mail.folderChanges, <String>['delete:Skola']);
+    });
+
+    testWidgets('a refusal is shown and the list stays', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = await picker(tester);
+      mail.folderChangeResult = const MailFolderFailed('already there');
+
+      await tester.tap(find.byKey(mailFolderNewKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(mailFolderFieldKey), 'Skola');
+      await tester.tap(find.byKey(mailFolderSaveKey));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('ALREADY THERE'), findsOneWidget);
+      expect(find.byKey(mailFolderFieldKey), findsOneWidget);
+    });
+  });
 }

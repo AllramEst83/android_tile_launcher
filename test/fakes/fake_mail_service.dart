@@ -78,6 +78,29 @@ class FakeMailService implements MailService {
   @override
   Future<MailMessages?> cachedInbox() async => cached;
 
+  /// What the folder changes answer, and every call made, as
+  /// `create:name`, `rename:path>new` and `delete:path`.
+  MailFolderResult folderChangeResult = const MailFolderDone();
+  final List<String> folderChanges = <String>[];
+
+  @override
+  Future<MailFolderResult> createFolder(String name) async {
+    folderChanges.add('create:$name');
+    return folderChangeResult;
+  }
+
+  @override
+  Future<MailFolderResult> renameFolder(String folder, String newName) async {
+    folderChanges.add('rename:$folder>$newName');
+    return folderChangeResult;
+  }
+
+  @override
+  Future<MailFolderResult> deleteFolder(String folder) async {
+    folderChanges.add('delete:$folder');
+    return folderChangeResult;
+  }
+
   /// What `folders` answers.
   List<MailFolder> folderList = const <MailFolder>[];
 

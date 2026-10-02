@@ -149,7 +149,7 @@ lib/
     text_tv_screen.dart      # showTextTv / TextTvScreen: the full-screen viewer (close, refresh, page arrows, number pad, shortcuts, links, parts, history)
     mail_tile_view.dart      # MailTileContentView: fits its size (small: unread count; medium: +newest message; wide: +as many one-line messages as fit, unread marked *)
     mail_setup_sheet.dart    # showMailSetupSheet: address, IMAP server (guessed from the address until typed over), app password (obscured); CONNECT logs in, then saves
-    mail_folder_sheet.dart   # showMailFolderSheet: the account's folders to pick from (the MailFolder list from MailService.folders)
+    mail_folder_sheet.dart   # showMailFolderSheet: the account's folders to pick from (MailService.folders), and under MANAGE to create / rename / delete the ones the user made (never the system ones)
     mail_sheet.dart          # showMailSheet: newest 20, tap a message for TRASH (asks again), REFRESH (FORGET ACCOUNT lives in Settings)
     media_tile_view.dart     # MediaTileContentView: fits its size (small: title+artist; medium: +[PLAYING]/[PAUSED]; wide: +album art)
     media_sheet.dart         # showMediaSheet: bigger art/title/artist/album/app, PREV/PLAY-PAUSE/NEXT, re-polled every 2s via TilePoller

@@ -70,6 +70,26 @@ enum MailFolderKind {
   other,
 }
 
+sealed class MailFolderResult {
+  const MailFolderResult();
+}
+
+/// The folder was created, renamed or deleted.
+class MailFolderDone extends MailFolderResult {
+  const MailFolderDone();
+}
+
+class MailFolderNotSetUp extends MailFolderResult {
+  const MailFolderNotSetUp();
+}
+
+/// Nothing was changed; [reason] is short and printable.
+class MailFolderFailed extends MailFolderResult {
+  const MailFolderFailed(this.reason);
+
+  final String reason;
+}
+
 /// One folder on the account. [name] is the server's own (encoded) path for
 /// it, what every call that takes a folder is given; [label] is what the picker shows.
 class MailFolder {
@@ -82,6 +102,10 @@ class MailFolder {
   final String name;
   final String label;
   final MailFolderKind kind;
+
+  /// Whether the user made it: one of the well-known folders (inbox, sent,
+  /// trash...) can neither be renamed nor deleted.
+  bool get isCustom => kind == MailFolderKind.other;
 
   /// Whether DELETE (a move to Trash) means anything here.
   bool get canTrash =>

@@ -229,9 +229,21 @@ class _ReadyScreenState extends State<ReadyScreen> {
                   padding: const EdgeInsets.fromLTRB(12, 12, 56, 12),
                   child: SizedBox(
                     width: double.infinity,
-                    child: Text(
-                      // A solid block for the cursor, at the end of the text.
-                      '${_shown.join('\n')}${typing ? '█' : ' '}',
+                    child: Text.rich(
+                      // The cursor is always there and only its colour
+                      // blinks: a blank in its place has another height, and
+                      // the whole text would shift with every blink.
+                      TextSpan(
+                        children: <InlineSpan>[
+                          TextSpan(text: _shown.join('\n')),
+                          TextSpan(
+                            text: '\u2588',
+                            style: typing
+                                ? null
+                                : const TextStyle(color: Colors.transparent),
+                          ),
+                        ],
+                      ),
                       key: readyTextKey,
                       style: style,
                     ),

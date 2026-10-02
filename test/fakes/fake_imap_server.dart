@@ -106,6 +106,10 @@ class FakeImapServer {
   /// older server may only have `UIDPLUS`.
   String capabilities = 'IMAP4rev1 MOVE UIDPLUS';
 
+  /// Folders besides INBOX and Trash, as `LIST` reports them (the server's own
+  /// spelling of the name); `CREATE`, `RENAME` and `DELETE` change it.
+  final List<String> extraFolders = [];
+
   /// Whether a folder flagged `\Trash` exists.
   bool hasTrash = true;
 
@@ -182,8 +186,20 @@ class FakeImapServer {
         socket.write(
           '* LIST (\\HasNoChildren) "/" "INBOX"\r\n'
           '${hasTrash ? '* LIST (\\HasNoChildren \\Trash) "/" "$trashName"\r\n' : ''}'
+          '${extraFolders.map((f) => '* LIST (\\HasNoChildren) "/" "$f"\r\n').join()}'
           '$tag OK LIST completed\r\n',
         );
+      case 'CREATE':
+        extraFolders.add(_quoted(rest).first);
+        socket.write('$tag OK CREATE completed\r\n');
+      case 'RENAME':
+        final names = _quoted(rest);
+        final at = extraFolders.indexOf(names.first);
+        if (at >= 0) extraFolders[at] = names.last;
+        socket.write('$tag OK RENAME completed\r\n');
+      case 'DELETE':
+        extraFolders.remove(_quoted(rest).first);
+        socket.write('$tag OK DELETE completed\r\n');
       case 'SELECT':
         if (failSelect) {
           socket.write('$tag NO [SERVERBUG] inbox is on fire\r\n');
@@ -219,6 +235,13 @@ class FakeImapServer {
         socket.write('$tag BAD unknown command\r\n');
     }
   }
+
+  /// The arguments of a command line, quotes removed (the client quotes a
+  /// name only when it has to).
+  List<String> _quoted(String line) => [
+    for (final m in RegExp(r'"([^"]*)"|(\S+)').allMatches(line).skip(1))
+      m.group(1) ?? m.group(2)!,
+  ];
 
   /// A sequence set (`101`, `101,102` or `101:103`) as the uids it names, in
   /// order — enough for what a search result's `UID FETCH` sends, without

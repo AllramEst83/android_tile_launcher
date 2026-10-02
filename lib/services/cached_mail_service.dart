@@ -155,6 +155,18 @@ class CachedMailService implements MailService {
   Future<List<MailFolder>> folders() => inner.folders();
 
   @override
+  Future<MailFolderResult> createFolder(String name) =>
+      inner.createFolder(name);
+
+  @override
+  Future<MailFolderResult> renameFolder(String folder, String newName) =>
+      inner.renameFolder(folder, newName);
+
+  @override
+  Future<MailFolderResult> deleteFolder(String folder) =>
+      inner.deleteFolder(folder);
+
+  @override
   Future<MailResult> search(
     MailFilter filter, {
     int count = 20,

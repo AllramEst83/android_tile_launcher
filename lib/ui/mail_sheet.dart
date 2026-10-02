@@ -276,9 +276,31 @@ class _MailSheetState extends State<_MailSheet> {
     }
     final MailFolder? picked = await showMailFolderSheet(
       context,
+      mail: widget.mail,
       folders: _folders,
       current: _folderInfo,
+      onChanged: (List<MailFolder> fresh) => _folders = fresh,
     );
+    if (!mounted) return;
+    // The folder on show was renamed or deleted from the picker: it is gone
+    // under that name, so back to the inbox.
+    final bool gone =
+        _folderInfo.kind != MailFolderKind.inbox &&
+        !_folders.any((MailFolder f) => f.name == _folderInfo.name);
+    if (gone && picked == null) {
+      setState(() {
+        _folderInfo = const MailFolder(
+          name: '',
+          label: 'INBOX',
+          kind: MailFolderKind.inbox,
+        );
+        _folder = null;
+        _filter = const MailFilter();
+        _status = null;
+      });
+      await _load(useCache: true);
+      return;
+    }
     if (picked == null || picked.name == _folderInfo.name) return;
     setState(() {
       _folderInfo = picked;

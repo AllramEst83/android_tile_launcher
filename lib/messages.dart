@@ -188,6 +188,18 @@ abstract final class Messages {
   static const String mailLoadingMore = 'LOADING MORE...';
   static const String mailToPrefix = 'TO:';
   static const String mailFolders = 'FOLDERS';
+  static const String mailFolderNew = 'NEW';
+  static const String mailFolderManage = 'MANAGE';
+  static const String mailFolderDone = 'DONE';
+  static const String mailFolderName = 'FOLDER NAME';
+  static const String mailFolderCreate = 'CREATE';
+  static const String mailFolderSave = 'SAVE';
+  static const String mailFolderRename = 'RENAME';
+  static const String mailFolderDelete = 'DELETE';
+  static const String mailFolderWorking = 'WORKING...';
+  static String mailFolderDeleteAsk(String label) =>
+      'DELETE FOLDER $label? ITS MAIL IS DELETED WITH IT ON MOST SERVERS '
+      '(GMAIL JUST REMOVES THE LABEL).';
   static const String mailNoFolders = 'NO FOLDERS FOUND.';
   static const String mailStar = 'STAR';
   static const String mailUnstar = 'UNSTAR';
@@ -471,7 +483,7 @@ abstract final class Messages {
       'AGENDA — COMING CALENDAR EVENTS.\n'
       'CONTACT — CALL, TEXT OR OPEN WHATSAPP FOR ONE PERSON.\n'
       'MAIL — THE INBOX AND THE ACCOUNT\'S OTHER FOLDERS (THE FOLDER '
-      'BUTTON); SCROLL FOR OLDER MAIL, TAP A MESSAGE TO READ IT, SELECT TO '
+      'BUTTON; MANAGE THERE TO CREATE, RENAME OR DELETE YOUR OWN); SCROLL FOR OLDER MAIL, TAP A MESSAGE TO READ IT, SELECT TO '
       'STAR, MARK OR DELETE.\n'
       'TEXT TV — HEADLINE PAGES, THE OLD TELETEXT WAY.\n'
       'CALC — A CALCULATOR AND UNIT/CURRENCY CONVERTER.\n'

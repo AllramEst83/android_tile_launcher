@@ -40,6 +40,20 @@ abstract interface class MailService {
   /// if there is none or it was kept for another account. Never throws.
   Future<MailMessages?> cachedInbox();
 
+  /// Makes a new top-level folder called [name] (a label, on Gmail). Never
+  /// throws, and changes nothing unless it returns [MailFolderDone].
+  Future<MailFolderResult> createFolder(String name);
+
+  /// Renames the folder at [folder] (a path from [folders]) to [newName],
+  /// keeping it where it is in the tree. Only a folder the user made; never
+  /// throws.
+  Future<MailFolderResult> renameFolder(String folder, String newName);
+
+  /// Deletes the folder at [folder] (a path from [folders]). Only a folder the
+  /// user made. What was in it goes too on most servers (Gmail only removes
+  /// the label and keeps the mail in All Mail). Never throws.
+  Future<MailFolderResult> deleteFolder(String folder);
+
   /// The account's folders worth showing, in the order to show them. Empty if
   /// there is no account or the server could not be asked. Never throws.
   Future<List<MailFolder>> folders();
