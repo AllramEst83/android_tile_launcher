@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/messages.dart';
+
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
+import 'package:android_tile_launcher/model/calendar_choices.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
+import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/services/calendar_service.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_week_grid.dart';
+import 'package:android_tile_launcher/ui/calendar_filter_sheet.dart';
 import 'package:android_tile_launcher/ui/event_detail_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -607,4 +613,270 @@ void main() {
 
     expect(find.text('THE CALENDAR DID NOT ANSWER'), findsOneWidget);
   });
+  group('week grid: whole days', () {
+    Future<void> openGrid(
+      WidgetTester tester,
+      List<CalendarEvent> events,
+    ) async {
+      await _open(tester, FakeAgendaRepository(AgendaReady(events)));
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('an all-day event sits in the all-day row, and opens', (
+      WidgetTester tester,
+    ) async {
+      await openGrid(tester, <CalendarEvent>[
+        CalendarEvent(
+          id: 5,
+          title: 'Birthday',
+          start: DateTime(2026, 9, 29),
+          end: DateTime(2026, 9, 30),
+          allDay: true,
+        ),
+      ]);
+
+      final Finder chip = find.byKey(
+        agendaGridAllDayKey(5, DateTime(2026, 9, 29)),
+      );
+      expect(chip, findsOneWidget);
+      expect(
+        find.byKey(agendaGridAllDayKey(5, DateTime(2026, 9, 30))),
+        findsNothing,
+      );
+
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      expect(find.text(Messages.agendaEventTitle), findsOneWidget);
+    });
+
+    testWidgets('a multi-day all-day event has a chip on each of its days', (
+      WidgetTester tester,
+    ) async {
+      await openGrid(tester, <CalendarEvent>[
+        CalendarEvent(
+          id: 6,
+          title: 'Trip',
+          start: DateTime(2026, 9, 30),
+          end: DateTime(2026, 10, 3),
+          allDay: true,
+        ),
+      ]);
+
+      for (final int day in <int>[30]) {
+        expect(
+          find.byKey(agendaGridAllDayKey(6, DateTime(2026, 9, day))),
+          findsOneWidget,
+        );
+      }
+      for (final int day in <int>[1, 2]) {
+        expect(
+          find.byKey(agendaGridAllDayKey(6, DateTime(2026, 10, day))),
+          findsOneWidget,
+        );
+      }
+      expect(
+        find.byKey(agendaGridAllDayKey(6, DateTime(2026, 10, 3))),
+        findsNothing,
+      );
+    });
+
+    testWidgets('a timed event over days: its middle day is all day', (
+      WidgetTester tester,
+    ) async {
+      await openGrid(tester, <CalendarEvent>[
+        CalendarEvent(
+          id: 7,
+          title: 'Conference',
+          start: DateTime(2026, 9, 28, 20),
+          end: DateTime(2026, 9, 30, 10),
+        ),
+      ]);
+
+      expect(
+        find.byKey(agendaGridAllDayKey(7, DateTime(2026, 9, 29))),
+        findsOneWidget,
+      );
+      // Its first and last days are blocks on the grid, not all-day chips.
+      expect(
+        find.byKey(agendaGridAllDayKey(7, DateTime(2026, 9, 28))),
+        findsNothing,
+      );
+      expect(
+        find.byKey(agendaGridAllDayKey(7, DateTime(2026, 9, 30))),
+        findsNothing,
+      );
+    });
+
+    testWidgets('it opens at seven in the morning whatever the zoom', (
+      WidgetTester tester,
+    ) async {
+      final SettingsState settings = SettingsState(store: InMemoryLocalStore());
+      await settings.update(
+        const LauncherSettings(
+          agendaGridView: true,
+          agendaWeekView: true,
+        ).copyWith(agendaGridZoom: 0.5),
+      );
+      await _open(tester, withEvents(), settings: settings);
+
+      final WeekView<CalendarEvent> grid = tester
+          .widget<WeekView<CalendarEvent>>(
+            find.byType(WeekView<CalendarEvent>),
+          );
+      expect(grid.scrollOffset, 7 * 60 * 0.5);
+    });
+  });
+
+  group('FILTER', () {
+    const List<CalendarInfo> calendars = <CalendarInfo>[
+      CalendarInfo(id: 1, name: 'Home', account: 'me@example.com'),
+      CalendarInfo(id: 2, name: 'Work', account: 'me@example.com'),
+    ];
+
+    FakeAgendaRepository twoCalendars() => FakeAgendaRepository(
+      AgendaReady(<CalendarEvent>[
+        CalendarEvent(
+          id: 1,
+          title: 'Dentist',
+          start: DateTime(2026, 9, 28, 9),
+          end: DateTime(2026, 9, 28, 10),
+          calendarId: 1,
+        ),
+        CalendarEvent(
+          id: 2,
+          title: 'Review',
+          start: DateTime(2026, 9, 28, 13),
+          end: DateTime(2026, 9, 28, 14),
+          calendarId: 2,
+        ),
+      ]),
+    )..calendarsResult = const CalendarList(calendars);
+
+    testWidgets('reads plain FILTER while every calendar shows', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, twoCalendars());
+
+      expect(find.text(Messages.agendaFilter), findsOneWidget);
+      expect(find.text('DENTIST'), findsOneWidget);
+      expect(find.text('REVIEW'), findsOneWidget);
+    });
+
+    testWidgets('a hidden calendar: its events go, and FILTER counts', (
+      WidgetTester tester,
+    ) async {
+      await _open(
+        tester,
+        twoCalendars()..choices = const CalendarChoices(<int, bool>{2: false}),
+      );
+
+      expect(find.text('${Messages.agendaFilter} 1/2'), findsOneWidget);
+      expect(find.text('DENTIST'), findsOneWidget);
+      expect(find.text('REVIEW'), findsNothing);
+    });
+
+    testWidgets('switching a calendar back on shows it once closed', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = twoCalendars()
+        ..choices = const CalendarChoices(<int, bool>{2: false});
+      await _open(tester, repository);
+
+      await tester.tap(find.byKey(agendaFilterKey));
+      await tester.pumpAndSettle();
+      expect(find.text(Messages.agendaCalendarsTitle), findsOneWidget);
+      expect(find.text('ME@EXAMPLE.COM'), findsOneWidget);
+      expect(find.text('[X]'), findsOneWidget);
+      expect(find.text('[ ]'), findsOneWidget);
+
+      await tester.tap(find.byKey(calendarFilterRowKey(2)));
+      await tester.pumpAndSettle();
+      expect(repository.switched, <(int, bool)>[(2, true)]);
+      expect(find.text('[X]'), findsNWidgets(2));
+
+      await tester.tap(find.byKey(calendarFilterCloseKey));
+      await tester.pumpAndSettle();
+      expect(find.text('REVIEW'), findsOneWidget);
+      expect(find.text(Messages.agendaFilter), findsOneWidget);
+    });
+
+    testWidgets('every calendar hidden says so, not "nothing today"', (
+      WidgetTester tester,
+    ) async {
+      await _open(
+        tester,
+        twoCalendars()
+          ..choices = const CalendarChoices(<int, bool>{1: false, 2: false}),
+      );
+
+      expect(find.text(Messages.agendaCalendarsAllHidden), findsOneWidget);
+      expect(find.text(Messages.agendaNothingToday), findsNothing);
+    });
+  });
+
+  testWidgets('a slow reply for a day already left is not shown', (
+    WidgetTester tester,
+  ) async {
+    final _GatedRepository repository = _GatedRepository();
+    final Widget app = MaterialApp(
+      theme: tileLauncherTheme(),
+      home: Builder(
+        builder: (BuildContext context) => TextButton(
+          onPressed: () => showAgendaSheet(
+            context,
+            repository: repository,
+            clock: () => _now,
+          ),
+          child: const Text('open'),
+        ),
+      ),
+    );
+    await tester.pumpWidget(app);
+    await tester.tap(find.text('open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    repository.answer(DateTime(2026, 9, 28), 'Today thing');
+    await tester.pump();
+
+    // Forward once (tomorrow), then again (the day after), before either
+    // answers; then the older request answers last.
+    await tester.tap(find.byKey(agendaNavForwardKey));
+    await tester.pump();
+    await tester.tap(find.byKey(agendaNavForwardKey));
+    await tester.pump();
+    repository.answer(DateTime(2026, 9, 30), 'Wednesday thing');
+    await tester.pump();
+    repository.answer(DateTime(2026, 9, 29), 'Tuesday thing');
+    await tester.pumpAndSettle();
+
+    expect(find.text('WEDNESDAY THING'), findsOneWidget);
+    expect(find.text('TUESDAY THING'), findsNothing);
+  });
+}
+
+/// Holds every `between` until [answer] gives that day an event, so a test
+/// can choose the order replies land in.
+class _GatedRepository extends FakeAgendaRepository {
+  _GatedRepository() : super(const AgendaReady(<CalendarEvent>[]));
+
+  final Map<DateTime, Completer<AgendaSnapshot>> _waiting =
+      <DateTime, Completer<AgendaSnapshot>>{};
+
+  @override
+  Future<AgendaSnapshot> between(DateTime from, DateTime to) =>
+      (_waiting[from] ??= Completer<AgendaSnapshot>()).future;
+
+  void answer(DateTime day, String title) {
+    (_waiting[day] ??= Completer<AgendaSnapshot>()).complete(
+      AgendaReady(<CalendarEvent>[
+        CalendarEvent(
+          id: day.day,
+          title: title,
+          start: day.add(const Duration(hours: 9)),
+          end: day.add(const Duration(hours: 10)),
+        ),
+      ]),
+    );
+  }
 }

@@ -10,7 +10,13 @@ The sibling repo `../android_terminal_launcher` already solves some of these pro
 
 ## Next, in order
 
-`plan.md` is empty of phases below, awaiting the user's next batch.
+**Analyze and improve the calendar tile** — implemented 2026-10-02, awaiting the user's phone test (see the changelog entry of that date for the eight bugs found and fixed, and the new FILTER / SHOW CALENDARS picker). Things to check on the phone:
+- Delete one occurrence of a repeating event: only that day's goes; the rest of the series stays (also check it in the phone's own calendar app).
+- Edit one occurrence (move its time): only that day's moves.
+- GRID: all-day events and the middle days of a multi-day event show in the all-day row under the day headers; tap one to open it.
+- GRID at a pinched zoom: reopening still starts around 07:00.
+- FILTER: hide a calendar, close — its events leave the list, grid and the tile; the button reads `FILTER n/m`.
+- Move an event to another calendar via EDIT: it ends up there once, not twice and not lost.
 
 ## Deliberately different from the terminal launcher
 

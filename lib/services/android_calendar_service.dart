@@ -73,6 +73,18 @@ class AndroidCalendarService implements CalendarService {
         permanent: status == PermissionStatus.permanentlyDenied,
       );
     }
+    return switch (await calendars()) {
+      CalendarList(:final List<CalendarInfo> calendars) => CalendarList(
+        List<CalendarInfo>.unmodifiable(
+          calendars.where((CalendarInfo c) => c.writable),
+        ),
+      ),
+      final CalendarListResult other => other,
+    };
+  }
+
+  @override
+  Future<CalendarListResult> calendars() async {
     try {
       final List<Map<Object?, Object?>>? raw = await channel
           .invokeListMethod<Map<Object?, Object?>>('calendars')
@@ -100,13 +112,21 @@ class AndroidCalendarService implements CalendarService {
       _write('insertEvent', event);
 
   @override
-  Future<CalendarWriteResult> updateEvent(int id, NewCalendarEvent event) =>
-      _write('updateEvent', event, id: id);
+  Future<CalendarWriteResult> updateEvent(
+    CalendarEvent event,
+    NewCalendarEvent draft,
+  ) => _write(
+    'updateEvent',
+    draft,
+    id: event.id,
+    instanceBegin: event.isOccurrence ? event.occurrenceMillis : null,
+  );
 
   Future<CalendarWriteResult> _write(
     String method,
     NewCalendarEvent event, {
     int? id,
+    int? instanceBegin,
   }) async {
     final PermissionStatus status = await permissions.request(
       AppPermission.calendarWrite,
@@ -120,6 +140,7 @@ class AndroidCalendarService implements CalendarService {
       final int? result = await channel
           .invokeMethod<int>(method, <String, Object?>{
             'id': ?id,
+            'instanceBegin': ?instanceBegin,
             'calendarId': ?event.calendarId,
             'title': event.title,
             'location': event.location,
@@ -146,7 +167,7 @@ class AndroidCalendarService implements CalendarService {
   }
 
   @override
-  Future<CalendarDeleteResult> deleteEvent(int id) async {
+  Future<CalendarDeleteResult> deleteEvent(CalendarEvent event) async {
     final PermissionStatus status = await permissions.request(
       AppPermission.calendarWrite,
     );
@@ -157,7 +178,11 @@ class AndroidCalendarService implements CalendarService {
     }
     try {
       final bool? removed = await channel
-          .invokeMethod<bool>('deleteEvent', <String, Object?>{'id': id})
+          .invokeMethod<bool>('deleteEvent', <String, Object?>{
+            'id': event.id,
+            if (event.isOccurrence) 'instanceBegin': event.occurrenceMillis,
+            if (event.splitOff) 'exception': true,
+          })
           .timeout(timeout);
       return removed == true
           ? const CalendarEventDeleted()
@@ -178,10 +203,18 @@ class AndroidCalendarService implements CalendarService {
     final Object? id = entry['id'];
     final Object? name = entry['name'];
     if (id is! int || name is! String) return null;
+    final Object? account = entry['account'];
     return CalendarInfo(
       id: id,
       name: name.trim().isEmpty ? '?' : name.trim(),
       primary: entry['primary'] == true,
+      account: account is String && account.trim().isNotEmpty
+          ? account.trim()
+          : null,
+      // Absent means an older reply: what the list used to hold, which was
+      // only shown, writable calendars.
+      visible: entry['visible'] != false,
+      writable: entry['writable'] != false,
     );
   }
 
@@ -214,6 +247,10 @@ class AndroidCalendarService implements CalendarService {
           ? description.trim()
           : null,
       calendarId: calendarId is int ? calendarId : null,
+      calendarVisible: entry['calendarVisible'] != false,
+      repeating: entry['repeating'] == true,
+      splitOff: entry['exception'] == true,
+      occurrenceMillis: begin,
     );
   }
 

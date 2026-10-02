@@ -102,9 +102,16 @@ class CalendarDeleteFailed extends CalendarDeleteResult {
 /// The phone's calendars (every account Android syncs), read through
 /// Android's calendar provider.
 abstract interface class CalendarService {
-  /// Events overlapping the half-open range [from, to). Never throws; never
-  /// asks for permission itself.
+  /// Events overlapping the half-open range [from, to), from every calendar
+  /// whether the phone's calendar app shows it or not (each event says, as
+  /// `CalendarEvent.calendarVisible`). Never throws; never asks for
+  /// permission itself.
   Future<CalendarResult> events({required DateTime from, required DateTime to});
+
+  /// Every calendar on the phone, writable or not, grouped by account. Never
+  /// asks for permission itself (no access is a [CalendarListDenied]); never
+  /// throws.
+  Future<CalendarListResult> calendars();
 
   /// The calendars an event could be added to. Asks for calendar permission
   /// itself; only ever called from an explicit tap (the add/edit form
@@ -115,12 +122,17 @@ abstract interface class CalendarService {
   /// only ever called from an explicit Save tap. Never throws.
   Future<CalendarWriteResult> createEvent(NewCalendarEvent event);
 
-  /// Replaces the event [id]'s fields with [event]'s. Same permission
-  /// behaviour as [createEvent]. Never throws; an event that no longer exists
-  /// is a [CalendarWriteFailed].
-  Future<CalendarWriteResult> updateEvent(int id, NewCalendarEvent event);
+  /// Replaces [event]'s fields with [draft]'s — only that occurrence when it
+  /// is one of a repeating series (`CalendarEvent.isOccurrence`). Same
+  /// permission behaviour as [createEvent]. Never throws; an event that no
+  /// longer exists is a [CalendarWriteFailed].
+  Future<CalendarWriteResult> updateEvent(
+    CalendarEvent event,
+    NewCalendarEvent draft,
+  );
 
-  /// Removes the event [id]. Asks for calendar write permission itself; only
-  /// ever called from an explicit Delete tap. Never throws.
-  Future<CalendarDeleteResult> deleteEvent(int id);
+  /// Removes [event] — only that occurrence when it is one of a repeating
+  /// series. Asks for calendar write permission itself; only ever called from
+  /// an explicit Delete tap. Never throws.
+  Future<CalendarDeleteResult> deleteEvent(CalendarEvent event);
 }

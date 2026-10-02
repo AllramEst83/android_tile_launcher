@@ -6,7 +6,8 @@ sealed class AgendaSnapshot {
   const AgendaSnapshot();
 }
 
-/// [events] overlap the range asked for: all-day events first, then by start.
+/// [events] overlap the range asked for, by start (an all-day event before a
+/// timed one starting the same moment), on the calendars chosen to show.
 /// Empty is a real answer: nothing planned.
 class AgendaReady extends AgendaSnapshot {
   const AgendaReady(this.events);

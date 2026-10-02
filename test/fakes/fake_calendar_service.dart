@@ -23,6 +23,11 @@ class FakeCalendarService implements CalendarService {
     return result;
   }
 
+  CalendarListResult allResult = const CalendarList(<CalendarInfo>[]);
+
+  @override
+  Future<CalendarListResult> calendars() async => allResult;
+
   CalendarListResult listResult = const CalendarList(<CalendarInfo>[]);
   int listCalls = 0;
 
@@ -34,6 +39,8 @@ class FakeCalendarService implements CalendarService {
 
   CalendarWriteResult writeResult = const CalendarEventSaved(1);
   final List<NewCalendarEvent> created = <NewCalendarEvent>[];
+
+  /// The id of each event updated, with the draft it was given.
   final List<(int, NewCalendarEvent)> updated = <(int, NewCalendarEvent)>[];
 
   @override
@@ -44,19 +51,21 @@ class FakeCalendarService implements CalendarService {
 
   @override
   Future<CalendarWriteResult> updateEvent(
-    int id,
-    NewCalendarEvent event,
+    CalendarEvent event,
+    NewCalendarEvent draft,
   ) async {
-    updated.add((id, event));
+    updated.add((event.id, draft));
     return writeResult;
   }
 
   CalendarDeleteResult deleteResult = const CalendarEventDeleted();
+
+  /// The id of each event deleted.
   final List<int> deleted = <int>[];
 
   @override
-  Future<CalendarDeleteResult> deleteEvent(int id) async {
-    deleted.add(id);
+  Future<CalendarDeleteResult> deleteEvent(CalendarEvent event) async {
+    deleted.add(event.id);
     return deleteResult;
   }
 }

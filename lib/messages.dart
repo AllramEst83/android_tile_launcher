@@ -86,6 +86,16 @@ abstract final class Messages {
   static const String agendaWriteNotAllowed = 'CALENDAR WRITE NOT ALLOWED.';
   static const String agendaWriteAllowInSettings =
       'ALLOW CALENDAR WRITE IN ANDROID SETTINGS';
+  static const String agendaEventDeleteOccurrenceAsk =
+      'DELETE THIS OCCURRENCE?';
+  static const String agendaEventRepeats =
+      'REPEATING EVENT: CHANGES APPLY TO THIS OCCURRENCE ONLY.';
+  static const String agendaFilter = 'FILTER';
+  static const String agendaCalendarsTitle = 'SHOW CALENDARS';
+  static const String agendaCalendarsNone = 'NO CALENDARS ON THIS PHONE.';
+  static const String agendaCalendarsReadOnly = 'READ ONLY';
+  static const String agendaCalendarsAllHidden =
+      'EVERY CALENDAR IS HIDDEN. TAP FILTER.';
 
   static const String contactSearch = 'SEARCH CONTACTS...';
   static const String contactsLoading = 'LOADING...';

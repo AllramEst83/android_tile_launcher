@@ -20,16 +20,27 @@ import java.util.concurrent.Executors
  * Android's calendar provider (no library: each is a handful of calls).
  *
  * `events` takes `begin`/`end` in epoch milliseconds and replies a list of
- * `{id, title, begin, end, allDay, location, description, calendarId}`, one
- * per occurrence (repeating events are already expanded by `Instances`). Times
- * are raw: an all-day event's are UTC midnights, and turning them into local
- * dates is the Dart side's job, where it is tested. `calendars` replies every
- * calendar Android will accept an insert for (`CALENDAR_ACCESS_LEVEL` at
- * least contributor), as `{id, name, primary}`. `insertEvent` and
- * `updateEvent` take `calendarId, title, location, description, begin, end`
- * (timed events only) and reply the event's id; `updateEvent` also takes `id`
- * and replies `NOT_FOUND` if it no longer exists. `deleteEvent` takes `id`
- * and replies whether a row was actually removed (false: already gone).
+ * `{id, title, begin, end, allDay, location, description, calendarId,
+ * calendarVisible, repeating, exception}`, one per occurrence (repeating
+ * events are already expanded by `Instances`), from every calendar whatever
+ * its system visibility: which calendars show is the Dart side's choice, with
+ * `calendarVisible` (the calendar app's own switch) as its default.
+ * `repeating` is an occurrence of a series (RRULE/RDATE), `exception` a single
+ * occurrence already split off from one (ORIGINAL_ID). Times are raw: an
+ * all-day event's are UTC midnights, and turning them into local dates is the
+ * Dart side's job, where it is tested. `calendars` replies every calendar the
+ * phone has, as `{id, name, account, primary, visible, writable}`; `writable`
+ * is `CALENDAR_ACCESS_LEVEL` at least contributor, what lets an insert
+ * succeed. `insertEvent` and `updateEvent` take `calendarId, title, location,
+ * description, begin, end` (timed events only) and reply the event's id;
+ * `updateEvent` also takes `id` and replies `NOT_FOUND` if it no longer
+ * exists. Given `instanceBegin` (an occurrence of a series: its original
+ * BEGIN), `updateEvent` changes only that occurrence, by inserting an
+ * exception, and replies the exception's id. `deleteEvent` takes `id` and
+ * replies whether a row was actually removed (false: already gone); with
+ * `instanceBegin` it cancels just that occurrence, and with `exception` it
+ * cancels the split-off occurrence rather than deleting its row (which would
+ * bring the series' own occurrence back in its place).
  * Reading is guarded by `READ_CALENDAR`, writing by `WRITE_CALENDAR`;
  * permission is asked for in Dart first, this only checks it and replies
  * `NO_PERMISSION`. Never throws into Flutter.
@@ -56,7 +67,12 @@ class CalendarChannelHandler(
             "calendars" -> calendars(result)
             "insertEvent" -> writeEvent(call, result, id = null)
             "updateEvent" -> writeEvent(call, result, id = call.argument<Number>("id")?.toLong())
-            "deleteEvent" -> deleteEvent(call.argument<Number>("id")?.toLong(), result)
+            "deleteEvent" -> deleteEvent(
+                call.argument<Number>("id")?.toLong(),
+                call.argument<Number>("instanceBegin")?.toLong(),
+                call.argument<Boolean>("exception") == true,
+                result,
+            )
             else -> result.notImplemented()
         }
     }
@@ -104,10 +120,14 @@ class CalendarChannelHandler(
             CalendarContract.Instances.EVENT_LOCATION,
             CalendarContract.Instances.DESCRIPTION,
             CalendarContract.Instances.CALENDAR_ID,
+            CalendarContract.Instances.VISIBLE,
+            CalendarContract.Instances.RRULE,
+            CalendarContract.Instances.RDATE,
+            CalendarContract.Instances.ORIGINAL_ID,
         )
-        // Only calendars the user has switched on, and not cancelled events.
-        val selection = "${CalendarContract.Instances.VISIBLE} = 1 AND " +
-            "(${CalendarContract.Instances.STATUS} IS NULL OR " +
+        // Every calendar (which ones show is chosen on the Dart side), but
+        // not cancelled events.
+        val selection = "(${CalendarContract.Instances.STATUS} IS NULL OR " +
             "${CalendarContract.Instances.STATUS} != ${CalendarContract.Events.STATUS_CANCELED})"
         val events = mutableListOf<Map<String, Any?>>()
         context.contentResolver
@@ -124,6 +144,12 @@ class CalendarChannelHandler(
                             "location" to cursor.getString(5),
                             "description" to cursor.getString(6),
                             "calendarId" to cursor.getLong(7),
+                            "calendarVisible" to (cursor.getInt(8) != 0),
+                            "repeating" to (
+                                !cursor.getString(9).isNullOrBlank() ||
+                                    !cursor.getString(10).isNullOrBlank()
+                                ),
+                            "exception" to !cursor.isNull(11),
                         ),
                     )
                 }
@@ -156,25 +182,33 @@ class CalendarChannelHandler(
             CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
             CalendarContract.Calendars.ACCOUNT_NAME,
             CalendarContract.Calendars.IS_PRIMARY,
+            CalendarContract.Calendars.VISIBLE,
+            CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL,
         )
-        // Contributor access or better is what lets an insert succeed; a
-        // calendar someone shared read-only never qualifies.
-        val selection = "${CalendarContract.Calendars.VISIBLE} = 1 AND " +
-            "${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= " +
-            "${CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR}"
-        val order = "${CalendarContract.Calendars.IS_PRIMARY} DESC, " +
+        val order = "${CalendarContract.Calendars.ACCOUNT_NAME} ASC, " +
+            "${CalendarContract.Calendars.IS_PRIMARY} DESC, " +
             "${CalendarContract.Calendars.CALENDAR_DISPLAY_NAME} ASC"
         val calendars = mutableListOf<Map<String, Any?>>()
         context.contentResolver
-            .query(CalendarContract.Calendars.CONTENT_URI, projection, selection, null, order)
+            .query(CalendarContract.Calendars.CONTENT_URI, projection, null, null, order)
             ?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val name = cursor.getString(1)
+                    val account = cursor.getString(2)
                     calendars.add(
                         mapOf(
                             "id" to cursor.getLong(0),
-                            "name" to (if (name.isNullOrBlank()) cursor.getString(2) else name),
+                            "name" to (if (name.isNullOrBlank()) account else name),
+                            "account" to account,
                             "primary" to (cursor.getInt(3) != 0),
+                            "visible" to (cursor.getInt(4) != 0),
+                            // Contributor access or better is what lets an
+                            // insert succeed; a calendar someone shared
+                            // read-only never qualifies.
+                            "writable" to (
+                                cursor.getInt(5) >=
+                                    CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR
+                                ),
                         ),
                     )
                 }
@@ -187,6 +221,7 @@ class CalendarChannelHandler(
         val title = call.argument<String>("title")
         val begin = call.argument<Number>("begin")?.toLong()
         val end = call.argument<Number>("end")?.toLong()
+        val instanceBegin = call.argument<Number>("instanceBegin")?.toLong()
         // An insert must name a calendar; an update with none keeps the
         // event's existing one, so nothing is silently moved between accounts.
         if (title == null || begin == null || end == null || (id == null && calendarId == null)) {
@@ -210,7 +245,21 @@ class CalendarChannelHandler(
         }
         executor.execute {
             try {
-                if (id == null) {
+                if (id != null && instanceBegin != null) {
+                    // One occurrence of a series: an exception for it, never a
+                    // rewrite of the series itself (which would move every
+                    // occurrence, and a series has a DURATION, not a DTEND).
+                    values.remove(CalendarContract.Events.CALENDAR_ID)
+                    values.put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, instanceBegin)
+                    val newId = insertException(id, values)
+                    mainHandler.post {
+                        if (newId == null) {
+                            result.error("NOT_FOUND", "event no longer exists", null)
+                        } else {
+                            result.success(newId)
+                        }
+                    }
+                } else if (id == null) {
                     val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
                     val newId = uri?.let { ContentUris.parseId(it) }
                     mainHandler.post {
@@ -243,7 +292,21 @@ class CalendarChannelHandler(
         }
     }
 
-    private fun deleteEvent(id: Long?, result: MethodChannel.Result) {
+    /** Inserts an exception to the series [id]; its id, or null if refused. */
+    private fun insertException(id: Long, values: ContentValues): Long? {
+        val uri = context.contentResolver.insert(
+            ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, id),
+            values,
+        )
+        return uri?.let { ContentUris.parseId(it) }?.takeIf { it > 0 }
+    }
+
+    private fun deleteEvent(
+        id: Long?,
+        instanceBegin: Long?,
+        exception: Boolean,
+        result: MethodChannel.Result,
+    ) {
         if (id == null) {
             result.error("QUERY_FAILED", "bad id", null)
             return
@@ -256,12 +319,32 @@ class CalendarChannelHandler(
         }
         executor.execute {
             try {
-                val rows = context.contentResolver.delete(
-                    ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id),
-                    null,
-                    null,
-                )
-                mainHandler.post { result.success(rows > 0) }
+                val removed = when {
+                    // One occurrence of a series: cancel just it.
+                    instanceBegin != null -> insertException(
+                        id,
+                        ContentValues().apply {
+                            put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, instanceBegin)
+                            put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CANCELED)
+                        },
+                    ) != null
+                    // An occurrence already split off: cancelling it keeps the
+                    // series' own occurrence from coming back in its place.
+                    exception -> context.contentResolver.update(
+                        ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id),
+                        ContentValues().apply {
+                            put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CANCELED)
+                        },
+                        null,
+                        null,
+                    ) > 0
+                    else -> context.contentResolver.delete(
+                        ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id),
+                        null,
+                        null,
+                    ) > 0
+                }
+                mainHandler.post { result.success(removed) }
             } catch (e: SecurityException) {
                 mainHandler.post { result.error("NO_PERMISSION", e.message, null) }
             } catch (e: Exception) {
@@ -274,6 +357,7 @@ class CalendarChannelHandler(
         const val CHANNEL = "com.codedbykay.android_tile_launcher/calendar"
 
         // A week of a very busy calendar; more would only slow the tile down.
+        // Counted before the Dart side drops hidden calendars.
         private const val MAX_EVENTS = 500
     }
 }

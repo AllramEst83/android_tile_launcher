@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 /// Keys so tests can find the parts.
 const Key agendaGridKey = ValueKey<String>('agenda-grid');
 Key agendaGridEventKey(int id) => ValueKey<String>('agenda-grid-event-$id');
+Key agendaGridAllDayKey(int id, DateTime day) =>
+    ValueKey<String>('agenda-grid-all-day-$id-${day.month}-${day.day}');
 
 /// The week's timed events as a time grid — hours down the side, the seven
 /// days across the top, each event a block positioned and sized by its own
@@ -22,9 +24,12 @@ Key agendaGridEventKey(int id) => ValueKey<String>('agenda-grid-event-$id');
 /// the package's own Material look. Its own paging is pinned to exactly
 /// [weekStart]'s week — the agenda sheet's PREV/NEXT chevrons drive
 /// navigation, not a second, redundant control inside the grid. All-day
-/// events have no time to place on a grid, so (as in the week list) they are
-/// left out here. A two-finger pinch anywhere on it zooms: shrinks or grows
-/// how tall an hour is drawn, so more or fewer of them fit at once.
+/// events have no time to place on a grid, so they sit in a row of their own
+/// under the day headers, one chip per day they fall on — and so does any day
+/// a timed event fills from midnight to midnight (the middle of a three-day
+/// trip), the same day the agenda list calls `ALL DAY`. A two-finger pinch
+/// anywhere on it zooms: shrinks or grows how tall an hour is drawn, so more
+/// or fewer of them fit at once.
 class AgendaWeekGrid extends StatefulWidget {
   const AgendaWeekGrid({
     super.key,
@@ -82,6 +87,16 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
   static const double _minHeightPerMinute = 0.4;
   static const double _maxHeightPerMinute = 2.5;
 
+  /// Where the grid opens: 07:00, in pixels at the zoom it opens with — the
+  /// package's `scrollOffset` is pixels, not minutes, so an unscaled `7 * 60`
+  /// opened a zoomed-out grid in the evening and a zoomed-in one at night.
+  /// Fixed once: a changed `scrollOffset` makes the package jump to it, which
+  /// on every pinch frame would yank the grid back to 07:00.
+  late final double _openingScroll = 7 * 60 * _heightPerMinute;
+
+  /// How many all-day chips one day's cell shows before a `+N`.
+  static const int _allDayShown = 2;
+
   /// Two-finger pinch tracking: raw pointers, not `GestureDetector.onScale*`,
   /// which would contend with the grid's own one-finger vertical scroll for
   /// every drag, pinch or not — a `Listener` never claims the gesture arena,
@@ -113,23 +128,42 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
   // block from a negative/huge same-day duration. The agenda list already
   // does the equivalent per-day split (`occursOn`/`formatSpan`); this is
   // that same idea for a view that draws a block instead of a line of text.
+  //
+  // A day the event fills completely goes in the all-day row instead
+  // (`startTime`/`endTime` left null): the package counts any 00:00-to-00:00
+  // block as "full day" whatever we say, and would otherwise draw it in that
+  // row with its own default (Material, coloured) widget. All-day events go
+  // there too, one entry per day they fall on, so the row is the launcher's
+  // own drawing ([_AllDayCell]) throughout.
   void _fill() {
     _controller.addAll(<CalendarEventData<CalendarEvent>>[
       for (final CalendarEvent event in widget.events)
-        if (!event.allDay)
-          for (int i = 0; i < 7; i++)
-            if (clampToDay(event, addDays(widget.weekStart, i)) case (
-              :final DateTime start,
-              :final DateTime end,
-            ))
-              CalendarEventData<CalendarEvent>(
-                title: event.title,
-                date: addDays(widget.weekStart, i),
-                startTime: start,
-                endTime: end,
-                event: event,
-              ),
+        for (int i = 0; i < 7; i++)
+          ?_entryFor(event, addDays(widget.weekStart, i)),
     ]);
+  }
+
+  CalendarEventData<CalendarEvent>? _entryFor(
+    CalendarEvent event,
+    DateTime day,
+  ) {
+    if (coversDay(event, day)) {
+      return CalendarEventData<CalendarEvent>(
+        title: event.title,
+        date: day,
+        event: event,
+      );
+    }
+    if (event.allDay) return null;
+    final ({DateTime start, DateTime end})? span = clampToDay(event, day);
+    if (span == null) return null;
+    return CalendarEventData<CalendarEvent>(
+      title: event.title,
+      date: day,
+      startTime: span.start,
+      endTime: span.end,
+      event: event,
+    );
   }
 
   @override
@@ -153,6 +187,8 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
       context,
       repository: widget.repository,
       day: moment,
+      // The slot tapped is the start time too, not just the date.
+      startAt: moment,
     );
     if (changed) widget.onChanged();
   }
@@ -213,12 +249,22 @@ class _AgendaWeekGridState extends State<AgendaWeekGrid> {
           minDay: widget.weekStart,
           maxDay: widget.weekStart,
           startDay: WeekDays.values[widget.weekStart.weekday - 1],
-          scrollOffset: 7 * 60,
+          scrollOffset: _openingScroll,
           heightPerMinute: _heightPerMinute,
           backgroundColor: TileColors.canvas,
           weekTitleBackgroundColor: TileColors.canvas,
           weekTitleHeight: 40,
           showVerticalLines: true,
+          fullDayEventBuilder:
+              (List<CalendarEventData<CalendarEvent>> events, DateTime date) =>
+                  _AllDayCell(
+                    events: events,
+                    day: date,
+                    shown: _allDayShown,
+                    text: text,
+                    onTap: (CalendarEvent event) =>
+                        unawaited(_openEvent(event, date)),
+                  ),
           hourIndicatorSettings: HourIndicatorSettings(
             color: TileColors.bezel,
             height: TileMetrics.bevel,
@@ -293,6 +339,77 @@ class _DayHeader extends StatelessWidget {
               style: text.bodySmall?.copyWith(fontSize: 11, color: colour),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One day's share of the all-day row: a flat chip per event that fills the
+/// day (at most [shown], then `+N` for the rest), each opening its event.
+class _AllDayCell extends StatelessWidget {
+  const _AllDayCell({
+    required this.events,
+    required this.day,
+    required this.shown,
+    required this.text,
+    required this.onTap,
+  });
+
+  final List<CalendarEventData<CalendarEvent>> events;
+  final DateTime day;
+  final int shown;
+  final TextTheme text;
+  final ValueChanged<CalendarEvent> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<CalendarEvent> all = <CalendarEvent>[
+      for (final CalendarEventData<CalendarEvent> e in events) ?e.event,
+    ];
+    final int hidden = all.length - shown;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (final CalendarEvent event in all.take(shown))
+            GestureDetector(
+              key: agendaGridAllDayKey(event.id, day),
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onTap(event),
+              child: Container(
+                margin: const EdgeInsets.all(1),
+                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                color: TileColors.accent,
+                child: Text(
+                  event.title.isEmpty ? '?' : event.title.toUpperCase(),
+                  style: text.bodySmall?.copyWith(
+                    fontSize: 7,
+                    color: TileColors.canvas,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                  softWrap: false,
+                ),
+              ),
+            ),
+          if (hidden > 0)
+            // The rest open from the first hidden one; the agenda list has
+            // them all.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onTap(all[shown]),
+              child: Text(
+                '+$hidden',
+                textAlign: TextAlign.center,
+                style: text.bodySmall?.copyWith(
+                  fontSize: 7,
+                  color: TileColors.accent,
+                ),
+              ),
+            ),
         ],
       ),
     );

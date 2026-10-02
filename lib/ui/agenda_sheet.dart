@@ -3,10 +3,13 @@ import 'dart:math' as math;
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/agenda_format.dart';
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
+import 'package:android_tile_launcher/model/calendar_choices.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/services/agenda_repository.dart';
+import 'package:android_tile_launcher/services/calendar_service.dart';
 import 'package:android_tile_launcher/ui/agenda_week_grid.dart';
+import 'package:android_tile_launcher/ui/calendar_filter_sheet.dart';
 import 'package:android_tile_launcher/ui/event_detail_sheet.dart';
 import 'package:android_tile_launcher/ui/pad_key.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
@@ -23,6 +26,7 @@ const Key agendaNavLabelKey = ValueKey<String>('agenda-nav-label');
 const Key agendaAddEventKey = ValueKey<String>('agenda-add-event');
 const Key agendaTodayKey = ValueKey<String>('agenda-today');
 const Key agendaCloseKey = ValueKey<String>('agenda-close');
+const Key agendaFilterKey = ValueKey<String>('agenda-filter');
 
 DateTime _systemNow() => DateTime.now();
 
@@ -32,7 +36,11 @@ DateTime _systemNow() => DateTime.now();
 /// looked at last), with chevrons either side of a heading to step a day or
 /// a week at a time — the navigated offset itself is not remembered, so the
 /// sheet always opens back on today's own day or week. Every event under its
-/// day.
+/// day. FILTER, beside the close key, picks which calendars show (in every
+/// view, and on the tile); it reads `FILTER 3/5` while some are hidden, so a
+/// thin week is never mistaken for an empty calendar. Completes once the
+/// sheet is closed, so the tile can read again (an event may have been
+/// added, changed or deleted, or a calendar hidden).
 Future<void> showAgendaSheet(
   BuildContext context, {
   required AgendaRepository repository,
@@ -87,6 +95,16 @@ class _AgendaSheetState extends State<_AgendaSheet> {
   AgendaSnapshot? _snapshot;
   late DateTime _now;
 
+  /// Bumped by every [_load]: a reply that lands after a newer request was
+  /// made (stepping weeks faster than the calendar answers) is dropped
+  /// rather than shown under the wrong heading.
+  int _request = 0;
+
+  /// The phone's calendars and which show, for FILTER's own label; null
+  /// until read (or if they could not be).
+  List<CalendarInfo>? _calendars;
+  CalendarChoices _choices = const CalendarChoices();
+
   @override
   void initState() {
     super.initState();
@@ -104,7 +122,40 @@ class _AgendaSheetState extends State<_AgendaSheet> {
       _week = settings.agendaWeekView;
       _grid = settings.agendaGridView;
       _load();
+      _loadCalendars();
     }
+  }
+
+  Future<void> _loadCalendars() async {
+    final CalendarListResult list = await widget.repository.calendars();
+    final CalendarChoices choices = await widget.repository.calendarChoices();
+    if (!mounted) return;
+    setState(() {
+      _calendars = list is CalendarList ? list.calendars : null;
+      _choices = choices;
+    });
+  }
+
+  Future<void> _filter() async {
+    await showCalendarFilterSheet(context, repository: widget.repository);
+    if (!mounted) return;
+    await Future.wait(<Future<void>>[_load(), _loadCalendars()]);
+  }
+
+  String _filterLabel() {
+    final List<CalendarInfo>? calendars = _calendars;
+    if (calendars == null) return Messages.agendaFilter;
+    final int hidden = _choices.hiddenAmong(calendars);
+    if (hidden == 0) return Messages.agendaFilter;
+    return '${Messages.agendaFilter} ${calendars.length - hidden}'
+        '/${calendars.length}';
+  }
+
+  bool get _everyCalendarHidden {
+    final List<CalendarInfo>? calendars = _calendars;
+    return calendars != null &&
+        calendars.isNotEmpty &&
+        _choices.hiddenAmong(calendars) == calendars.length;
   }
 
   int get _span => _week ? 7 : 1;
@@ -116,13 +167,14 @@ class _AgendaSheetState extends State<_AgendaSheet> {
   DateTime get _rangeStart => _startFor(_now);
 
   Future<void> _load() async {
+    final int request = ++_request;
     final DateTime now = widget.clock();
     final DateTime start = _startFor(now);
     final AgendaSnapshot snapshot = await widget.repository.between(
       start,
       addDays(start, _span),
     );
-    if (!mounted) return;
+    if (!mounted || request != _request) return;
     setState(() {
       _now = now;
       _snapshot = snapshot;
@@ -194,6 +246,18 @@ class _AgendaSheetState extends State<_AgendaSheet> {
                 Expanded(
                   child: Text(Messages.agendaTitle, style: text.bodyMedium),
                 ),
+                PadKey(
+                  key: agendaFilterKey,
+                  label: _filterLabel(),
+                  height: 32,
+                  fontSize: 11,
+                  accent:
+                      _calendars != null &&
+                      _choices.hiddenAmong(_calendars!) > 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  onTap: _filter,
+                ),
+                const SizedBox(width: TileMetrics.gutter),
                 SizedBox(
                   width: 48,
                   child: PadKey(
@@ -335,7 +399,9 @@ class _AgendaSheetState extends State<_AgendaSheet> {
         );
         if (days.isEmpty) {
           return Text(
-            !_week && _offset == 0
+            _everyCalendarHidden
+                ? Messages.agendaCalendarsAllHidden
+                : !_week && _offset == 0
                 ? Messages.agendaNothingToday
                 : Messages.agendaNothingPlanned,
             style: text.bodyMedium,

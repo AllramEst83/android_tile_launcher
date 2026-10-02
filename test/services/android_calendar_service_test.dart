@@ -51,6 +51,21 @@ Map<String, Object?> _allDay(
 final DateTime _from = DateTime(2026, 9, 26);
 final DateTime _to = DateTime(2026, 9, 27);
 
+CalendarEvent _stored(
+  int id, {
+  bool repeating = false,
+  bool splitOff = false,
+  int? occurrenceMillis,
+}) => CalendarEvent(
+  id: id,
+  title: 'Standup',
+  start: DateTime(2026, 9, 26, 9),
+  end: DateTime(2026, 9, 26, 10),
+  repeating: repeating,
+  splitOff: splitOff,
+  occurrenceMillis: occurrenceMillis,
+);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -275,7 +290,116 @@ void main() {
     );
   });
 
+  group('events: calendar and series fields', () {
+    test('reads which calendar, its switch, and the series', () async {
+      _mockChannel(
+        (call) async => <Object?>[
+          <String, Object?>{
+            ..._timed(
+              1,
+              'Standup',
+              DateTime(2026, 9, 26, 9),
+              DateTime(2026, 9, 26, 10),
+            ),
+            'calendarId': 3,
+            'calendarVisible': false,
+            'repeating': true,
+            'exception': false,
+          },
+        ],
+      );
+
+      final result = await service.events(from: _from, to: _to);
+
+      final CalendarEvent event = (result as CalendarEvents).events.single;
+      expect(event.calendarId, 3);
+      expect(event.calendarVisible, isFalse);
+      expect(event.repeating, isTrue);
+      expect(event.splitOff, isFalse);
+      expect(event.occurrenceMillis, _ms(DateTime(2026, 9, 26, 9)));
+      expect(event.isOccurrence, isTrue);
+    });
+
+    test('an older reply without them is a visible one-off', () async {
+      _mockChannel(
+        (call) async => <Object?>[
+          _timed(1, 'A', DateTime(2026, 9, 26, 9), DateTime(2026, 9, 26, 10)),
+        ],
+      );
+
+      final result = await service.events(from: _from, to: _to);
+
+      final CalendarEvent event = (result as CalendarEvents).events.single;
+      expect(event.calendarVisible, isTrue);
+      expect(event.repeating, isFalse);
+      expect(event.isOccurrence, isFalse);
+    });
+  });
+
+  group('calendars', () {
+    test('lists every calendar without asking for permission', () async {
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return <Object?>[
+          <String, Object?>{
+            'id': 1,
+            'name': 'Family',
+            'account': 'me@example.com',
+            'primary': false,
+            'visible': false,
+            'writable': true,
+          },
+          <String, Object?>{
+            'id': 2,
+            'name': 'Holidays',
+            'account': ' ',
+            'primary': false,
+            'visible': true,
+            'writable': false,
+          },
+        ];
+      });
+
+      final result = await service.calendars();
+
+      expect(seen?.method, 'calendars');
+      expect(permissions.requested, isEmpty);
+      final List<CalendarInfo> calendars = (result as CalendarList).calendars;
+      expect(calendars, const <CalendarInfo>[
+        CalendarInfo(
+          id: 1,
+          name: 'Family',
+          account: 'me@example.com',
+          visible: false,
+        ),
+        CalendarInfo(id: 2, name: 'Holidays', writable: false),
+      ]);
+    });
+
+    test('no access is denied, not a crash', () async {
+      _mockChannel(
+        (call) async => throw PlatformException(code: 'NO_PERMISSION'),
+      );
+
+      expect(await service.calendars(), isA<CalendarListDenied>());
+    });
+  });
+
   group('writableCalendars', () {
+    test('leaves out the calendars that cannot be written to', () async {
+      _mockChannel(
+        (call) async => <Object?>[
+          <String, Object?>{'id': 1, 'name': 'Mine', 'writable': true},
+          <String, Object?>{'id': 2, 'name': 'Shared', 'writable': false},
+        ],
+      );
+
+      final result = await service.writableCalendars();
+
+      expect((result as CalendarList).calendars.map((c) => c.id), <int>[1]);
+    });
+
     test('asks for read permission and maps the calendars', () async {
       _mockChannel(
         (call) async => <Object?>[
@@ -352,13 +476,51 @@ void main() {
         return 9;
       });
 
-      await service.updateEvent(9, event());
+      await service.updateEvent(_stored(9), event());
 
       expect(seen?.method, 'updateEvent');
       expect(seen?.arguments, isA<Map<Object?, Object?>>());
-      expect((seen!.arguments as Map<Object?, Object?>)['id'], 9);
+      final Map<Object?, Object?> args =
+          seen!.arguments as Map<Object?, Object?>;
+      expect(args['id'], 9);
+      expect(args.containsKey('calendarId'), isFalse);
+      // A one-off event is rewritten in place, not split from a series.
+      expect(args.containsKey('instanceBegin'), isFalse);
+    });
+
+    test('an occurrence of a series names which one, and only it', () async {
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return 12;
+      });
+
+      final result = await service.updateEvent(
+        _stored(9, repeating: true, occurrenceMillis: 1234),
+        event(),
+      );
+
+      final Map<Object?, Object?> args =
+          seen!.arguments as Map<Object?, Object?>;
+      expect(args['id'], 9);
+      expect(args['instanceBegin'], 1234);
+      expect((result as CalendarEventSaved).id, 12);
+    });
+
+    test('an occurrence already split off is updated as itself', () async {
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return 9;
+      });
+
+      await service.updateEvent(
+        _stored(9, repeating: true, splitOff: true, occurrenceMillis: 1234),
+        event(),
+      );
+
       expect(
-        (seen!.arguments as Map<Object?, Object?>).containsKey('calendarId'),
+        (seen!.arguments as Map<Object?, Object?>).containsKey('instanceBegin'),
         isFalse,
       );
     });
@@ -381,7 +543,7 @@ void main() {
     test('an event that no longer exists is a failure that says so', () async {
       _mockChannel((call) async => throw PlatformException(code: 'NOT_FOUND'));
 
-      final result = await service.updateEvent(9, event());
+      final result = await service.updateEvent(_stored(9), event());
 
       expect(result, isA<CalendarWriteFailed>());
     });
@@ -395,7 +557,7 @@ void main() {
         return true;
       });
 
-      final result = await service.deleteEvent(5);
+      final result = await service.deleteEvent(_stored(5));
 
       expect(permissions.requested, <AppPermission>[
         AppPermission.calendarWrite,
@@ -408,7 +570,38 @@ void main() {
     test('nothing removed is already gone, not a failure', () async {
       _mockChannel((call) async => false);
 
-      expect(await service.deleteEvent(5), isA<CalendarEventAlreadyGone>());
+      expect(
+        await service.deleteEvent(_stored(5)),
+        isA<CalendarEventAlreadyGone>(),
+      );
+    });
+
+    test('an occurrence of a series cancels only that one', () async {
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return true;
+      });
+
+      await service.deleteEvent(
+        _stored(5, repeating: true, occurrenceMillis: 777),
+      );
+
+      expect(seen?.arguments, <String, Object?>{'id': 5, 'instanceBegin': 777});
+    });
+
+    test('an occurrence already split off is cancelled, not removed', () async {
+      MethodCall? seen;
+      _mockChannel((call) async {
+        seen = call;
+        return true;
+      });
+
+      await service.deleteEvent(
+        _stored(5, repeating: true, splitOff: true, occurrenceMillis: 777),
+      );
+
+      expect(seen?.arguments, <String, Object?>{'id': 5, 'exception': true});
     });
 
     test('refused permission is denied, and connects to nothing', () async {
@@ -419,7 +612,7 @@ void main() {
         return true;
       });
 
-      final result = await service.deleteEvent(5);
+      final result = await service.deleteEvent(_stored(5));
 
       expect(result, isA<CalendarDeleteDenied>());
       expect(seen, isNull);

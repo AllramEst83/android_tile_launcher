@@ -30,9 +30,10 @@ lib/
     mail.dart                # MailMessage, MailResult (MailMessages / MailNotSetUp / MailUnavailable), MailAccountInfo, MailMoveResult (MailMoved / MailGone / MailMoveNotSetUp / MailMoveFailed)
     mail_format.dart         # guessImapHost(email), formatMailDate
     contact.dart             # PhoneNumber, Contact(key, name, numbers, preferredNumber), dialable, whatsAppNumber (default country code 46), findContact
-    calendar_event.dart      # CalendarEvent: id, title, start/end (local; all-day = half-open dates), allDay, location
+    calendar_event.dart      # CalendarEvent: id, title, start/end (local; all-day = half-open dates), allDay, location, calendarId/calendarVisible, repeating/splitOff/occurrenceMillis (isOccurrence); NewCalendarEvent; CalendarInfo (account, visible, writable)
+    calendar_choices.dart    # CalendarChoices: which calendars show (only the user's own switches; the rest follow the phone's calendar app), filter, JSON
     agenda_snapshot.dart     # AgendaSnapshot (sealed): AgendaReady(events) / NeedsPermission / Denied(permanent) / Unavailable(reason)
-    agenda_format.dart       # startOfDay/addDays, occursOn, groupByDay, nextEvent, formatDayHeading/formatWhen/formatSpan
+    agenda_format.dart       # startOfDay/addDays, occursOn, coversDay, clampToDay, groupByDay (whole-day first, then by start on that day), nextEvent, formatDayHeading/formatWhen/formatSpan/formatEventRange
     weather.dart             # Place, Conditions, DayForecast, Forecast; WeatherKind + weatherKind(code); describeWeather(code) (WMO codes, upper case)
     weather_snapshot.dart    # WeatherSnapshot (sealed): WeatherReady(forecast, stale) / NeedsPlace / LocationDenied / LocationUnavailable / Offline
     weather_format.dart      # formatDegrees, weekdayAbbreviation
@@ -106,10 +107,10 @@ lib/
     android_sms_service.dart # asks for SEND_SMS; the Kotlin side reports the network's per-part answer
     whatsapp_service.dart    # abstract: openChat(number) -> WhatsAppOpened / WhatsAppFailed (wa.me hand-off, no permission, opens only)
     android_whatsapp_service.dart  # MethodChannel implementation
-    calendar_service.dart    # abstract read-only: events(from, to) -> CalendarEvents / CalendarNoAccess / CalendarUnavailable; never asks for permission
-    android_calendar_service.dart  # MethodChannel implementation: all-day UTC midnights -> local dates, range filter, sort
-    agenda_repository.dart   # abstract: between(from, to) -> AgendaSnapshot; allow() asks for calendar access (tap only)
-    live_agenda_repository.dart  # LiveAgendaRepository: CalendarService + PermissionService; remembers a refusal until a read succeeds
+    calendar_service.dart    # abstract: events(from, to) (every calendar) and calendars() never ask for permission; writableCalendars/create/update/delete do (tap only); update/delete of a series occurrence touch only it
+    android_calendar_service.dart  # MethodChannel implementation (CalendarChannelHandler.kt): all-day UTC midnights -> local dates, range filter, sort; occurrence edits/deletes become exceptions
+    agenda_repository.dart   # abstract: between(from, to) -> AgendaSnapshot (shown calendars only); calendars/calendarChoices/setCalendarShown; allow() asks for calendar access (tap only)
+    live_agenda_repository.dart  # LiveAgendaRepository: CalendarService + PermissionService + LocalStore ('calendar_choices'); remembers a refusal until a read succeeds; a calendar change on edit is add-then-delete
     agenda_tile_source.dart  # AgendaTileSource: now .. end of the 7th day, with the moment it read (AgendaContent.now)
     tile_services.dart       # TileServices: the platform collaborators live tiles read from (systemControl, device, weather, agenda, contacts, phone, sms, whatsApp, mail, textTv), bundled
     device_repository.dart   # abstract: Future<DeviceStatus> status(); never throws
@@ -146,7 +147,10 @@ lib/
     contact_picker.dart      # showContactPicker: phone book grouped like the drawer (flat while searching), tap pins the person; opening it asks for contacts
     contact_sheet.dart       # showContactSheet: numbers + CALL / SMS / WHATSAPP; every action its own tap, a text typed and SENT
     agenda_tile_view.dart    # AgendaTileContentView: fits its size (small: when+title; medium: +place, +N more; wide: as many one-line events as the height holds)
-    agenda_sheet.dart        # showAgendaSheet: DAY / WEEK toggle, events under a heading per day (opened by tapping a ready agenda tile)
+    agenda_sheet.dart        # showAgendaSheet: DAY / AGENDA / GRID, chevrons + TODAY, + ADD EVENT, FILTER (calendars shown; `FILTER 3/5` while some are hidden)
+    agenda_week_grid.dart    # AgendaWeekGrid: calendar_view WeekView in the launcher's look; timed blocks split per day; an all-day row for all-day events and whole days of long timed ones
+    event_detail_sheet.dart  # showEventDetailSheet: read view (whole range) / add / edit / delete; a series occurrence is changed on its own
+    calendar_filter_sheet.dart  # showCalendarFilterSheet: every calendar grouped by account, a [X]/[ ] switch each, applied at once
     weather_tile_view.dart   # WeatherTileContentView: fits its size (small: sky+temp; medium: +words/place/source; wide: +5 days); states without a forecast say why
     weather_icon.dart        # WeatherIcon: 12x12 pixel-block sky pictures, drawn from bitmaps in the tile's ink
     device_tile_view.dart    # DeviceTileContentView: battery and free storage, each a label + value + flat bar
@@ -346,3 +350,7 @@ Record decisions that future agents can't derive from code (append, newest last)
 - The resize picker's 4th column used to stretch to the full width on a 6-column mosaic: `TileSize.of(4, 2)`/`of(4, 4)` found `wide`/`large` first, and those are `fullWidth` hero bands, so a tile picked (or flipped) at 4 wide came out 6 wide. `size4x2`/`size4x4` are now plain 4-column twins of those shapes, and `of` never returns a `fullWidth` size. `wide`/`large` keep their names and stretching, so saved layouts don't change. The picker paints `spanIn(maxColumns)`, which means an existing `wide`/`large` tile shows the width it is actually drawn at.
 - The resize panel always shows the tile's drawn width, never its stored one: the SIZE readout and the picker's painted cells both use `spanIn(columns)` from the live column setting. Switching 4/6 columns rewrites no stored size (switching back restores the layout, as before); the panel just follows the grid. The stored size changes only when the user picks or flips.
 - FLIP was removed from the resize panel: the grid picker reaches every shape directly (3×2 and 2×3 are both one tap), so a separate swap button only added a second way to do the same thing.
+- Calendar visibility is the launcher's own choice, not the phone calendar app's: `CalendarChannelHandler.events` reads every calendar (no `VISIBLE = 1` filter any more) and reports each event's `calendarVisible`, and `CalendarChoices` keeps only the calendars the user switched in FILTER — every other one follows that `visible` switch, so a newly added calendar turns up the way the calendar app shows it. Stored in `LocalStore` under `calendar_choices`, not in `LauncherSettings`, because calendar ids mean nothing on another phone and the settings travel with an exported layout. The filtering happens in `LiveAgendaRepository.between`, so the tile and every sheet view agree without each knowing about it.
+- Editing or deleting one occurrence of a repeating event writes an exception (`Events.CONTENT_EXCEPTION_URI/{id}` with `ORIGINAL_INSTANCE_TIME` = the occurrence's raw `Instances.BEGIN`; a delete is an exception with `STATUS_CANCELED`), never the series row: before, DELETE removed the whole series and EDIT tried to rewrite the series' DTSTART/DTEND (a series has a DURATION, so the provider refused). An occurrence already split off (`ORIGINAL_ID` set) is updated as itself, and deleted by cancelling it, since deleting its row would bring the series' own occurrence back. An occurrence cannot change calendar.
+- Changing an existing event's calendar is add-to-the-new-calendar then delete-the-old, never an update of `CALENDAR_ID` (sync adapters, Google's included, do not support moving a synced event that way). If the delete fails the user has two copies, never none.
+- `calendar_view` treats any block whose start and end are both midnight as a full-day event and draws it in its own all-day row with its own Material default widget. So the grid puts every whole day (`coversDay`: an all-day event, or a day a timed event runs right through) there deliberately, with a `fullDayEventBuilder` of our own. Its `scrollOffset` is pixels, not minutes: the opening 07:00 is `7 * 60 * heightPerMinute`, fixed once, since a changed `scrollOffset` makes the package jump to it on every pinch frame.

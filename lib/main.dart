@@ -119,6 +119,7 @@ Future<void> main() async {
             permissions: AndroidPermissionService(),
           ),
           permissions: const AndroidPermissionService(),
+          store: store,
         ),
         weather: LiveWeatherRepository(
           weather: Weather(

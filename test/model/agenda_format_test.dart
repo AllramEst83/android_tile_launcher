@@ -392,4 +392,131 @@ void main() {
       expect(clampToDay(_timed('a', at, at), day), isNull);
     });
   });
+  group('coversDay', () {
+    final DateTime tue = DateTime(2026, 9, 29);
+
+    test('an all-day event covers each of its days', () {
+      final CalendarEvent trip = _allDay(
+        'Trip',
+        DateTime(2026, 9, 28),
+        days: 3,
+      );
+
+      expect(coversDay(trip, tue), isTrue);
+      expect(coversDay(trip, DateTime(2026, 10, 1)), isFalse);
+    });
+
+    test('a timed event covers only the days it runs right through', () {
+      final CalendarEvent conference = _timed(
+        'Conference',
+        DateTime(2026, 9, 28, 20),
+        DateTime(2026, 9, 30, 10),
+      );
+
+      expect(coversDay(conference, DateTime(2026, 9, 28)), isFalse);
+      expect(coversDay(conference, tue), isTrue);
+      expect(coversDay(conference, DateTime(2026, 9, 30)), isFalse);
+    });
+
+    test('midnight to midnight covers that day exactly', () {
+      final CalendarEvent block = _timed(
+        'Block',
+        DateTime(2026, 9, 29),
+        DateTime(2026, 9, 30),
+      );
+
+      expect(coversDay(block, tue), isTrue);
+      expect(coversDay(block, DateTime(2026, 9, 30)), isFalse);
+    });
+
+    test('a short event covers nothing', () {
+      expect(
+        coversDay(
+          _timed('Lunch', DateTime(2026, 9, 29, 12), DateTime(2026, 9, 29, 13)),
+          tue,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('groupByDay order within a day', () {
+    test('whole-day things first, then by start on that day', () {
+      final CalendarEvent overnight = _timed(
+        'Overnight',
+        DateTime(2026, 9, 28, 22),
+        DateTime(2026, 9, 29, 8),
+      );
+      final CalendarEvent early = _timed(
+        'Early',
+        DateTime(2026, 9, 29, 7),
+        DateTime(2026, 9, 29, 7, 30),
+      );
+      final CalendarEvent trip = _timed(
+        'Trip',
+        DateTime(2026, 9, 27, 9),
+        DateTime(2026, 10, 2, 9),
+      );
+      final CalendarEvent birthday = _allDay('Birthday', DateTime(2026, 9, 29));
+
+      // In the order the calendar sorts them: by their own start.
+      final List<AgendaDay> days = groupByDay(
+        <CalendarEvent>[trip, overnight, early, birthday],
+        from: DateTime(2026, 9, 29),
+        days: 1,
+      );
+
+      expect(days.single.events.map((e) => e.title), <String>[
+        'Trip',
+        'Birthday',
+        'Overnight',
+        'Early',
+      ]);
+    });
+  });
+
+  group('formatEventRange', () {
+    test('a timed event on one day', () {
+      expect(
+        formatEventRange(
+          _timed('A', DateTime(2026, 9, 29, 9), DateTime(2026, 9, 29, 10, 30)),
+        ),
+        'TUE 29 SEP 09:00-10:30',
+      );
+    });
+
+    test('ending at midnight is still one day', () {
+      expect(
+        formatEventRange(
+          _timed('A', DateTime(2026, 9, 29, 22), DateTime(2026, 9, 30)),
+        ),
+        'TUE 29 SEP 22:00-00:00',
+      );
+    });
+
+    test('across midnight gives both dates', () {
+      expect(
+        formatEventRange(
+          _timed('A', DateTime(2026, 10, 3, 18), DateTime(2026, 10, 4, 14)),
+        ),
+        'SAT 3 OCT 18:00 - SUN 4 OCT 14:00',
+      );
+    });
+
+    test('a moment', () {
+      final DateTime t = DateTime(2026, 9, 29, 9);
+      expect(formatEventRange(_timed('A', t, t)), 'TUE 29 SEP 09:00');
+    });
+
+    test('all day, one day and several', () {
+      expect(
+        formatEventRange(_allDay('A', DateTime(2026, 9, 29))),
+        'TUE 29 SEP ALL DAY',
+      );
+      expect(
+        formatEventRange(_allDay('A', DateTime(2026, 10, 3), days: 3)),
+        'SAT 3 OCT - MON 5 OCT ALL DAY',
+      );
+    });
+  });
 }

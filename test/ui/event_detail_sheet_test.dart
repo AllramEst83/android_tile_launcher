@@ -26,6 +26,7 @@ Future<_Opened> _open(
   FakeAgendaRepository repository, {
   CalendarEvent? event,
   DateTime? day,
+  DateTime? startAt,
   SettingsState? settings,
 }) async {
   final _Opened opened = _Opened();
@@ -53,6 +54,7 @@ Future<_Opened> _open(
                         event.start.month,
                         event.start.day,
                       )),
+            startAt: startAt,
           );
         },
         child: const Text('open'),
@@ -637,5 +639,111 @@ void main() {
 
       expect(repository.created, isEmpty);
     });
+  });
+  group('repeating events', () {
+    CalendarEvent standup() => CalendarEvent(
+      id: 7,
+      title: 'Standup',
+      start: DateTime(2026, 9, 28, 9),
+      end: DateTime(2026, 9, 28, 9, 15),
+      calendarId: 2,
+      repeating: true,
+      occurrenceMillis: DateTime(2026, 9, 28, 9).millisecondsSinceEpoch,
+    );
+
+    testWidgets('say that a change touches this occurrence only', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _withOneCalendar(), event: standup());
+
+      expect(find.text(Messages.agendaEventRepeats), findsOneWidget);
+
+      await tester.tap(find.byKey(eventDetailEditKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(Messages.agendaEventRepeats), findsOneWidget);
+    });
+
+    testWidgets('DELETE asks about the occurrence, and deletes only it', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = FakeAgendaRepository();
+      await _open(tester, repository, event: standup());
+
+      await tester.tap(find.byKey(eventDetailDeleteKey));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(Messages.agendaEventDeleteOccurrenceAsk),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(eventDetailDeleteYesKey));
+      await tester.pumpAndSettle();
+
+      // The whole event goes to the repository, so it can name the one
+      // occurrence rather than the series' id alone.
+      expect(repository.deletedEvents.single.isOccurrence, isTrue);
+    });
+
+    testWidgets('a one-off event says nothing about occurrences', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, FakeAgendaRepository(), event: _dentist());
+
+      expect(find.text(Messages.agendaEventRepeats), findsNothing);
+    });
+  });
+
+  testWidgets('a multi-day event shows its own start and end', (
+    WidgetTester tester,
+  ) async {
+    await _open(
+      tester,
+      FakeAgendaRepository(),
+      event: CalendarEvent(
+        id: 3,
+        title: 'Ferry',
+        start: DateTime(2026, 9, 26, 18),
+        end: DateTime(2026, 9, 27, 14),
+      ),
+      // Opened from its second day, which used to read "UNTIL 14:00" alone.
+      day: DateTime(2026, 9, 27),
+    );
+
+    expect(find.text('SAT 26 SEP 18:00 - SUN 27 SEP 14:00'), findsOneWidget);
+  });
+
+  testWidgets('a week-grid slot presets the start, and an end an hour on', (
+    WidgetTester tester,
+  ) async {
+    await _open(
+      tester,
+      _withOneCalendar(),
+      day: DateTime(2026, 9, 28, 14, 30),
+      startAt: DateTime(2026, 9, 28, 14, 30),
+    );
+
+    expect(find.text('14:30'), findsOneWidget);
+    expect(find.text('15:30'), findsOneWidget);
+    expect(find.text(Messages.agendaEventTapToSet), findsNothing);
+  });
+
+  testWidgets('a slot in the last hour ends on the next day', (
+    WidgetTester tester,
+  ) async {
+    final FakeAgendaRepository repository = _withOneCalendar();
+    await _open(
+      tester,
+      repository,
+      day: DateTime(2026, 9, 28, 23, 30),
+      startAt: DateTime(2026, 9, 28, 23, 30),
+    );
+    await tester.enterText(find.byKey(eventDetailTitleFieldKey), 'Late');
+    await tester.ensureVisible(find.byKey(eventDetailSaveKey));
+    await tester.tap(find.byKey(eventDetailSaveKey));
+    await tester.pumpAndSettle();
+
+    final NewCalendarEvent saved = repository.created.single;
+    expect(saved.start, DateTime(2026, 9, 28, 23, 30));
+    expect(saved.end, DateTime(2026, 9, 29, 0, 30));
   });
 }

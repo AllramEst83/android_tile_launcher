@@ -56,13 +56,18 @@ const Key eventDetailEndTimeFieldKey = ValueKey<String>(
 /// The calendar field lists every calendar Android will accept an insert for,
 /// defaulting to the event's own (or the account's primary) — changing it
 /// moves the event. An end date is only shown once set; left alone, the event
-/// ends the same day it starts. Completes with whether anything actually
-/// changed, so the agenda sheet knows to reload.
+/// ends the same day it starts. One occurrence of a repeating event is edited
+/// or deleted on its own (the rest of the series is never touched), and says
+/// so; it cannot change calendar. [startAt], when adding, presets the start
+/// time (and an end an hour later), as a tap on a week-grid slot gives.
+/// Completes with whether anything actually changed, so the agenda sheet
+/// knows to reload.
 Future<bool> showEventDetailSheet(
   BuildContext context, {
   required AgendaRepository repository,
   CalendarEvent? event,
   required DateTime day,
+  DateTime? startAt,
 }) async {
   final bool? changed = await showModalBottomSheet<bool>(
     context: context,
@@ -75,7 +80,12 @@ Future<bool> showEventDetailSheet(
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
       ),
-      child: _EventDetailSheet(repository: repository, event: event, day: day),
+      child: _EventDetailSheet(
+        repository: repository,
+        event: event,
+        day: day,
+        startAt: startAt,
+      ),
     ),
   );
   return changed ?? false;
@@ -88,6 +98,7 @@ class _EventDetailSheet extends StatefulWidget {
     required this.repository,
     required this.event,
     required this.day,
+    this.startAt,
   });
 
   final AgendaRepository repository;
@@ -96,6 +107,7 @@ class _EventDetailSheet extends StatefulWidget {
   /// sheet opens straight into the edit form.
   final CalendarEvent? event;
   final DateTime day;
+  final DateTime? startAt;
 
   @override
   State<_EventDetailSheet> createState() => _EventDetailSheetState();
@@ -139,9 +151,20 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
       _endTime = TimeOfDay.fromDateTime(event.end);
       final DateTime endDay = _dateOnly(event.end);
       if (endDay != _startDate) _endDate = endDay;
+    } else if (widget.startAt case final DateTime at) {
+      final DateTime end = at.add(const Duration(hours: 1));
+      _startDate = _dateOnly(at);
+      _startTime = TimeOfDay.fromDateTime(at);
+      _endTime = TimeOfDay.fromDateTime(end);
+      // A slot in the last hour of the day ends on the next one.
+      if (_dateOnly(end) != _startDate) _endDate = _dateOnly(end);
     }
     if (_editing) _loadCalendars();
   }
+
+  /// One occurrence of a series: edited and deleted on its own, and kept on
+  /// its series' calendar.
+  bool get _occurrence => widget.event?.repeating ?? false;
 
   @override
   void dispose() {
@@ -347,7 +370,7 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
     final CalendarEvent? current = widget.event;
     final CalendarWriteResult result = current == null
         ? await widget.repository.createEvent(draft)
-        : await widget.repository.updateEvent(current.id, draft);
+        : await widget.repository.updateEvent(current, draft);
     if (!mounted) return;
     switch (result) {
       case CalendarEventSaved():
@@ -382,7 +405,7 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
       _confirmingDelete = false;
     });
     final CalendarDeleteResult result = await widget.repository.deleteEvent(
-      event.id,
+      event,
     );
     if (!mounted) return;
     switch (result) {
@@ -479,8 +502,9 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
         _Field(
           fieldKey: eventDetailWhenKey,
           label: Messages.agendaEventWhen,
-          value:
-              '${formatClockDate(widget.day)} ${formatSpan(event, widget.day)}',
+          // The whole event, not just the day it was opened from: a
+          // multi-day event's own start and end.
+          value: formatEventRange(event),
         ),
         if (location != null) ...<Widget>[
           const SizedBox(height: TileMetrics.gutter),
@@ -498,13 +522,19 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
               ? Messages.agendaEventNoDescription
               : description.toUpperCase(),
         ),
+        if (_occurrence) ...<Widget>[
+          const SizedBox(height: TileMetrics.gutter),
+          _note(text),
+        ],
         const SizedBox(height: TileMetrics.margin),
         if (_confirmingDelete)
           Row(
             children: <Widget>[
               Expanded(
                 child: Text(
-                  Messages.agendaEventDeleteAsk,
+                  _occurrence
+                      ? Messages.agendaEventDeleteOccurrenceAsk
+                      : Messages.agendaEventDeleteAsk,
                   style: text.bodySmall?.copyWith(
                     fontSize: 11,
                     color: TileColors.highlight,
@@ -553,11 +583,20 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
     );
   }
 
+  Widget _note(TextTheme text) => Text(
+    Messages.agendaEventRepeats,
+    style: text.bodySmall?.copyWith(fontSize: 9, color: TileColors.highlight),
+  );
+
   Widget _editForm(TextTheme text) {
     final bool disabled = _busy || _loadingCalendars;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        if (_occurrence) ...<Widget>[
+          _note(text),
+          const SizedBox(height: TileMetrics.gutter),
+        ],
         _EditField(
           fieldKey: eventDetailTitleFieldKey,
           label: Messages.agendaEventTitleLabel,
@@ -690,7 +729,10 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
                 ),
               ),
           ],
-          onChanged: (int? value) => setState(() => _calendarId = value),
+          // An occurrence stays with its series.
+          onChanged: _occurrence
+              ? null
+              : (int? value) => setState(() => _calendarId = value),
         );
       }
     }

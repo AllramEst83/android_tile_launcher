@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/model/agenda_snapshot.dart';
+import 'package:android_tile_launcher/model/calendar_choices.dart';
 import 'package:android_tile_launcher/model/calendar_event.dart';
 import 'package:android_tile_launcher/services/calendar_service.dart';
 import 'package:android_tile_launcher/services/live_agenda_repository.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_calendar_service.dart';
 import '../fakes/fake_permission_service.dart';
+import '../fakes/in_memory_local_store.dart';
 
 final DateTime _from = DateTime(2026, 9, 28);
 final DateTime _to = DateTime(2026, 9, 29);
@@ -140,7 +142,39 @@ void main() {
         CalendarInfo(id: 4, name: 'Family'),
       ]);
 
-      expect(await repository.writableCalendars(), calendar.listResult);
+      expect(
+        (await repository.writableCalendars() as CalendarList).calendars,
+        const <CalendarInfo>[CalendarInfo(id: 4, name: 'Family')],
+      );
+    });
+
+    test('writableCalendars leaves out the hidden ones', () async {
+      calendar.listResult = const CalendarList(<CalendarInfo>[
+        CalendarInfo(id: 4, name: 'Family'),
+        CalendarInfo(id: 5, name: 'Work'),
+      ]);
+      await repository.setCalendarShown(4, shown: false);
+
+      expect(
+        (await repository.writableCalendars() as CalendarList).calendars.map(
+          (c) => c.id,
+        ),
+        <int>[5],
+      );
+    });
+
+    test('...unless that would leave none to write to', () async {
+      calendar.listResult = const CalendarList(<CalendarInfo>[
+        CalendarInfo(id: 4, name: 'Family'),
+      ]);
+      await repository.setCalendarShown(4, shown: false);
+
+      expect(
+        (await repository.writableCalendars() as CalendarList).calendars.map(
+          (c) => c.id,
+        ),
+        <int>[4],
+      );
     });
 
     test('createEvent passes the draft through and back', () async {
@@ -152,22 +186,147 @@ void main() {
       expect(result, const CalendarEventSaved(9));
     });
 
-    test('updateEvent passes the id and draft through and back', () async {
+    CalendarEvent stored({int? calendarId = 4, bool repeating = false}) =>
+        CalendarEvent(
+          id: 9,
+          title: 'Lunch',
+          start: DateTime(2026, 9, 28, 12),
+          end: DateTime(2026, 9, 28, 13),
+          calendarId: calendarId,
+          repeating: repeating,
+          occurrenceMillis: repeating ? 1 : null,
+        );
+
+    test('updateEvent on the same calendar edits it in place', () async {
       calendar.writeResult = const CalendarEventSaved(9);
 
-      final result = await repository.updateEvent(9, draft);
+      final result = await repository.updateEvent(stored(), draft);
 
-      expect(calendar.updated, <(int, NewCalendarEvent)>[(9, draft)]);
+      expect(calendar.updated.single.$1, 9);
+      // The calendar is never rewritten on an existing event.
+      expect(calendar.updated.single.$2.calendarId, isNull);
+      expect(calendar.updated.single.$2.title, 'Lunch');
+      expect(calendar.created, isEmpty);
       expect(result, const CalendarEventSaved(9));
     });
 
-    test('deleteEvent passes the id through and back', () async {
+    test('updateEvent to another calendar adds there, then removes', () async {
+      calendar.writeResult = const CalendarEventSaved(20);
+
+      final result = await repository.updateEvent(stored(calendarId: 7), draft);
+
+      expect(calendar.created, <NewCalendarEvent>[draft]);
+      expect(calendar.deleted, <int>[9]);
+      expect(calendar.updated, isEmpty);
+      expect(result, const CalendarEventSaved(20));
+    });
+
+    test('a failed add to another calendar removes nothing', () async {
+      calendar.writeResult = const CalendarWriteFailed('nope');
+
+      final result = await repository.updateEvent(stored(calendarId: 7), draft);
+
+      expect(calendar.deleted, isEmpty);
+      expect(result, isA<CalendarWriteFailed>());
+    });
+
+    test('an occurrence of a series never moves calendar', () async {
+      await repository.updateEvent(
+        stored(calendarId: 7, repeating: true),
+        draft,
+      );
+
+      expect(calendar.created, isEmpty);
+      expect(calendar.deleted, isEmpty);
+      expect(calendar.updated.single.$1, 9);
+    });
+
+    test('deleteEvent passes the event through and back', () async {
       calendar.deleteResult = const CalendarEventAlreadyGone();
 
-      final result = await repository.deleteEvent(9);
+      final result = await repository.deleteEvent(stored());
 
       expect(calendar.deleted, <int>[9]);
       expect(result, const CalendarEventAlreadyGone());
+    });
+  });
+
+  group('calendar choices', () {
+    CalendarEvent on(int id, int calendarId, {bool visible = true}) =>
+        CalendarEvent(
+          id: id,
+          title: 'E$id',
+          start: DateTime(2026, 9, 28, 9),
+          end: DateTime(2026, 9, 28, 10),
+          calendarId: calendarId,
+          calendarVisible: visible,
+        );
+
+    test('the phone calendar app decides until the user picks', () async {
+      calendar.result = CalendarEvents(<CalendarEvent>[
+        on(1, 1),
+        on(2, 2, visible: false),
+      ]);
+
+      final snapshot = await repository.between(_from, _to);
+
+      expect((snapshot as AgendaReady).events.map((e) => e.id), <int>[1]);
+    });
+
+    test('a hidden calendar drops out; a shown one comes in', () async {
+      calendar.result = CalendarEvents(<CalendarEvent>[
+        on(1, 1),
+        on(2, 2, visible: false),
+      ]);
+      await repository.setCalendarShown(1, shown: false);
+      await repository.setCalendarShown(2, shown: true);
+
+      final snapshot = await repository.between(_from, _to);
+
+      expect((snapshot as AgendaReady).events.map((e) => e.id), <int>[2]);
+    });
+
+    test('choices are saved and read back by a later run', () async {
+      final InMemoryLocalStore store = InMemoryLocalStore();
+      await LiveAgendaRepository(
+        calendar: calendar,
+        permissions: permissions,
+        store: store,
+      ).setCalendarShown(3, shown: false);
+
+      final LiveAgendaRepository later = LiveAgendaRepository(
+        calendar: calendar,
+        permissions: permissions,
+        store: store,
+      );
+
+      expect(
+        await later.calendarChoices(),
+        const CalendarChoices(<int, bool>{3: false}),
+      );
+    });
+
+    test('an unreadable store is no choices, not a failure', () async {
+      final LiveAgendaRepository broken = LiveAgendaRepository(
+        calendar: calendar,
+        permissions: permissions,
+        store: InMemoryLocalStore(failure: Exception('disk')),
+      );
+      calendar.result = CalendarEvents(<CalendarEvent>[on(1, 1)]);
+
+      expect(await broken.calendarChoices(), const CalendarChoices());
+      await broken.setCalendarShown(1, shown: false);
+      // Still honoured for this run.
+      expect((await broken.between(_from, _to) as AgendaReady).events, isEmpty);
+    });
+
+    test('calendars passes the full list straight through', () async {
+      calendar.allResult = const CalendarList(<CalendarInfo>[
+        CalendarInfo(id: 1, name: 'Shared', writable: false),
+      ]);
+
+      expect(await repository.calendars(), same(calendar.allResult));
+      expect(permissions.requested, isEmpty);
     });
   });
 }

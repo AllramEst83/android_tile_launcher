@@ -521,7 +521,9 @@ Future<void> _weatherTap(WeatherRepository weather, WeatherSnapshot snapshot) {
 /// What a tap on the agenda tile does: open the day and week when there are
 /// events to show; otherwise fix what is in the way (ask for the calendar, or
 /// read it again). Nothing when Android has stopped asking — the tile says
-/// where the setting is.
+/// where the setting is. The tile reads again once the sheet closes: an event
+/// may have been added, changed or deleted there, or a calendar hidden, and
+/// the next poll is up to a minute away.
 void _agendaTap(
   BuildContext context,
   AgendaRepository agenda,
@@ -530,7 +532,9 @@ void _agendaTap(
 ) {
   switch (snapshot) {
     case AgendaReady():
-      unawaited(showAgendaSheet(context, repository: agenda));
+      unawaited(
+        showAgendaSheet(context, repository: agenda).then((_) => refreshNow()),
+      );
     case AgendaDenied(permanent: true):
       break;
     case AgendaNeedsPermission() || AgendaDenied():

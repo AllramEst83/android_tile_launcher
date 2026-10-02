@@ -51,9 +51,20 @@ class AgendaDay {
   final List<CalendarEvent> events;
 }
 
+/// Whether [event] fills the whole day starting at [day]: an all-day event,
+/// or a timed one that began before it and runs on past it (the middle day of
+/// a three-day trip) — what the agenda list calls `ALL DAY` and the week grid
+/// puts in its all-day row rather than as a block.
+bool coversDay(CalendarEvent event, DateTime day) {
+  if (event.allDay) return occursOn(event, day);
+  return !event.start.isAfter(day) && !event.end.isBefore(addDays(day, 1));
+}
+
 /// [events] laid out by day for the [days] days from [from]'s day. An event
 /// that spans several days is listed under each of them; a day with nothing
-/// on is left out.
+/// on is left out. Within a day, whatever fills it ([coversDay]) comes first,
+/// then the rest by when they start *on that day* — so an overnight event
+/// that began yesterday sorts by its midnight, not by yesterday's start.
 List<AgendaDay> groupByDay(
   List<CalendarEvent> events, {
   required DateTime from,
@@ -65,12 +76,28 @@ List<AgendaDay> groupByDay(
       if (events.any((CalendarEvent e) => occursOn(e, addDays(first, i))))
         AgendaDay(
           day: addDays(first, i),
-          events: <CalendarEvent>[
+          events: _inDayOrder(<CalendarEvent>[
             for (final CalendarEvent e in events)
               if (occursOn(e, addDays(first, i))) e,
-          ],
+          ], addDays(first, i)),
         ),
   ];
+}
+
+List<CalendarEvent> _inDayOrder(List<CalendarEvent> events, DateTime day) {
+  int rank(CalendarEvent e) => coversDay(e, day) ? 0 : 1;
+  DateTime startOn(CalendarEvent e) => e.start.isBefore(day) ? day : e.start;
+  // Indexed so events that tie keep the order they came in (List.sort is
+  // not stable).
+  final List<(int, CalendarEvent)> indexed = events.indexed.toList()
+    ..sort(((int, CalendarEvent) a, (int, CalendarEvent) b) {
+      final int byRank = rank(a.$2).compareTo(rank(b.$2));
+      if (byRank != 0) return byRank;
+      final int byStart = startOn(a.$2).compareTo(startOn(b.$2));
+      if (byStart != 0) return byStart;
+      return a.$1.compareTo(b.$1);
+    });
+  return <CalendarEvent>[for (final (_, CalendarEvent e) in indexed) e];
 }
 
 /// The event the tile leads with: the first timed one (a meeting is more
@@ -117,6 +144,31 @@ String formatWhen(CalendarEvent event, DateTime now) {
   if (event.allDay) return '${prefix}ALL DAY';
   if (!event.start.isAfter(now)) return 'NOW';
   return '$prefix${formatClockTime(event.start)}';
+}
+
+/// The whole of [event], for its own detail view (not one day's share of it,
+/// as [formatSpan] gives): `TUE 29 SEP 09:00-10:30`, `SAT 4 OCT 18:00 - SUN
+/// 5 OCT 14:00` across midnight, `TUE 29 SEP ALL DAY`, or `SAT 4 OCT - MON 6
+/// OCT ALL DAY` for an all-day event of several days (whose own end is the
+/// midnight after its last day).
+String formatEventRange(CalendarEvent event) {
+  if (event.allDay) {
+    final DateTime first = startOfDay(event.start);
+    final DateTime last = addDays(startOfDay(event.end), -1);
+    if (!last.isAfter(first)) return '${formatClockDate(first)} ALL DAY';
+    return '${formatClockDate(first)} - ${formatClockDate(last)} ALL DAY';
+  }
+  final String date = formatClockDate(event.start);
+  final String from = formatClockTime(event.start);
+  if (event.end == event.start) return '$date $from';
+  // Ending exactly at midnight still ends on the day it started, as far as a
+  // reader is concerned: `22:00-00:00`, not a second date.
+  final bool sameDay =
+      startOfDay(event.end) == startOfDay(event.start) ||
+      event.end == addDays(startOfDay(event.start), 1);
+  if (sameDay) return '$date $from-${formatClockTime(event.end)}';
+  return '$date $from - ${formatClockDate(event.end)} '
+      '${formatClockTime(event.end)}';
 }
 
 /// The hours of [event] on the day starting at [day], for the agenda sheet:
