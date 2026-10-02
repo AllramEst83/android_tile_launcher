@@ -43,6 +43,7 @@ import 'services/smhi.dart';
 import 'services/system_clipboard_service.dart';
 import 'services/text_tv.dart';
 import 'services/tile_services.dart';
+import 'services/todo_list.dart';
 import 'services/weather.dart';
 
 const String _ownPackage = 'com.codedbykay.android_tile_launcher';
@@ -67,6 +68,8 @@ Future<void> main() async {
   await firstRun.load();
   final LaunchStats launchStats = LaunchStats(store: store);
   await launchStats.load();
+  final TodoList todoList = TodoList(store: store);
+  await todoList.load();
   final IoHttpFetcher fetcher = IoHttpFetcher();
 
   final AndroidAppRepository appRepository = AndroidAppRepository(
@@ -106,6 +109,7 @@ Future<void> main() async {
         ),
         link: const AndroidLinkService(),
         media: const AndroidMediaService(),
+        todos: todoList,
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

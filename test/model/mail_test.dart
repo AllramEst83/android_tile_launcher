@@ -2,6 +2,7 @@ import 'package:android_tile_launcher/model/mail.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  _starTests();
   group('MailAgeFilter.cutoff', () {
     final DateTime now = DateTime(2026, 9, 30);
 
@@ -122,6 +123,31 @@ void main() {
         const MailFilter(text: 'a') == const MailFilter(text: 'b'),
         isFalse,
       );
+    });
+  });
+}
+
+void _starTests() {
+  group('starredFirst', () {
+    test('puts starred first and keeps each group in order', () {
+      const List<MailMessage> list = <MailMessage>[
+        MailMessage(uid: 9, from: 'a', subject: ''),
+        MailMessage(uid: 8, from: 'b', subject: '', starred: true),
+        MailMessage(uid: 7, from: 'c', subject: ''),
+        MailMessage(uid: 2, from: 'd', subject: '', starred: true),
+      ];
+      expect(starredFirst(list).map((MailMessage m) => m.uid), <int>[
+        8,
+        2,
+        9,
+        7,
+      ]);
+    });
+
+    test('copyWith keeps and changes starred', () {
+      const MailMessage m = MailMessage(uid: 1, from: 'a', subject: '');
+      expect(m.copyWith(starred: true).starred, isTrue);
+      expect(m.copyWith(starred: true).copyWith(unread: true).starred, isTrue);
     });
   });
 }

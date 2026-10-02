@@ -47,6 +47,11 @@ abstract interface class MailService {
   /// nothing unless it returns [MailMarked].
   Future<MailMarkResult> mark(int uid, {required bool read, int? validity});
 
+  /// Stars (sets `\Flagged` on) the inbox message with [uid], or with
+  /// `starred: false` unstars it. Same [validity] rule as [read]. Never
+  /// throws, and changes nothing unless it returns [MailStarred].
+  Future<MailStarResult> star(int uid, {required bool starred, int? validity});
+
   /// Sends a new message from the set-up account to every address in [to],
   /// copying every address in [cc]. Never throws; nothing is sent unless it
   /// returns [MailSent].

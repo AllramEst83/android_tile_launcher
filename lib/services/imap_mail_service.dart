@@ -197,8 +197,13 @@ class ImapMailService implements MailService {
       final messages = [
         for (final message in fetched.messages) ?mailMessageFrom(message),
       ]..sort((a, b) => b.uid.compareTo(a.uid));
+      // The newest [count], plus any older starred message: a star keeps it
+      // in the list however far down the inbox it has sunk.
       final capped = messages.length > count
-          ? messages.sublist(0, count)
+          ? <MailMessage>[
+              ...messages.sublist(0, count),
+              ...messages.sublist(count).where((m) => m.starred),
+            ]
           : messages;
       return MailMessages(
         capped,
@@ -368,6 +373,44 @@ class ImapMailService implements MailService {
     return switch (outcome) {
       _Done(:final value) => value,
       _Failed(:final reason) => MailMarkFailed(reason),
+    };
+  }
+
+  @override
+  Future<MailStarResult> star(
+    int uid, {
+    required bool starred,
+    int? validity,
+  }) async {
+    final MailAccount? saved;
+    try {
+      saved = await _accounts.load();
+    } on LocalStoreException catch (error) {
+      return MailStarFailed(error.message);
+    }
+    if (saved == null) return const MailStarNotSetUp();
+
+    final outcome = await _session<MailStarResult>(saved, (client) async {
+      final inbox = await client.selectInbox();
+      if (validity != null && inbox.uidValidity != validity) {
+        return const MailStarFailed(
+          'the server renumbered the inbox; refresh the list',
+        );
+      }
+      final sequence = MessageSequence.fromId(uid, isUid: true);
+      final present = await client.uidFetchMessages(sequence, '(UID)');
+      if (present.messages.isEmpty) return const MailStarGone();
+      await client.uidStore(
+        sequence,
+        [MessageFlags.flagged],
+        action: starred ? StoreAction.add : StoreAction.remove,
+        silent: true,
+      );
+      return MailStarred(starred: starred);
+    });
+    return switch (outcome) {
+      _Done(:final value) => value,
+      _Failed(:final reason) => MailStarFailed(reason),
     };
   }
 
@@ -610,6 +653,7 @@ MailMessage? mailMessageFrom(MimeMessage message) {
     subject: subject.trim(),
     date: sent?.toLocal(),
     unread: !message.isSeen,
+    starred: message.isFlagged,
   );
 }
 

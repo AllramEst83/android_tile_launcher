@@ -26,6 +26,7 @@ import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/text_tv_repository.dart';
 import 'package:android_tile_launcher/services/text_tv_tile_source.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
+import 'package:android_tile_launcher/services/todo_list.dart';
 import 'package:android_tile_launcher/services/toggle_tile_source.dart';
 import 'package:android_tile_launcher/services/weather_repository.dart';
 import 'package:android_tile_launcher/services/weather_tile_source.dart';
@@ -59,6 +60,8 @@ import 'package:android_tile_launcher/ui/text_tv_tile_view.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_gloss.dart';
 import 'package:android_tile_launcher/ui/tile_poller.dart';
+import 'package:android_tile_launcher/ui/todo_sheet.dart';
+import 'package:android_tile_launcher/ui/todo_tile_view.dart';
 import 'package:android_tile_launcher/ui/weather_tile_view.dart';
 import 'package:flutter/material.dart';
 
@@ -399,6 +402,18 @@ Widget tileContent(
                     alarm: alarm,
                   ).then((_) => refreshNow()),
                 )
+              : null,
+        ),
+      );
+    case TileKind.todo:
+      final TodoList todos = services.todos;
+      return ListenableBuilder(
+        listenable: todos,
+        builder: (context, _) => TodoTileContentView(
+          items: todos.items,
+          ink: tile.colour.ink,
+          onTap: interactive
+              ? () => unawaited(showTodoSheet(context, todos: todos))
               : null,
         ),
       );

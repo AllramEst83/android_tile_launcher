@@ -17,6 +17,7 @@ import 'package:android_tile_launcher/services/shade_service.dart';
 import 'package:android_tile_launcher/services/sms_service.dart';
 import 'package:android_tile_launcher/services/system_control_service.dart';
 import 'package:android_tile_launcher/services/text_tv_repository.dart';
+import 'package:android_tile_launcher/services/todo_list.dart';
 import 'package:android_tile_launcher/services/wallpaper_service.dart';
 import 'package:android_tile_launcher/services/weather_repository.dart';
 import 'package:android_tile_launcher/services/whatsapp_service.dart';
@@ -48,6 +49,7 @@ class TileServices {
     required this.camera,
     required this.link,
     required this.media,
+    required this.todos,
   });
 
   final SystemControlService systemControl;
@@ -89,4 +91,7 @@ class TileServices {
 
   /// The Now Playing tile's session read and transport controls.
   final MediaService media;
+
+  /// The to-do tile's list, kept on the phone.
+  final TodoList todos;
 }

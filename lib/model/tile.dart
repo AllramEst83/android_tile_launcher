@@ -24,6 +24,7 @@ enum TileKind {
   qrScanner,
   scene,
   media,
+  todo,
 }
 
 /// The app package [tile] launches when tapped, or `null` for a tile with no
@@ -53,6 +54,7 @@ String displayNameOf(TileKind kind) => switch (kind) {
   TileKind.qrScanner => 'QR SCANNER',
   TileKind.scene => 'SCENE',
   TileKind.media => 'NOW PLAYING',
+  TileKind.todo => 'TO-DO',
 };
 
 /// The id of the tile for the contact with lookup [key]. Unlike a system kind

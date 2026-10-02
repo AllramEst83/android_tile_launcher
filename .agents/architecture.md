@@ -20,6 +20,7 @@ lib/
     scene_animation.dart     # SceneAnimation (rocket, palmTree, flower, calmAndEasy, retroVinyl): each one's label and its bundled .lottie asset path
     layout_export.dart       # exportLayout / parseLayout: the tiles + settings as one line of JSON (format tag + version), sealed LayoutImported / LayoutRejected
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
+    todo_item.dart           # TodoItem (id, title, done) + JSON; todoFit(items, lines): how many fit and the +N left over
     list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder
     styled_text.dart         # TvColor, StyledRun (text + colours + underline + tall + mosaic + link), mergeRuns, plainText
     tv_mosaic.dart           # tvPictureFor(hash): texttv.nu's block-graphics GIFs rebuilt and looked up by CRC-32 (no downloads)
@@ -91,6 +92,7 @@ lib/
     mail_service.dart        # abstract MailService: account / setUp / forget / latest({count, fresh}) / moveToTrash; never throws
     imap_mail_service.dart   # ImapMailService on enough_mail (the only file that knows it): envelope-only listing, move to Trash, never a delete
     cached_mail_service.dart # CachedMailService: reuses a good inbox listing for 3 min; setUp / forget / moveToTrash drop it
+    todo_list.dart           # TodoList (ChangeNotifier): the to-do list in LocalStore 'todos'; add/setDone/rename/remove/move
     mail_tile_source.dart    # MailTileSource: the newest ten + the moment they were read
     media_service.dart       # abstract MediaService: now() -> MediaSnapshot; playPause/next/previous; openAccessSettings() (no runtime dialog exists for this one)
     android_media_service.dart  # MethodChannel implementation

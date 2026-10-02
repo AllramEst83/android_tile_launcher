@@ -103,6 +103,16 @@ class CachedMailService implements MailService {
   }
 
   @override
+  Future<MailStarResult> star(
+    int uid, {
+    required bool starred,
+    int? validity,
+  }) async {
+    _drop();
+    return inner.star(uid, starred: starred, validity: validity);
+  }
+
+  @override
   Future<MailSendResult> send({
     required List<String> to,
     List<String> cc = const <String>[],

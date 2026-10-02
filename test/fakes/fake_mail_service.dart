@@ -109,6 +109,20 @@ class FakeMailService implements MailService {
     return markResult ?? MailMarked(read: read);
   }
 
+  /// What `star` answers, and every `(uid, starred, validity)` it was given.
+  MailStarResult? starResult;
+  final List<(int, bool, int?)> stars = <(int, bool, int?)>[];
+
+  @override
+  Future<MailStarResult> star(
+    int uid, {
+    required bool starred,
+    int? validity,
+  }) async {
+    stars.add((uid, starred, validity));
+    return starResult ?? MailStarred(starred: starred);
+  }
+
   /// What `send` answers, and every `(to, cc, subject, text)` it was given.
   MailSendResult sendResult = const MailSent();
   final List<(List<String>, List<String>, String, String)> sent =

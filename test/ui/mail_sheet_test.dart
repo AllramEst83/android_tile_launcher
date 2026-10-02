@@ -1692,4 +1692,75 @@ void main() {
       expect(mail.marks, isEmpty);
     });
   });
+
+  group('star', () {
+    testWidgets('STAR stars the selection and floats it to the top', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      await tester.tap(find.byKey(mailMessageKey(11)));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailBulkStarKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.stars, <(int, bool, int?)>[(11, true, 77)]);
+      expect(find.text(Messages.mailBulkStarred(1)), findsOneWidget);
+      expect(find.byKey(mailStarKey(11)), findsOneWidget);
+      expect(find.byKey(mailStarKey(12)), findsNothing);
+      // Starred first, though uid 12 is the newer message.
+      expect(
+        tester.getTopLeft(find.byKey(mailMessageKey(11))).dy,
+        lessThan(tester.getTopLeft(find.byKey(mailMessageKey(12))).dy),
+      );
+    });
+
+    testWidgets('a starred message is listed first and marked', (
+      WidgetTester tester,
+    ) async {
+      final MailMessages inbox = MailMessages(
+        <MailMessage>[
+          _mail(12, 'Anna Andersson', 'Lunch'),
+          _mail(5, 'Old Friend', 'Keep this').copyWith(starred: true),
+        ],
+        total: 2,
+        unread: 0,
+        validity: 77,
+      );
+      await _open(tester, _service(inbox));
+
+      expect(find.byKey(mailStarKey(5)), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(mailMessageKey(5))).dy,
+        lessThan(tester.getTopLeft(find.byKey(mailMessageKey(12))).dy),
+      );
+    });
+
+    testWidgets('the button unstars when everything selected is starred', (
+      WidgetTester tester,
+    ) async {
+      final MailMessages inbox = MailMessages(
+        <MailMessage>[_mail(5, 'Old Friend', 'Keep').copyWith(starred: true)],
+        total: 1,
+        unread: 0,
+        validity: 77,
+      );
+      final FakeMailService mail = _service(inbox);
+      await _open(tester, mail);
+      await tester.tap(find.byKey(mailSelectKey));
+      await tester.pump();
+      await tester.tap(find.byKey(mailMessageKey(5)));
+      await tester.pump();
+
+      expect(find.text(Messages.mailUnstarSelected(1)), findsOneWidget);
+      await tester.tap(find.byKey(mailBulkStarKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.stars, <(int, bool, int?)>[(5, false, 77)]);
+      expect(find.byKey(mailStarKey(5)), findsNothing);
+    });
+  });
 }

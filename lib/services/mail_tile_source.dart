@@ -21,6 +21,17 @@ class MailTileSource implements TileSource {
   @override
   Future<TileContent> read() async {
     final MailResult result = await service.latest(count: count);
-    return MailContent(result: result, now: clock());
+    // Starred messages older than the newest few ride along for the sheet;
+    // the tile lists only the newest.
+    final MailResult shown =
+        result is MailMessages && result.messages.length > count
+        ? MailMessages(
+            result.messages.sublist(0, count),
+            total: result.total,
+            unread: result.unread,
+            validity: result.validity,
+          )
+        : result;
+    return MailContent(result: shown, now: clock());
   }
 }

@@ -182,6 +182,12 @@ abstract final class Messages {
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS READ.';
   static String mailBulkMarkedUnread(int n) =>
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS UNREAD.';
+  static String mailStarSelected(int n) => 'STAR ($n)';
+  static String mailUnstarSelected(int n) => 'UNSTAR ($n)';
+  static String mailBulkStarred(int n) =>
+      '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} STARRED.';
+  static String mailBulkUnstarred(int n) =>
+      '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} UNSTARRED.';
   static const String mailCompose = 'COMPOSE';
   static const String mailComposeTitle = 'NEW MESSAGE';
   static const String mailSubject = 'SUBJECT';
@@ -225,6 +231,24 @@ abstract final class Messages {
       stale ? 'SAVED RATES FROM $day (OFFLINE)' : 'RATES FROM $day (ECB)';
   static const String calcMoney = 'MONEY';
 
+  static const String todoTitle = 'TO-DO';
+  static const String todoEmpty = 'NOTHING TO DO.';
+  static const String todoAddHint = 'ADD A TO-DO';
+  static const String todoAdd = 'ADD';
+  static const String todoSelect = 'SELECT';
+  static const String todoMove = 'MOVE';
+  static const String todoDone = 'DONE';
+  static const String todoSelectAll = 'SELECT ALL';
+  static const String todoSave = 'SAVE';
+  static const String todoCancel = 'CANCEL';
+  static const String todoYes = 'YES';
+  static const String todoNo = 'NO';
+  static const String todoMoveHint = 'DRAG THE HANDLES TO REORDER.';
+  static String todoSelectedCount(int n) => '$n SELECTED';
+  static String todoDeleteSelected(int n) => 'DELETE ($n)';
+  static String todoDeleteAsk(int n) =>
+      'DELETE $n ${n == 1 ? 'TO-DO' : 'TO-DOS'}? THIS CAN\'T BE UNDONE.';
+  static String todoMore(int n) => '+$n';
   static const String alarmTitle = 'ALARM';
   static const String alarmTabTimer = 'TIMER';
   static const String alarmTabAlarm = 'ALARM';
@@ -432,7 +456,9 @@ abstract final class Messages {
       'FLASHLIGHT — TOGGLES THE TORCH.\n'
       'FILES — BROWSES AND DELETES ANYWHERE ON THE PHONE\'S STORAGE.\n'
       'NOW PLAYING — WHAT IS PLAYING IN SPOTIFY OR ANY OTHER MUSIC APP; '
-      'TAP FOR BIGGER ART AND FULL CONTROLS.';
+      'TAP FOR BIGGER ART AND FULL CONTROLS.\n'
+      'TO-DO — A SIMPLE LIST; TAP TO ADD, CHECK OFF, EDIT, REORDER OR '
+      'DELETE.';
 
   static const String helpResizingTitle = 'RESIZING A TILE';
   static const String helpResizingBody =

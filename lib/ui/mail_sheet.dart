@@ -16,6 +16,7 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 
 /// Keys so tests can find the parts.
 Key mailMessageKey(int uid) => ValueKey<String>('mail-message-$uid');
+Key mailStarKey(int uid) => ValueKey<String>('mail-star-$uid');
 Key mailCheckboxKey(int uid) => ValueKey<String>('mail-checkbox-$uid');
 const Key mailComposeKey = ValueKey<String>('mail-compose');
 const Key mailFromComposeKey = ValueKey<String>('mail-from-compose');
@@ -38,6 +39,7 @@ const Key mailCancelSelectKey = ValueKey<String>('mail-cancel-select');
 const Key mailBulkDeleteKey = ValueKey<String>('mail-bulk-delete');
 const Key mailBulkReadKey = ValueKey<String>('mail-bulk-read');
 const Key mailBulkUnreadKey = ValueKey<String>('mail-bulk-unread');
+const Key mailBulkStarKey = ValueKey<String>('mail-bulk-star');
 const Key mailBulkYesKey = ValueKey<String>('mail-bulk-yes');
 const Key mailBulkNoKey = ValueKey<String>('mail-bulk-no');
 const Key mailShowImagesKey = ValueKey<String>('mail-show-images');
@@ -195,7 +197,7 @@ class _MailSheetState extends State<_MailSheet> {
       _email = account?.email;
       _result = result;
       _messages = result is MailMessages
-          ? List<MailMessage>.of(result.messages)
+          ? starredFirst(result.messages)
           : <MailMessage>[];
     });
   }
@@ -231,6 +233,16 @@ class _MailSheetState extends State<_MailSheet> {
     final int i = _messages.indexWhere((MailMessage m) => m.uid == uid);
     if (i >= 0) _messages[i] = _messages[i].copyWith(unread: unread);
   }
+
+  void _setStarred(int uid, bool starred) {
+    final int i = _messages.indexWhere((MailMessage m) => m.uid == uid);
+    if (i >= 0) _messages[i] = _messages[i].copyWith(starred: starred);
+  }
+
+  /// Whether the STAR button would unstar: every selected message already is.
+  bool get _selectionAllStarred =>
+      _selected.isNotEmpty &&
+      _selected.every((int uid) => _entry(uid)?.starred ?? false);
 
   void _dropFromList(int uid) => _messages.removeWhere((m) => m.uid == uid);
 
@@ -554,6 +566,43 @@ class _MailSheetState extends State<_MailSheet> {
     });
   }
 
+  /// Stars (or, when all of them are already starred, unstars) every
+  /// selected message, then regroups the list with the starred on top.
+  Future<void> _bulkStar() async {
+    final List<int> uids = _selected.toList();
+    final bool starred = !_selectionAllStarred;
+    setState(() => _busy = true);
+    int changed = 0;
+    for (final int uid in uids) {
+      final MailStarResult result = await widget.mail.star(
+        uid,
+        starred: starred,
+        validity: _validity,
+      );
+      if (!mounted) return;
+      switch (result) {
+        case MailStarred():
+          _setStarred(uid, starred);
+          changed++;
+        case MailStarGone():
+          _dropFromList(uid);
+        case MailStarNotSetUp():
+        case MailStarFailed():
+          break;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _selecting = false;
+      _selected.clear();
+      _messages = starredFirst(_messages);
+      _status = starred
+          ? Messages.mailBulkStarred(changed)
+          : Messages.mailBulkUnstarred(changed);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
@@ -681,6 +730,13 @@ class _MailSheetState extends State<_MailSheet> {
                     onTap: _busy || _selected.isEmpty
                         ? null
                         : () => _bulkMark(false),
+                  ),
+                  _Button(
+                    key: mailBulkStarKey,
+                    label: _selectionAllStarred
+                        ? Messages.mailUnstarSelected(_selected.length)
+                        : Messages.mailStarSelected(_selected.length),
+                    onTap: _busy || _selected.isEmpty ? null : _bulkStar,
                   ),
                   _Button(
                     key: mailBulkDeleteKey,
@@ -1065,6 +1121,15 @@ class _MailSheetState extends State<_MailSheet> {
                           color: TileColors.accent,
                         ),
                       ),
+                      if (m.starred) ...<Widget>[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.star,
+                          key: mailStarKey(m.uid),
+                          size: 14,
+                          color: TileColors.accent,
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),

@@ -8,6 +8,7 @@ class MailMessage {
     required this.subject,
     this.date,
     this.unread = false,
+    this.starred = false,
   });
 
   /// The server's id for it, which never changes and is never reused, unlike
@@ -26,14 +27,25 @@ class MailMessage {
   final DateTime? date;
   final bool unread;
 
-  MailMessage copyWith({bool? unread}) => MailMessage(
+  /// Whether it carries the server's `\Flagged` flag (Gmail's star).
+  final bool starred;
+
+  MailMessage copyWith({bool? unread, bool? starred}) => MailMessage(
     uid: uid,
     from: from,
     subject: subject,
     date: date,
     unread: unread ?? this.unread,
+    starred: starred ?? this.starred,
   );
 }
+
+/// [messages] with the starred ones first, each group keeping its order
+/// (newest first, as the service hands them over).
+List<MailMessage> starredFirst(List<MailMessage> messages) => <MailMessage>[
+  ...messages.where((MailMessage m) => m.starred),
+  ...messages.where((MailMessage m) => !m.starred),
+];
 
 /// A unit an age cutoff counts in.
 enum MailAgeUnit {
@@ -358,6 +370,32 @@ class MailSendNotSetUp extends MailSendResult {
 /// password.
 class MailSendFailed extends MailSendResult {
   const MailSendFailed(this.reason);
+
+  final String reason;
+}
+
+sealed class MailStarResult {
+  const MailStarResult();
+}
+
+/// The message is now [starred] (or not) on the server.
+class MailStarred extends MailStarResult {
+  const MailStarred({required this.starred});
+
+  final bool starred;
+}
+
+class MailStarGone extends MailStarResult {
+  const MailStarGone();
+}
+
+class MailStarNotSetUp extends MailStarResult {
+  const MailStarNotSetUp();
+}
+
+/// Nothing was changed; [reason] is short and printable.
+class MailStarFailed extends MailStarResult {
+  const MailStarFailed(this.reason);
 
   final String reason;
 }
