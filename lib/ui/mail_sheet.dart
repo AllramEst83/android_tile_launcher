@@ -16,6 +16,8 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 
 /// Keys so tests can find the parts.
 Key mailMessageKey(int uid) => ValueKey<String>('mail-message-$uid');
+const Key mailStarredHeaderKey = ValueKey<String>('mail-starred-header');
+const Key mailInboxHeaderKey = ValueKey<String>('mail-inbox-header');
 Key mailStarKey(int uid) => ValueKey<String>('mail-star-$uid');
 Key mailCheckboxKey(int uid) => ValueKey<String>('mail-checkbox-$uid');
 const Key mailComposeKey = ValueKey<String>('mail-compose');
@@ -1062,7 +1064,15 @@ class _MailSheetState extends State<_MailSheet> {
         final DateTime now = widget.clock();
         return ListView(
           children: <Widget>[
-            for (final MailMessage m in _messages) _row(text, m, now),
+            // Starred messages are their own section; the plain inbox gets a
+            // heading only when there is a starred section to tell it from.
+            for (final (int i, MailMessage m) in _messages.indexed) ...<Widget>[
+              if (m.starred && i == 0)
+                _sectionHeader(text, Messages.mailStarredSection, starred: true)
+              else if (!m.starred && i > 0 && _messages[i - 1].starred)
+                _sectionHeader(text, Messages.mailInboxSection),
+              _row(text, m, now),
+            ],
           ],
         );
       case MailNotSetUp():
@@ -1073,6 +1083,36 @@ class _MailSheetState extends State<_MailSheet> {
         return const SizedBox.shrink();
     }
   }
+
+  Widget _sectionHeader(TextTheme text, String label, {bool starred = false}) =>
+      Container(
+        key: starred ? mailStarredHeaderKey : mailInboxHeaderKey,
+        margin: EdgeInsets.only(top: starred ? 0 : 10),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        color: starred ? TileColors.bezel : null,
+        decoration: starred
+            ? null
+            : BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: TileColors.bezel, width: 2),
+                ),
+              ),
+        child: Row(
+          children: <Widget>[
+            if (starred) ...<Widget>[
+              Icon(Icons.star, size: 12, color: TileColors.accent),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: text.bodySmall?.copyWith(
+                fontSize: 10,
+                color: starred ? TileColors.textBright : TileColors.muted,
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _row(TextTheme text, MailMessage m, DateTime now) {
     final Color bright = m.unread ? TileColors.textBright : TileColors.muted;

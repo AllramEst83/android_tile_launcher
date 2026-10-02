@@ -1694,6 +1694,14 @@ void main() {
   });
 
   group('star', () {
+    testWidgets('no section headings while nothing is starred', (
+      WidgetTester tester,
+    ) async {
+      await _open(tester, _service());
+      expect(find.byKey(mailStarredHeaderKey), findsNothing);
+      expect(find.byKey(mailInboxHeaderKey), findsNothing);
+    });
+
     testWidgets('STAR stars the selection and floats it to the top', (
       WidgetTester tester,
     ) async {
@@ -1733,6 +1741,8 @@ void main() {
       await _open(tester, _service(inbox));
 
       expect(find.byKey(mailStarKey(5)), findsOneWidget);
+      expect(find.byKey(mailStarredHeaderKey), findsOneWidget);
+      expect(find.byKey(mailInboxHeaderKey), findsOneWidget);
       expect(
         tester.getTopLeft(find.byKey(mailMessageKey(5))).dy,
         lessThan(tester.getTopLeft(find.byKey(mailMessageKey(12))).dy),

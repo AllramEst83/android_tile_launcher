@@ -10,16 +10,7 @@ The sibling repo `../android_terminal_launcher` already solves some of these pro
 
 ## Next, in order
 
-**Email tile** — implemented 2026-10-02, awaiting the user's phone test. A star is the IMAP `\Flagged` flag, which Gmail shows as its yellow star (both ways), so it syncs with Gmail without the Gmail API. SELECT → STAR (UNSTAR when everything selected is starred); starred on top with a star by the date; an older starred message is kept in the list beyond the newest 20.
-* I want users to be able to star/pin emails, similar to Gmail's implementation.
-* Starred/pinned emails should be grouped and displayed at the top of the email list whenever starred/pinned messages exist.
-* To star an email, the user taps "Select", and next to the "Delete" button, there should be a "Star" button.
-* In addition to grouping starred/pinned emails at the top, display a star icon to the right of each starred/pinned email in the list, positioned next to the date/time stamp.
-**To-Do tile** — implemented 2026-10-02, awaiting the user's phone test. Add it from + ADD TILE; tap it for the list (tap box = check/uncheck, tap title = edit, SELECT → DELETE with a confirm, MOVE → drag handles).
-* Create a To-Do tile. The tile should display any active to-dos and show completed items as crossed off. Completed to-dos should feature a checked checkbox and a strike-through title. This is a simple to-do list that contains only titles. The tile should be able to show todos in any size. But we can show a number/label "+5" if there is not engough space to show all todod
-* Use local storage to persist the to-dos.
-* Tapping the To-Do tile opens the pane or sheet to add, check off, uncheck, edit, rearrange and delete to-dos.
-* Implement bulk delete functionality consistent with other tiles, such as the email tile. Perhaps for rearranging todods user can enter move/rearrange mode similar to select but where they can drag todods. 
+---
 
 ## Deliberately different from the terminal launcher
 

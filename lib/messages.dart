@@ -182,6 +182,8 @@ abstract final class Messages {
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS READ.';
   static String mailBulkMarkedUnread(int n) =>
       '$n ${n == 1 ? 'EMAIL' : 'EMAILS'} MARKED AS UNREAD.';
+  static const String mailStarredSection = 'STARRED';
+  static const String mailInboxSection = 'INBOX';
   static String mailStarSelected(int n) => 'STAR ($n)';
   static String mailUnstarSelected(int n) => 'UNSTAR ($n)';
   static String mailBulkStarred(int n) =>
