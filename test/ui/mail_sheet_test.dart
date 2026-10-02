@@ -1694,6 +1694,24 @@ void main() {
   });
 
   group('star', () {
+    testWidgets('the reader can star and unstar the open message', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await _read(tester, 11);
+
+      await tester.tap(find.byKey(mailStarToggleKey));
+      await tester.pumpAndSettle();
+      expect(mail.stars, <(int, bool, int?)>[(11, true, 77)]);
+      expect(find.text(Messages.mailUnstar), findsOneWidget);
+
+      await tester.tap(find.byKey(mailStarToggleKey));
+      await tester.pumpAndSettle();
+      expect(mail.stars.last, (11, false, 77));
+      expect(find.text(Messages.mailStar), findsOneWidget);
+    });
+
     testWidgets('no section headings while nothing is starred', (
       WidgetTester tester,
     ) async {

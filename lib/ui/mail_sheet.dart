@@ -32,6 +32,7 @@ const Key mailTrashYesKey = ValueKey<String>('mail-trash-yes');
 const Key mailTrashNoKey = ValueKey<String>('mail-trash-no');
 const Key mailRefreshKey = ValueKey<String>('mail-refresh');
 const Key mailBackKey = ValueKey<String>('mail-back');
+const Key mailStarToggleKey = ValueKey<String>('mail-star-toggle');
 const Key mailMarkKey = ValueKey<String>('mail-mark');
 const Key mailReaderKey = ValueKey<String>('mail-reader');
 const Key mailBodyKey = ValueKey<String>('mail-body');
@@ -326,6 +327,40 @@ class _MailSheetState extends State<_MailSheet> {
         case MailMarkNotSetUp():
           _status = '${Messages.failedPrefix}${Messages.mailTapToSetUp}';
         case MailMarkFailed(:final String reason):
+          _status = '${Messages.failedPrefix}${reason.toUpperCase()}';
+      }
+    });
+  }
+
+  /// Flips the open message between starred and not.
+  Future<void> _toggleStar(int uid) async {
+    final MailMessage? entry = _entry(uid);
+    if (entry == null) return;
+    final bool starred = !entry.starred;
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    final MailStarResult result = await widget.mail.star(
+      uid,
+      starred: starred,
+      validity: _validity,
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      switch (result) {
+        case MailStarred(starred: final bool now):
+          _setStarred(uid, now);
+          _messages = starredFirst(_messages);
+          _status = now ? Messages.mailStarred : Messages.mailUnstarred;
+        case MailStarGone():
+          _dropFromList(uid);
+          _openUid = null;
+          _status = Messages.mailGone;
+        case MailStarNotSetUp():
+          _status = '${Messages.failedPrefix}${Messages.mailTapToSetUp}';
+        case MailStarFailed(:final String reason):
           _status = '${Messages.failedPrefix}${reason.toUpperCase()}';
       }
     });
@@ -986,6 +1021,13 @@ class _MailSheetState extends State<_MailSheet> {
           onTap: _busy ? null : () => _toggleRead(uid),
         ),
         _Button(
+          key: mailStarToggleKey,
+          label: (_entry(uid)?.starred ?? false)
+              ? Messages.mailUnstar
+              : Messages.mailStar,
+          onTap: _busy ? null : () => _toggleStar(uid),
+        ),
+        _Button(
           key: mailReplyKey,
           label: Messages.mailReply,
           onTap: _busy || opened == null ? null : () => _reply(opened),
@@ -1087,16 +1129,9 @@ class _MailSheetState extends State<_MailSheet> {
   Widget _sectionHeader(TextTheme text, String label, {bool starred = false}) =>
       Container(
         key: starred ? mailStarredHeaderKey : mailInboxHeaderKey,
-        margin: EdgeInsets.only(top: starred ? 0 : 10),
+        margin: EdgeInsets.only(top: starred ? 0 : 12),
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        color: starred ? TileColors.bezel : null,
-        decoration: starred
-            ? null
-            : BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: TileColors.bezel, width: 2),
-                ),
-              ),
+        color: TileColors.bezel,
         child: Row(
           children: <Widget>[
             if (starred) ...<Widget>[
