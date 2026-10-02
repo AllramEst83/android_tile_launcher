@@ -110,9 +110,16 @@ class _AgendaSheetState extends State<_AgendaSheet> {
   bool _initialised = false;
 
   /// Steps of a day (Day view) or a week (Week view) from today; navigated
-  /// with the chevrons, reset to `0` whenever the view or the sheet itself
+  /// with the chevrons, reset to `0` whenever the sheet itself
   /// reopens. Not persisted: only which tab was last chosen is.
-  int _offset = 0;
+  ///
+  /// Each view (day, agenda, grid) keeps its own, for as long as the sheet is
+  /// open, so going to another view and back finds it where it was left.
+  final Map<int, int> _offsets = <int, int>{};
+
+  int get _view => !_week ? 0 : (_grid ? 2 : 1);
+  int get _offset => _offsets[_view] ?? 0;
+  set _offset(int value) => _offsets[_view] = value;
 
   _Page? _page;
 
@@ -220,11 +227,10 @@ class _AgendaSheetState extends State<_AgendaSheet> {
             .copyWith(agendaWeekView: week, agendaGridView: grid),
       );
     }
-    if (week == _week && grid == _grid && _offset == 0) return;
+    if (week == _week && grid == _grid) return;
     setState(() {
       _week = week;
       _grid = grid;
-      _offset = 0;
       _direction = 0;
     });
     _load();

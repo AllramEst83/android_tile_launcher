@@ -855,6 +855,40 @@ void main() {
   });
 
   group('swipe and slide', () {
+    testWidgets('each view remembers its own place while the sheet is open', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = withEvents();
+      await _open(tester, repository);
+      String label() =>
+          tester.widget<Text>(find.byKey(agendaNavLabelKey)).data!;
+
+      // Grid two weeks on; agenda one week on; day untouched.
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(agendaNavForwardKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(agendaNavForwardKey));
+      await tester.pumpAndSettle();
+      final String gridLabel = label();
+
+      await tester.tap(find.byKey(agendaWeekToggleKey));
+      await tester.pumpAndSettle();
+      expect(label(), 'THIS WEEK');
+      await tester.tap(find.byKey(agendaNavForwardKey));
+      await tester.pumpAndSettle();
+      expect(label(), 'NEXT WEEK');
+
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+      expect(label(), gridLabel);
+      expect(repository.lastFrom, DateTime(2026, 10, 12));
+
+      await tester.tap(find.byKey(agendaDayToggleKey));
+      await tester.pumpAndSettle();
+      expect(label(), 'TODAY');
+    });
+
     testWidgets('a swipe left goes forward, a swipe right goes back', (
       WidgetTester tester,
     ) async {
