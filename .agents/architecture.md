@@ -21,6 +21,8 @@ lib/
     layout_export.dart       # exportLayout / parseLayout: the tiles + settings as one line of JSON (format tag + version), sealed LayoutImported / LayoutRejected
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     todo_item.dart           # TodoItem (id, title, done) + JSON; todoFit(items, lines): how many fit and the +N left over
+    ready_script.dart        # readyScript(now, events, todos, unread): the lines the READY. screen types (intro) and prints (body)
+    mail_cache.dart          # mailListingToJson / mailListingFromJson: the inbox listing (headers only) kept between runs, per account
     list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder
     styled_text.dart         # TvColor, StyledRun (text + colours + underline + tall + mosaic + link), mergeRuns, plainText
     tv_mosaic.dart           # tvPictureFor(hash): texttv.nu's block-graphics GIFs rebuilt and looked up by CRC-32 (no downloads)

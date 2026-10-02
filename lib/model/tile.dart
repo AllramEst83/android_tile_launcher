@@ -25,6 +25,7 @@ enum TileKind {
   scene,
   media,
   todo,
+  ready,
 }
 
 /// The app package [tile] launches when tapped, or `null` for a tile with no
@@ -55,6 +56,7 @@ String displayNameOf(TileKind kind) => switch (kind) {
   TileKind.scene => 'SCENE',
   TileKind.media => 'NOW PLAYING',
   TileKind.todo => 'TO-DO',
+  TileKind.ready => 'READY',
 };
 
 /// The id of the tile for the contact with lookup [key]. Unlike a system kind

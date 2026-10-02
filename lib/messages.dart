@@ -244,6 +244,17 @@ abstract final class Messages {
       stale ? 'SAVED RATES FROM $day (OFFLINE)' : 'RATES FROM $day (ECB)';
   static const String calcMoney = 'MONEY';
 
+  static const String readyTileHint = 'TAP TO RUN TODAY';
+  static const String readyLoad = 'LOAD "TODAY",8';
+  static const String readySearching = 'SEARCHING FOR TODAY';
+  static const String readyEvents = 'NEXT UP';
+  static const String readyNoCalendar = 'NO CALENDAR ACCESS.';
+  static const String readyNothingPlanned = 'NOTHING PLANNED.';
+  static const String readyNothingToDo = 'NOTHING TO DO.';
+  static const String readyAllDone = 'ALL DONE.';
+  static String readyMore(int n) => '+$n MORE';
+  static String readyTodos(int open) => 'TO-DO: $open OPEN';
+  static String readyUnread(int n) => 'UNREAD MAIL: $n';
   static const String todoTitle = 'TO-DO';
   static const String todoEmpty = 'NOTHING TO DO.';
   static const String todoAddHint = 'ADD A TO-DO';
@@ -471,6 +482,8 @@ abstract final class Messages {
       'FILES — BROWSES AND DELETES ANYWHERE ON THE PHONE\'S STORAGE.\n'
       'NOW PLAYING — WHAT IS PLAYING IN SPOTIFY OR ANY OTHER MUSIC APP; '
       'TAP FOR BIGGER ART AND FULL CONTROLS.\n'
+      'READY. — TAP TO WATCH THE PHONE "LOAD" TODAY: THE DATE, THE NEXT '
+      'EVENTS, OPEN TO-DOS AND UNREAD MAIL, THE C64 WAY.\n'
       'TO-DO — A SIMPLE LIST; TAP TO ADD, CHECK OFF, EDIT, REORDER OR '
       'DELETE.';
 

@@ -51,6 +51,8 @@ import 'package:android_tile_launcher/ui/media_tile_view.dart';
 import 'package:android_tile_launcher/ui/press_listener.dart';
 import 'package:android_tile_launcher/ui/qr_scanner_screen.dart';
 import 'package:android_tile_launcher/ui/qr_scanner_tile_view.dart';
+import 'package:android_tile_launcher/ui/ready_screen.dart';
+import 'package:android_tile_launcher/ui/ready_tile_view.dart';
 import 'package:android_tile_launcher/ui/scene_sheet.dart';
 import 'package:android_tile_launcher/ui/scene_tile_view.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
@@ -401,6 +403,23 @@ Widget tileContent(
                     context,
                     alarm: alarm,
                   ).then((_) => refreshNow()),
+                )
+              : null,
+        ),
+      );
+    case TileKind.ready:
+      // Reads nothing until tapped: the screen it opens gathers the day.
+      return Builder(
+        builder: (context) => ReadyTileContentView(
+          ink: tile.colour.ink,
+          onTap: interactive
+              ? () => unawaited(
+                  showReadyScreen(
+                    context,
+                    agenda: services.agenda,
+                    todos: services.todos,
+                    mail: services.mail,
+                  ),
                 )
               : null,
         ),
