@@ -138,6 +138,10 @@ lib/
     tile_grid.dart           # layoutTiles/gridHeight (shared pixel math) + renders a packed layout; never packs itself
     tile_view.dart           # chrome shell (fill, bevel/selection, delete badge) + tileContent(tile) dispatcher + AppTileContent
     tile_poller.dart         # TilePoller: rebuilds from a TileSource on an interval, paused while backgrounded; builder gets a refreshNow to re-read early
+    todo_tile_view.dart      # TodoTileContentView: title + as many to-dos as fit (done: [X] + strike-through), +N for the rest
+    todo_sheet.dart          # showTodoSheet: add, check, edit, SELECT/DELETE, MOVE (drag handles)
+    ready_tile_view.dart     # ReadyTileContentView: READY. and a blinking cursor; a tap runs the summary
+    ready_screen.dart        # showReadyScreen: types LOAD "TODAY",8, flashes the border while "loading", prints the day; tap skips
     clock_tile_view.dart     # ClockTileContentView: the clock's content -- time large, date small
     grouped_list.dart        # GroupedList<T> (headers per initial + jump index, shared by the app drawer and the contact picker), SectionHeader, JumpIndex (rows shrink to fit a short strip)
     tv_row.dart              # TvRow: one row of a Text TV page drawn cell by cell (colour bars, block graphics, underlined links, tall headlines); font fitted to the width
