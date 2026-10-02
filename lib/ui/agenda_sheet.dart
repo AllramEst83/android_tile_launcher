@@ -52,16 +52,15 @@ Future<void> showAgendaSheet(
     isScrollControlled: true,
     builder: (BuildContext sheetContext) {
       final MediaQueryData media = MediaQuery.of(sheetContext);
-      return ConstrainedBox(
-        constraints: BoxConstraints(
-          // As tall as the screen allows, short of the status bar/camera
-          // cutout at the top (plus a little breathing room below it) —
-          // a week with many events should not be capped well short of
-          // that just because a day view rarely needs the room.
-          maxHeight: math.min(
-            media.size.height * 0.92,
-            media.size.height - media.padding.top - TileMetrics.margin,
-          ),
+      return SizedBox(
+        // As tall as the screen allows, short of the status bar/camera
+        // cutout at the top (plus a little breathing room below it), and
+        // always that tall: a sheet that shrank to its content jumped in
+        // size (showing what is behind it) at every step from one day or
+        // week to the next.
+        height: math.min(
+          media.size.height * 0.92,
+          media.size.height - media.padding.top - TileMetrics.margin,
         ),
         child: _AgendaSheet(repository: repository, clock: clock),
       );
@@ -79,6 +78,29 @@ class _AgendaSheet extends StatefulWidget {
   State<_AgendaSheet> createState() => _AgendaSheetState();
 }
 
+/// What the sheet is showing now: the answer for one day or week in one view.
+/// Kept apart from what has been asked for, so the page on screen stays until
+/// the next one has arrived and can slide in.
+class _Page {
+  const _Page({
+    required this.snapshot,
+    required this.start,
+    required this.week,
+    required this.grid,
+    required this.now,
+  });
+
+  final AgendaSnapshot snapshot;
+  final DateTime start;
+  final bool week;
+  final bool grid;
+  final DateTime now;
+
+  /// The same for the same day/week and view, so a reload in place (an event
+  /// was edited) swaps content without a slide.
+  Key get key => ValueKey<(DateTime, bool, bool)>((start, week, grid));
+}
+
 class _AgendaSheetState extends State<_AgendaSheet> {
   bool _week = false;
 
@@ -92,7 +114,11 @@ class _AgendaSheetState extends State<_AgendaSheet> {
   /// reopens. Not persisted: only which tab was last chosen is.
   int _offset = 0;
 
-  AgendaSnapshot? _snapshot;
+  _Page? _page;
+
+  /// Which way the last step went, for the slide: 1 is forward (the new page
+  /// comes in from the right), -1 back, 0 a change of view (a fade).
+  int _direction = 0;
   late DateTime _now;
 
   /// Bumped by every [_load]: a reply that lands after a newer request was
@@ -177,7 +203,13 @@ class _AgendaSheetState extends State<_AgendaSheet> {
     if (!mounted || request != _request) return;
     setState(() {
       _now = now;
-      _snapshot = snapshot;
+      _page = _Page(
+        snapshot: snapshot,
+        start: start,
+        week: _week,
+        grid: _grid,
+        now: now,
+      );
     });
   }
 
@@ -193,7 +225,7 @@ class _AgendaSheetState extends State<_AgendaSheet> {
       _week = week;
       _grid = grid;
       _offset = 0;
-      _snapshot = null;
+      _direction = 0;
     });
     _load();
   }
@@ -201,7 +233,7 @@ class _AgendaSheetState extends State<_AgendaSheet> {
   void _navigate(int delta) {
     setState(() {
       _offset += delta;
-      _snapshot = null;
+      _direction = delta > 0 ? 1 : -1;
     });
     _load();
   }
@@ -209,8 +241,9 @@ class _AgendaSheetState extends State<_AgendaSheet> {
   void _goToday() {
     if (_offset == 0) return;
     setState(() {
+      // Today is back from the future, or forward from the past.
+      _direction = _offset > 0 ? -1 : 1;
       _offset = 0;
-      _snapshot = null;
     });
     _load();
   }
@@ -231,7 +264,7 @@ class _AgendaSheetState extends State<_AgendaSheet> {
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
-    final AgendaSnapshot? snapshot = _snapshot;
+    final _Page? page = _page;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(TileMetrics.margin),
@@ -360,28 +393,67 @@ class _AgendaSheetState extends State<_AgendaSheet> {
               ],
             ),
             const SizedBox(height: TileMetrics.margin),
-            if (snapshot == null)
-              const SizedBox.shrink()
-            else if (_week && _grid)
-              // The grid wants to fill whatever room is left, not just what
-              // its own content needs (unlike the shrink-to-fit list below).
-              Expanded(child: _body(snapshot, text))
-            else
-              Flexible(child: _body(snapshot, text)),
+            Expanded(
+              child: page == null
+                  ? const SizedBox.shrink()
+                  : _SwipeNavigator(
+                      onSwipe: _navigate,
+                      child: ClipRect(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 240),
+                          layoutBuilder: (Widget? current, List<Widget> old) =>
+                              Stack(
+                                fit: StackFit.expand,
+                                alignment: Alignment.topLeft,
+                                children: <Widget>[...old, ?current],
+                              ),
+                          transitionBuilder: (
+                            Widget child,
+                            Animation<double> animation,
+                          ) => _transition(child, animation, page.key),
+                          child: KeyedSubtree(
+                            key: page.key,
+                            child: _body(page, text),
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _body(AgendaSnapshot snapshot, TextTheme text) {
-    switch (snapshot) {
+  /// The page coming in slides from the side the step went towards while the
+  /// one leaving slides out the other way; a change of view just fades.
+  Widget _transition(Widget child, Animation<double> animation, Key current) {
+    final int direction = _direction;
+    if (direction == 0) {
+      return FadeTransition(opacity: animation, child: child);
+    }
+    final bool incoming = child.key == current;
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: Offset((incoming ? direction : -direction).toDouble(), 0),
+        end: Offset.zero,
+      ).animate(animation),
+      child: child,
+    );
+  }
+
+  Widget _body(_Page page, TextTheme text) {
+    final bool week = page.week;
+    final bool grid = page.grid;
+    final DateTime start = page.start;
+    final DateTime now = page.now;
+    switch (page.snapshot) {
       case AgendaReady(:final List<CalendarEvent> events):
-        if (_week && _grid) {
+        if (week && grid) {
           return AgendaWeekGrid(
             events: events,
-            weekStart: _rangeStart,
-            now: _now,
+            weekStart: start,
+            now: now,
             repository: widget.repository,
             onChanged: _load,
             initialHeightPerMinute: SettingsScope.of(context).agendaGridZoom,
@@ -391,17 +463,16 @@ class _AgendaSheetState extends State<_AgendaSheet> {
                 ),
           );
         }
-        final DateTime start = _rangeStart;
         final List<AgendaDay> days = groupByDay(
           events,
           from: start,
-          days: _span,
+          days: week ? 7 : 1,
         );
         if (days.isEmpty) {
           return Text(
             _everyCalendarHidden
                 ? Messages.agendaCalendarsAllHidden
-                : !_week && _offset == 0
+                : !week && start == startOfDay(now)
                 ? Messages.agendaNothingToday
                 : Messages.agendaNothingPlanned,
             style: text.bodyMedium,
@@ -412,14 +483,14 @@ class _AgendaSheetState extends State<_AgendaSheet> {
           children: <Widget>[
             for (final AgendaDay day in days) ...<Widget>[
               // The day view is one day, so its heading adds nothing.
-              if (_week)
+              if (week)
                 Padding(
                   padding: const EdgeInsets.only(top: TileMetrics.margin),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        formatDayHeading(day.day, _now),
+                        formatDayHeading(day.day, now),
                         style: text.bodyMedium?.copyWith(
                           color: TileColors.textBright,
                         ),
@@ -574,6 +645,73 @@ class _EventRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Turns a quick sideways swipe anywhere over [child] into [onSwipe] (1 for
+/// a swipe left, which goes forward; -1 for a swipe right), the same as the
+/// chevrons. Watches raw pointers rather than joining the gesture arena, so
+/// it works over a list, a scrolling grid and a pinch-to-zoom alike, and
+/// ignores anything with a second finger on it (a pinch).
+class _SwipeNavigator extends StatefulWidget {
+  const _SwipeNavigator({required this.onSwipe, required this.child});
+
+  final void Function(int direction) onSwipe;
+  final Widget child;
+
+  @override
+  State<_SwipeNavigator> createState() => _SwipeNavigatorState();
+}
+
+class _SwipeNavigatorState extends State<_SwipeNavigator> {
+  static const double _minDistance = 72;
+  static const Duration _maxTime = Duration(milliseconds: 700);
+
+  final Set<int> _down = <int>{};
+  Offset? _from;
+  DateTime? _at;
+  bool _pinched = false;
+
+  void _onDown(PointerDownEvent event) {
+    if (_down.isEmpty) {
+      _from = event.position;
+      _at = DateTime.now();
+      _pinched = false;
+    } else {
+      _pinched = true;
+    }
+    _down.add(event.pointer);
+  }
+
+  void _onUp(PointerUpEvent event) {
+    final bool last = _down.length == 1 && _down.contains(event.pointer);
+    _down.remove(event.pointer);
+    final Offset? from = _from;
+    final DateTime? at = _at;
+    if (!last || _pinched || from == null || at == null) return;
+    final Offset moved = event.position - from;
+    final bool quick = DateTime.now().difference(at) <= _maxTime;
+    if (quick &&
+        moved.dx.abs() >= _minDistance &&
+        moved.dx.abs() > moved.dy.abs() * 2) {
+      widget.onSwipe(moved.dx < 0 ? 1 : -1);
+    }
+  }
+
+  void _onCancel(PointerCancelEvent event) {
+    _down.remove(event.pointer);
+    if (_down.isEmpty) _pinched = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _onDown,
+      onPointerUp: _onUp,
+      onPointerCancel: _onCancel,
+      child: widget.child,
     );
   }
 }

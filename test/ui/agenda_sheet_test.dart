@@ -853,6 +853,49 @@ void main() {
     expect(find.text('WEDNESDAY THING'), findsOneWidget);
     expect(find.text('TUESDAY THING'), findsNothing);
   });
+
+  group('swipe and slide', () {
+    testWidgets('a swipe left goes forward, a swipe right goes back', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = withEvents();
+      await _open(tester, repository);
+
+      final Finder page = find.byType(AnimatedSwitcher);
+      await tester.fling(page, const Offset(-300, 0), 1500);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+        'TOMORROW',
+      );
+
+      await tester.fling(page, const Offset(300, 0), 1500);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(agendaNavLabelKey)).data, 'TODAY');
+    });
+
+    testWidgets('a swipe steps the week in the week view and in the grid', (
+      WidgetTester tester,
+    ) async {
+      final FakeAgendaRepository repository = withEvents();
+      await _open(tester, repository);
+      await tester.tap(find.byKey(agendaWeekGridToggleKey));
+      await tester.pumpAndSettle();
+
+      await tester.fling(
+        find.byKey(agendaGridKey),
+        const Offset(-300, 0),
+        1500,
+      );
+      await tester.pumpAndSettle();
+
+      expect(repository.lastFrom, DateTime(2026, 10, 5));
+      expect(
+        tester.widget<Text>(find.byKey(agendaNavLabelKey)).data,
+        'NEXT WEEK',
+      );
+    });
+  });
 }
 
 /// Holds every `between` until [answer] gives that day an event, so a test
