@@ -185,6 +185,17 @@ abstract final class Messages {
   static const String mailUpdating = 'UPDATING...';
   static const String mailSavedListing =
       'OFFLINE: SHOWING THE LAST SAVED LIST.';
+  static const String mailAlertChannel = 'New mail';
+  static const String mailAlertChannelNote =
+      'A notification for each new unread email.';
+  static String mailAlertMoreTitle(int n) => '$n MORE NEW EMAILS';
+  static const String mailAlertMoreBody = 'Open the launcher to read them.';
+  static const String settingsMailAlerts = 'NEW MAIL ALERTS';
+  static const String settingsMailAlertsNote =
+      'A NOTIFICATION FOR NEW UNREAD EMAIL, CHECKED ABOUT EVERY 15 MINUTES (THE '
+      'SHORTEST ANDROID ALLOWS IN THE BACKGROUND). TAP ONE TO OPEN THAT EMAIL.';
+  static const String settingsMailAlertsDenied =
+      'ALLOW NOTIFICATIONS FOR THE LAUNCHER IN ANDROID\'S SETTINGS FIRST.';
   static const String mailLoadingMore = 'LOADING MORE...';
   static const String mailToPrefix = 'TO:';
   static const String mailFolders = 'FOLDERS';
@@ -484,7 +495,8 @@ abstract final class Messages {
       'CONTACT — CALL, TEXT OR OPEN WHATSAPP FOR ONE PERSON.\n'
       'MAIL — THE INBOX AND THE ACCOUNT\'S OTHER FOLDERS (THE FOLDER '
       'BUTTON; MANAGE THERE TO CREATE, RENAME OR DELETE YOUR OWN); SCROLL FOR OLDER MAIL, TAP A MESSAGE TO READ IT, SELECT TO '
-      'STAR, MARK OR DELETE.\n'
+      'STAR, MARK OR DELETE. SETTINGS CAN ALERT YOU TO NEW MAIL; TAP THE '
+      'NOTIFICATION TO OPEN THAT EMAIL.\n'
       'TEXT TV — HEADLINE PAGES, THE OLD TELETEXT WAY.\n'
       'CALC — A CALCULATOR AND UNIT/CURRENCY CONVERTER.\n'
       'ALARM — THE NEXT ALARM DUE; SETS TIMERS AND ALARMS THROUGH THE '

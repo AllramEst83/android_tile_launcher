@@ -23,6 +23,11 @@
          permission at all. -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
+    <!-- New-mail alerts (a setting, off until turned on): the notification
+         for each new unread email. A runtime permission on Android 13+, asked
+         for when the setting is switched on. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- The weather tile fetches forecasts (SMHI, Open-Meteo)... -->
     <uses-permission android:name="android.permission.INTERNET" />
 

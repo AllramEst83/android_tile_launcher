@@ -9,6 +9,8 @@ import 'package:android_tile_launcher/services/device_repository.dart';
 import 'package:android_tile_launcher/services/files_service.dart';
 import 'package:android_tile_launcher/services/home_role_service.dart';
 import 'package:android_tile_launcher/services/link_service.dart';
+import 'package:android_tile_launcher/services/mail_alert_scheduler.dart';
+import 'package:android_tile_launcher/services/mail_notifier.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/media_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
@@ -33,6 +35,8 @@ import 'fake_device_repository.dart';
 import 'fake_files_service.dart';
 import 'fake_home_role_service.dart';
 import 'fake_link_service.dart';
+import 'fake_mail_alert_scheduler.dart';
+import 'fake_mail_notifier.dart';
 import 'fake_mail_service.dart';
 import 'fake_media_service.dart';
 import 'fake_rates_repository.dart';
@@ -69,6 +73,8 @@ TileServices fakeTileServices({
   LinkService? link,
   MediaService? media,
   TodoList? todos,
+  MailNotifier? mailNotifier,
+  MailAlertScheduler? mailAlertScheduler,
 }) => TileServices(
   systemControl: systemControl ?? FakeSystemControlService(),
   device: device ?? FakeDeviceRepository(),
@@ -93,4 +99,6 @@ TileServices fakeTileServices({
   link: link ?? FakeLinkService(),
   media: media ?? FakeMediaService(),
   todos: todos ?? TodoList(store: InMemoryLocalStore()),
+  mailNotifier: mailNotifier ?? FakeMailNotifier(),
+  mailAlertScheduler: mailAlertScheduler ?? FakeMailAlertScheduler(),
 );

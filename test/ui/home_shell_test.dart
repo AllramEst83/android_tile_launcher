@@ -7,6 +7,7 @@ import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/contact.dart';
 import 'package:android_tile_launcher/model/device_status.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/mail_alert.dart';
 import 'package:android_tile_launcher/model/scene_animation.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/sound_mode.dart';
@@ -20,6 +21,7 @@ import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/first_run.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/launch_stats.dart';
+import 'package:android_tile_launcher/services/mail_alert_links.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/ui/agenda_sheet.dart';
 import 'package:android_tile_launcher/ui/agenda_tile_view.dart';
@@ -107,12 +109,14 @@ Future<void> pumpShell(
   FirstRun? firstRun,
   LaunchStats? launchStats,
   AppIconLoader? icons,
+  MailAlertLinks? alertLinks,
 }) => tester.pumpWidget(
   SettingsScope(
     state: settingsState ?? SettingsState(store: InMemoryLocalStore()),
     child: MaterialApp(
       theme: tileLauncherTheme(),
       home: HomeShell(
+        alertLinks: alertLinks,
         firstRun: firstRun,
         launchStats: launchStats,
         appRepository: repository,
@@ -1728,6 +1732,101 @@ void main() {
       await tester.tap(find.byKey(settingsButtonKey));
       await tester.pumpAndSettle();
       expect(find.byKey(settingsCloseKey), findsOneWidget);
+    });
+  });
+
+  group('a tapped new-mail notification', () {
+    testWidgets('opens the mail sheet on that email', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail =
+          FakeMailService(
+              const MailMessages(
+                <MailMessage>[
+                  MailMessage(uid: 12, from: 'Anna', subject: 'Lunch'),
+                  MailMessage(uid: 11, from: 'Bo', subject: 'Invoice'),
+                ],
+                total: 2,
+                unread: 0,
+                validity: 7,
+              ),
+            )
+            ..saved = const MailAccountInfo(email: 'kay@gmail.com', host: 'h')
+            ..readResult = MailOpened(
+              MailBody(
+                uid: 11,
+                from: 'Bo',
+                subject: 'Invoice',
+                text: 'The invoice body',
+              ),
+            );
+      final MailAlertLinks links = MailAlertLinks();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        mailService: mail,
+        alertLinks: links,
+      );
+
+      links.open(const MailRef(uid: 11));
+      await tester.pumpAndSettle();
+
+      expect(mail.reads, <(int, int?)>[(11, 7)]);
+      expect(find.text('The invoice body'), findsOneWidget);
+    });
+
+    testWidgets('one that started the app is not lost', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail =
+          FakeMailService(
+              const MailMessages(
+                <MailMessage>[
+                  MailMessage(uid: 11, from: 'Bo', subject: 'Invoice'),
+                ],
+                total: 1,
+                unread: 0,
+                validity: 7,
+              ),
+            )
+            ..saved = const MailAccountInfo(email: 'kay@gmail.com', host: 'h')
+            ..readResult = MailOpened(
+              MailBody(uid: 11, from: 'Bo', subject: 'Invoice', text: 'Opened'),
+            );
+      final MailAlertLinks links = MailAlertLinks()
+        ..open(const MailRef(uid: 11));
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        mailService: mail,
+        alertLinks: links,
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.text('Opened'), findsOneWidget);
+    });
+
+    testWidgets('the summary just opens the mail', (WidgetTester tester) async {
+      final FakeMailService mail = FakeMailService(
+        const MailMessages(
+          <MailMessage>[MailMessage(uid: 11, from: 'Bo', subject: 'Invoice')],
+          total: 1,
+          unread: 0,
+        ),
+      )..saved = const MailAccountInfo(email: 'kay@gmail.com', host: 'h');
+      final MailAlertLinks links = MailAlertLinks();
+      await pumpShell(
+        tester,
+        FakeAppRepository(),
+        mailService: mail,
+        alertLinks: links,
+      );
+
+      links.open(null);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(mailRefreshKey), findsOneWidget);
+      expect(mail.reads, isEmpty);
     });
   });
 }

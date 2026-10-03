@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/clock_format.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/mail_alert.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:android_tile_launcher/services/attachment_download_service.dart';
 import 'package:android_tile_launcher/services/contacts_repository.dart';
@@ -100,6 +102,7 @@ Future<void> showMailSheet(
   required MailService mail,
   required AttachmentDownloadService attachmentDownload,
   required ContactsRepository contacts,
+  MailRef? open,
   DateTime Function() clock = _systemNow,
 }) {
   return showModalBottomSheet<void>(
@@ -120,6 +123,7 @@ Future<void> showMailSheet(
           attachmentDownload: attachmentDownload,
           contacts: contacts,
           clock: clock,
+          open: open,
         ),
       );
     },
@@ -132,7 +136,12 @@ class _MailSheet extends StatefulWidget {
     required this.attachmentDownload,
     required this.contacts,
     required this.clock,
+    this.open,
   });
+
+  /// A message to open as soon as the list has loaded (from a tapped
+  /// notification).
+  final MailRef? open;
 
   final MailService mail;
   final AttachmentDownloadService attachmentDownload;
@@ -365,6 +374,24 @@ class _MailSheetState extends State<_MailSheet> {
       _selected.retainWhere(now.contains);
     });
     _checkFilled();
+    _openRequested();
+  }
+
+  bool _openHandled = false;
+
+  /// Opens the message a notification was about, once, when the real list is
+  /// in (a saved one may not have it yet). A message no longer there is
+  /// simply not opened.
+  void _openRequested() {
+    final MailRef? ref = widget.open;
+    if (_openHandled || ref == null) return;
+    _openHandled = true;
+    for (final MailMessage m in _messages) {
+      if (m.uid == ref.uid && m.folder == ref.folder) {
+        unawaited(_open(m));
+        return;
+      }
+    }
   }
 
   Future<void> _openFilter() async {

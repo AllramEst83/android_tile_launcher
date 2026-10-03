@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/layout_export.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/mail_alert.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/wallpaper.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
@@ -558,6 +561,22 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  /// Turns new-mail notifications on (after Android has allowed notifications)
+  /// or off, and starts or stops the background look to match.
+  Future<void> _setMailAlerts(MailAlertMode mode) async {
+    if (mode != MailAlertMode.off) {
+      final bool allowed = await widget.services.mailNotifier
+          .requestPermission();
+      if (!mounted) return;
+      if (!allowed) {
+        setState(() => _message = Messages.settingsMailAlertsDenied);
+        return;
+      }
+    }
+    _change(_current.copyWith(mailAlerts: mode));
+    await widget.services.mailAlertScheduler.apply(mode);
+  }
+
   Widget _mailSection() {
     final MailAccountInfo? account = _mailAccount;
     final String status = !_mailAccountKnown
@@ -592,6 +611,16 @@ class _SettingsScreenState extends State<SettingsScreen>
               widget.settings.update(_current.copyWith(mailSignature: value)),
         ),
         const _Note(text: Messages.settingsSignatureNote),
+        const SizedBox(height: TileMetrics.gutter),
+        _Label(text: Messages.settingsMailAlerts),
+        _Choices<MailAlertMode>(
+          values: MailAlertMode.values,
+          selected: _current.mailAlerts,
+          labelOf: (MailAlertMode m) => m.label,
+          keyOf: (MailAlertMode m) => settingsKey('mail-alerts-${m.name}'),
+          onSelect: (MailAlertMode m) => unawaited(_setMailAlerts(m)),
+        ),
+        const _Note(text: Messages.settingsMailAlertsNote),
         const SizedBox(height: TileMetrics.gutter),
         _Label(text: Messages.settingsMailAccount),
         Text(

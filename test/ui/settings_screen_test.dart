@@ -1,6 +1,7 @@
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/layout_export.dart';
 import 'package:android_tile_launcher/model/mail.dart';
+import 'package:android_tile_launcher/model/mail_alert.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/tile.dart';
@@ -17,6 +18,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_clipboard_service.dart';
 import '../fakes/fake_home_role_service.dart';
+import '../fakes/fake_mail_alert_scheduler.dart';
+import '../fakes/fake_mail_notifier.dart';
 import '../fakes/fake_mail_service.dart';
 import '../fakes/fake_tile_services.dart';
 import '../fakes/fake_wallpaper_service.dart';
@@ -28,10 +31,14 @@ class _Rig {
     FakeHomeRoleService? homeRole,
     FakeWallpaperService? wallpaper,
     FakeMailService? mail,
+    FakeMailNotifier? notifier,
+    FakeMailAlertScheduler? scheduler,
   }) : clipboard = clipboard ?? FakeClipboardService(),
        homeRole = homeRole ?? FakeHomeRoleService(),
        wallpaper = wallpaper ?? FakeWallpaperService(),
-       mail = mail ?? FakeMailService() {
+       mail = mail ?? FakeMailService(),
+       notifier = notifier ?? FakeMailNotifier(),
+       scheduler = scheduler ?? FakeMailAlertScheduler() {
     settings = SettingsState(store: InMemoryLocalStore());
     grid = GridState(store: InMemoryLocalStore());
   }
@@ -42,6 +49,8 @@ class _Rig {
   final FakeHomeRoleService homeRole;
   final FakeWallpaperService wallpaper;
   final FakeMailService mail;
+  final FakeMailNotifier notifier;
+  final FakeMailAlertScheduler scheduler;
 
   Future<void> open(WidgetTester tester) async {
     tester.view
@@ -62,6 +71,8 @@ class _Rig {
                 homeRole: homeRole,
                 wallpaper: wallpaper,
                 mail: mail,
+                mailNotifier: notifier,
+                mailAlertScheduler: scheduler,
               ),
             ),
             child: const Text('open'),
@@ -844,5 +855,49 @@ void main() {
         );
       },
     );
+  });
+
+  group('new mail alerts', () {
+    testWidgets('are off until switched on, then asked for and scheduled', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+      expect(rig.settings.settings.mailAlerts, MailAlertMode.off);
+
+      await _tap(tester, settingsKey('mail-alerts-periodic'));
+
+      expect(rig.notifier.permissionRequests, 1);
+      expect(rig.settings.settings.mailAlerts, MailAlertMode.periodic);
+      expect(rig.scheduler.applied, <MailAlertMode>[MailAlertMode.periodic]);
+    });
+
+    testWidgets('stay off when Android will not allow notifications', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig(notifier: FakeMailNotifier(permitted: false));
+      await rig.open(tester);
+
+      await _tap(tester, settingsKey('mail-alerts-periodic'));
+
+      expect(rig.settings.settings.mailAlerts, MailAlertMode.off);
+      expect(rig.scheduler.applied, isEmpty);
+      expect(find.text(Messages.settingsMailAlertsDenied), findsOneWidget);
+    });
+
+    testWidgets('switching them off stops the background look', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+      await _tap(tester, settingsKey('mail-alerts-periodic'));
+
+      await _tap(tester, settingsKey('mail-alerts-off'));
+
+      expect(rig.settings.settings.mailAlerts, MailAlertMode.off);
+      expect(rig.scheduler.applied.last, MailAlertMode.off);
+      // Turning off needs no permission.
+      expect(rig.notifier.permissionRequests, 1);
+    });
   });
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app.dart';
+import 'model/mail_alert.dart';
 import 'services/android_alarm_service.dart';
 import 'services/android_app_repository.dart';
 import 'services/android_attachment_download_service.dart';
@@ -36,7 +37,10 @@ import 'services/live_contacts_repository.dart';
 import 'services/live_rates_repository.dart';
 import 'services/live_text_tv_repository.dart';
 import 'services/live_weather_repository.dart';
+import 'services/local_mail_notifier.dart';
 import 'services/mail_account.dart';
+import 'services/mail_alert_links.dart';
+import 'services/mail_alert_scheduler.dart';
 import 'services/settings_state.dart';
 import 'services/shared_preferences_local_store.dart';
 import 'services/smhi.dart';
@@ -68,6 +72,19 @@ Future<void> main() async {
   await firstRun.load();
   final LaunchStats launchStats = LaunchStats(store: store);
   await launchStats.load();
+  // New-mail notifications: a tap on one is handed to the shell, and the
+  // background look is set to what the settings say.
+  final MailAlertLinks alertLinks = MailAlertLinks();
+  final LocalMailNotifier mailNotifier = LocalMailNotifier();
+  await mailNotifier.initialize(
+    onTap: (String? payload) => alertLinks.open(MailRef.fromPayload(payload)),
+  );
+  final String? launchedBy = await mailNotifier.launchPayload();
+  if (launchedBy != null) alertLinks.open(MailRef.fromPayload(launchedBy));
+  const WorkmanagerMailAlertScheduler mailAlertScheduler =
+      WorkmanagerMailAlertScheduler();
+  await mailAlertScheduler.initialize();
+  unawaited(mailAlertScheduler.apply(settingsState.settings.mailAlerts));
   final TodoList todoList = TodoList(store: store);
   await todoList.load();
   final IoHttpFetcher fetcher = IoHttpFetcher();
@@ -83,6 +100,7 @@ Future<void> main() async {
       settingsState: settingsState,
       firstRun: firstRun,
       launchStats: launchStats,
+      alertLinks: alertLinks,
       services: TileServices(
         systemControl: const AndroidSystemControlService(),
         device: const AndroidDeviceRepository(),
@@ -110,6 +128,8 @@ Future<void> main() async {
         link: const AndroidLinkService(),
         media: const AndroidMediaService(),
         todos: todoList,
+        mailNotifier: mailNotifier,
+        mailAlertScheduler: mailAlertScheduler,
         rates: LiveRatesRepository(
           currencyRates: CurrencyRates(fetcher: fetcher, store: store),
         ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:android_tile_launcher/messages.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/list_reorder.dart';
+import 'package:android_tile_launcher/model/mail_alert.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/tile.dart';
@@ -12,6 +13,7 @@ import 'package:android_tile_launcher/services/app_repository.dart';
 import 'package:android_tile_launcher/services/first_run.dart';
 import 'package:android_tile_launcher/services/grid_state.dart';
 import 'package:android_tile_launcher/services/launch_stats.dart';
+import 'package:android_tile_launcher/services/mail_alert_links.dart';
 import 'package:android_tile_launcher/services/settings_state.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
 import 'package:android_tile_launcher/ui/add_tile_sheet.dart';
@@ -20,6 +22,7 @@ import 'package:android_tile_launcher/ui/app_tile_grid.dart';
 import 'package:android_tile_launcher/ui/bevel_key.dart';
 import 'package:android_tile_launcher/ui/boot_screen.dart';
 import 'package:android_tile_launcher/ui/editable_tile_grid.dart';
+import 'package:android_tile_launcher/ui/mail_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/settings_screen.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
@@ -44,6 +47,7 @@ class HomeShell extends StatefulWidget {
     required this.services,
     this.firstRun,
     this.launchStats,
+    this.alertLinks,
   });
 
   final AppRepository appRepository;
@@ -57,6 +61,9 @@ class HomeShell extends StatefulWidget {
   /// When given, every launch from home or the drawer is counted, and the
   /// most used apps are suggested on the add-tile sheet.
   final LaunchStats? launchStats;
+
+  /// A tapped new-mail notification arrives here; the shell opens that email.
+  final MailAlertLinks? alertLinks;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -73,10 +80,31 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _apps = widget.appRepository.listApps();
+    widget.alertLinks?.addListener(_alertTapped);
+    // A notification may have started the app, before anything listened.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _alertTapped());
+  }
+
+  /// Opens the email a tapped notification was about, in the mail sheet.
+  void _alertTapped() {
+    final MailAlertLinks? links = widget.alertLinks;
+    if (links == null || !links.hasPending || !mounted) return;
+    final (bool tapped, MailRef? ref) = links.take();
+    if (!tapped) return;
+    unawaited(
+      showMailSheet(
+        context,
+        mail: widget.services.mail,
+        attachmentDownload: widget.services.attachmentDownload,
+        contacts: widget.services.contacts,
+        open: ref,
+      ),
+    );
   }
 
   @override
   void dispose() {
+    widget.alertLinks?.removeListener(_alertTapped);
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _searchFocus.dispose();

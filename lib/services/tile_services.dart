@@ -9,6 +9,8 @@ import 'package:android_tile_launcher/services/device_repository.dart';
 import 'package:android_tile_launcher/services/files_service.dart';
 import 'package:android_tile_launcher/services/home_role_service.dart';
 import 'package:android_tile_launcher/services/link_service.dart';
+import 'package:android_tile_launcher/services/mail_alert_scheduler.dart';
+import 'package:android_tile_launcher/services/mail_notifier.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/services/media_service.dart';
 import 'package:android_tile_launcher/services/phone_service.dart';
@@ -50,6 +52,8 @@ class TileServices {
     required this.link,
     required this.media,
     required this.todos,
+    required this.mailNotifier,
+    required this.mailAlertScheduler,
   });
 
   final SystemControlService systemControl;
@@ -94,4 +98,9 @@ class TileServices {
 
   /// The to-do tile's list, kept on the phone.
   final TodoList todos;
+
+  /// Not for tiles: what the settings screen asks to turn new-mail
+  /// notifications on.
+  final MailNotifier mailNotifier;
+  final MailAlertScheduler mailAlertScheduler;
 }

@@ -1,4 +1,5 @@
 import 'package:android_tile_launcher/model/file_filter.dart';
+import 'package:android_tile_launcher/model/mail_alert.dart';
 import 'package:android_tile_launcher/model/scene_animation.dart';
 
 /// How the launcher looks: the screen it draws on.
@@ -87,6 +88,7 @@ class LauncherSettings {
     this.agendaGridZoom = 1,
     this.lastUsedCalendarId,
     this.mailSignature = '',
+    this.mailAlerts = MailAlertMode.off,
     this.sceneAnimation = SceneAnimation.rocket,
     this.fileSortKey = FileSortKey.modified,
     this.fileSortAscending = false,
@@ -142,6 +144,9 @@ class LauncherSettings {
   /// above it; empty (the default) adds nothing. Set on the settings screen.
   final String mailSignature;
 
+  /// Whether, and how, new mail is announced with a notification.
+  final MailAlertMode mailAlerts;
+
   /// Which of the Scene tile's animations is playing — chosen from the
   /// tile's own picker sheet, not the settings screen (there is nothing else
   /// to configure about it, so a whole settings section would be one field).
@@ -185,6 +190,7 @@ class LauncherSettings {
     double? agendaGridZoom,
     int? lastUsedCalendarId,
     String? mailSignature,
+    MailAlertMode? mailAlerts,
     SceneAnimation? sceneAnimation,
     FileSortKey? fileSortKey,
     bool? fileSortAscending,
@@ -203,6 +209,7 @@ class LauncherSettings {
     agendaGridZoom: agendaGridZoom ?? this.agendaGridZoom,
     lastUsedCalendarId: lastUsedCalendarId ?? this.lastUsedCalendarId,
     mailSignature: mailSignature ?? this.mailSignature,
+    mailAlerts: mailAlerts ?? this.mailAlerts,
     sceneAnimation: sceneAnimation ?? this.sceneAnimation,
     fileSortKey: fileSortKey ?? this.fileSortKey,
     fileSortAscending: fileSortAscending ?? this.fileSortAscending,
@@ -223,6 +230,7 @@ class LauncherSettings {
     'agendaGridZoom': agendaGridZoom,
     'lastUsedCalendarId': lastUsedCalendarId,
     'mailSignature': mailSignature,
+    'mailAlerts': mailAlerts.name,
     'sceneAnimation': sceneAnimation.name,
     'fileSortKey': fileSortKey.name,
     'fileSortAscending': fileSortAscending,
@@ -285,6 +293,11 @@ class LauncherSettings {
       mailSignature: json['mailSignature'] is String
           ? json['mailSignature']! as String
           : defaults.mailSignature,
+      mailAlerts: pick(
+        MailAlertMode.values,
+        json['mailAlerts'],
+        defaults.mailAlerts,
+      ),
       sceneAnimation: pick(
         SceneAnimation.values,
         json['sceneAnimation'],
@@ -318,6 +331,7 @@ class LauncherSettings {
       other.agendaGridZoom == agendaGridZoom &&
       other.lastUsedCalendarId == lastUsedCalendarId &&
       other.mailSignature == mailSignature &&
+      other.mailAlerts == mailAlerts &&
       other.sceneAnimation == sceneAnimation &&
       other.fileSortKey == fileSortKey &&
       other.fileSortAscending == fileSortAscending;
@@ -338,6 +352,7 @@ class LauncherSettings {
     agendaGridZoom,
     lastUsedCalendarId,
     mailSignature,
+    mailAlerts,
     sceneAnimation,
     fileSortKey,
     fileSortAscending,
@@ -345,5 +360,5 @@ class LauncherSettings {
 
   @override
   String toString() =>
-      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, agendaGridZoom: $agendaGridZoom, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature, sceneAnimation: $sceneAnimation, fileSortKey: $fileSortKey, fileSortAscending: $fileSortAscending)';
+      'LauncherSettings($theme, $columns columns, $gap, $fontScale, down: $swipeDown, up: $swipeUp, haptics: $haptics, effects: $effects, appIcons: $appIcons, agendaWeekView: $agendaWeekView, agendaGridView: $agendaGridView, agendaGridZoom: $agendaGridZoom, lastUsedCalendarId: $lastUsedCalendarId, mailSignature: $mailSignature, mailAlerts: $mailAlerts, sceneAnimation: $sceneAnimation, fileSortKey: $fileSortKey, fileSortAscending: $fileSortAscending)';
 }

@@ -6,6 +6,7 @@ import 'services/app_repository.dart';
 import 'services/first_run.dart';
 import 'services/grid_state.dart';
 import 'services/launch_stats.dart';
+import 'services/mail_alert_links.dart';
 import 'services/settings_state.dart';
 import 'services/tile_services.dart';
 import 'ui/home_shell.dart';
@@ -21,6 +22,7 @@ class TileLauncherApp extends StatefulWidget {
     required this.services,
     this.firstRun,
     this.launchStats,
+    this.alertLinks,
   });
 
   final AppRepository appRepository;
@@ -29,6 +31,7 @@ class TileLauncherApp extends StatefulWidget {
   final TileServices services;
   final FirstRun? firstRun;
   final LaunchStats? launchStats;
+  final MailAlertLinks? alertLinks;
 
   @override
   State<TileLauncherApp> createState() => _TileLauncherAppState();
@@ -102,6 +105,7 @@ class _TileLauncherAppState extends State<TileLauncherApp> {
           services: widget.services,
           firstRun: widget.firstRun,
           launchStats: widget.launchStats,
+          alertLinks: widget.alertLinks,
         ),
       ),
     );

@@ -22,6 +22,7 @@ lib/
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     todo_item.dart           # TodoItem (id, title, done) + JSON; todoFit(items, lines): how many fit and the +N left over
     ready_script.dart        # readyScript(now, events, todos, unread): the lines the READY. screen types (intro) and prints (body)
+    mail_alert.dart          # MailAlertMode (off / every 15 min), MailRef (a notification's payload), MailAlertCursor, planMailAlerts: which unread mail is new since the last look
     mail_cache.dart          # mailListingToJson / mailListingFromJson: the inbox listing (headers only) kept between runs, per account
     list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder
     styled_text.dart         # TvColor, StyledRun (text + colours + underline + tall + mosaic + link), mergeRuns, plainText
@@ -95,6 +96,12 @@ lib/
     imap_mail_service.dart   # ImapMailService on enough_mail (the only file that knows it): envelope-only listing, move to Trash, never a delete
     cached_mail_service.dart # CachedMailService: reuses a good inbox listing for 3 min; setUp / forget / moveToTrash drop it
     todo_list.dart           # TodoList (ChangeNotifier): the to-do list in LocalStore 'todos'; add/setDone/rename/remove/move
+    mail_notifier.dart       # abstract MailNotifier: show(alerts) / requestPermission / isPermitted
+    local_mail_notifier.dart # MailNotifier on flutter_local_notifications (the only file that knows it); taps and the notification that started the app
+    mail_alert_runner.dart   # MailAlertRunner.check(): one fresh look at the inbox, the cursor in LocalStore 'mail_alert_cursor', a notification per new unread message
+    mail_alert_scheduler.dart  # MailAlertScheduler.apply(mode): WorkManager (workmanager, the only file that knows it) runs a look about every 15 minutes
+    mail_alert_worker.dart   # mailAlertDispatcher: what the background isolate runs (builds its own services; reads the mode from the saved settings)
+    mail_alert_links.dart    # MailAlertLinks: a tapped notification on its way to HomeShell, which opens that email in the mail sheet
     mail_tile_source.dart    # MailTileSource: the newest ten + the moment they were read
     media_service.dart       # abstract MediaService: now() -> MediaSnapshot; playPause/next/previous; openAccessSettings() (no runtime dialog exists for this one)
     android_media_service.dart  # MethodChannel implementation
