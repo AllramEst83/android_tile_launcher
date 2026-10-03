@@ -17,7 +17,7 @@ lib/
     tile_size.dart           # small 1x1, flat 2x1, tall 1x2, medium 2x2, broad 3x2, wide 4x2, tower 2x4, large 4x4; spanIn(columns) gives the width on a 4- or 6-column grid (fullWidth sizes span it entirely; others clamp to it)
     tile_layout.dart         # packTiles(tiles, columns:): ordered tiles -> PlacedTile (column, row, span); skyline algorithm
     settings.dart            # LauncherSettings (theme, columns, gap, font scale, swipe down, swipe up, scene animation, ...) + ThemeVariant, GridGap, FontScale, GestureAction; tolerant fromJson
-    scene_animation.dart     # SceneAnimation (rocket, palmTree, flower, calmAndEasy, retroVinyl): each one's label and its bundled .lottie asset path
+    scene_animation.dart     # SceneAnimation (11 animations): each one's label, bundled .lottie asset path and draw scale
     layout_export.dart       # exportLayout / parseLayout: the tiles + settings as one line of JSON (format tag + version), sealed LayoutImported / LayoutRejected
     pinned_tile.dart         # PinnedTile: id + kind + size + colour, JSON (de)serialisable; PinnedTile.app/.system factories; pinnableColours, the fill cycle
     todo_item.dart           # TodoItem (id, title, done) + JSON; todoFit(items, lines): how many fit and the +N left over

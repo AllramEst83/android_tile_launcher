@@ -7,18 +7,21 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test(
-    'five to start with: rocket, palm tree, flower, calm and easy, retro vinyl',
-    () {
-      expect(SceneAnimation.values, <SceneAnimation>[
-        SceneAnimation.rocket,
-        SceneAnimation.palmTree,
-        SceneAnimation.flower,
-        SceneAnimation.calmAndEasy,
-        SceneAnimation.retroVinyl,
-      ]);
-    },
-  );
+  test('the picker lists them in order, oldest first', () {
+    expect(SceneAnimation.values, <SceneAnimation>[
+      SceneAnimation.rocket,
+      SceneAnimation.palmTree,
+      SceneAnimation.flower,
+      SceneAnimation.calmAndEasy,
+      SceneAnimation.retroVinyl,
+      SceneAnimation.rainyDay,
+      SceneAnimation.cockroach,
+      SceneAnimation.octopus,
+      SceneAnimation.dinosaur,
+      SceneAnimation.fly,
+      SceneAnimation.butterfly,
+    ]);
+  });
 
   test('each has its own label for the picker sheet', () {
     expect(SceneAnimation.rocket.label, 'ROCKET LAUNCH');
@@ -26,6 +29,12 @@ void main() {
     expect(SceneAnimation.flower.label, 'FLOWER');
     expect(SceneAnimation.calmAndEasy.label, 'CALM AND EASY');
     expect(SceneAnimation.retroVinyl.label, 'RETRO VINYL');
+    expect(SceneAnimation.rainyDay.label, 'RAINY DAY');
+    expect(SceneAnimation.cockroach.label, 'COCKROACH');
+    expect(SceneAnimation.octopus.label, 'OCTOPUS');
+    expect(SceneAnimation.dinosaur.label, 'DINOSAUR');
+    expect(SceneAnimation.fly.label, 'FLY');
+    expect(SceneAnimation.butterfly.label, 'BUTTERFLY');
   });
 
   test('each points at its own bundled .lottie asset', () {
@@ -37,6 +46,18 @@ void main() {
       'lottie/calm_and_easy.lottie',
     );
     expect(SceneAnimation.retroVinyl.lottieAsset, 'lottie/retro_vinyl.lottie');
+    expect(SceneAnimation.rainyDay.lottieAsset, 'lottie/rainy_day.lottie');
+    expect(SceneAnimation.cockroach.lottieAsset, 'lottie/cockroach.lottie');
+    expect(SceneAnimation.octopus.lottieAsset, 'lottie/octopus.lottie');
+    expect(SceneAnimation.dinosaur.lottieAsset, 'lottie/dinosaur.lottie');
+    expect(SceneAnimation.fly.lottieAsset, 'lottie/fly.lottie');
+    expect(SceneAnimation.butterfly.lottieAsset, 'lottie/butterfly.lottie');
+  });
+
+  test('each has a sensible draw scale', () {
+    for (final SceneAnimation a in SceneAnimation.values) {
+      expect(a.scale, inInclusiveRange(1.0, 2.0), reason: a.label);
+    }
   });
 
   test('every asset path is distinct', () {
