@@ -14,7 +14,8 @@ environment:
 
 dependencies:
   calendar_view: ^2.0.0
-  dotlottie_flutter: ^0.1.7
+  dotlottie_flutter:
+    path: third_party/dotlottie_flutter
   enough_mail: ^2.1.7
   flutter:
     sdk: flutter

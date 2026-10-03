@@ -124,10 +124,9 @@ packages:
   dotlottie_flutter:
     dependency: "direct main"
     description:
-      name: dotlottie_flutter
-      sha256: "4617fa3199d2ac2003172a7bc82b6e7eab76ad97d96ef235733f9b21e71ed788"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/dotlottie_flutter"
+      relative: true
+    source: path
     version: "0.1.7"
   encrypter_plus:
     dependency: transitive
