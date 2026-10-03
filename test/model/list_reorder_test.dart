@@ -72,42 +72,4 @@ void main() {
       expect(items, ['A', 'B', 'C']);
     });
   });
-
-  group('moveBlockBeside', () {
-    List<String> block(Set<String> moving, int target, {required bool after}) =>
-        moveBlockBeside(
-          ['A', 'B', 'C', 'D', 'E'],
-          moving: moving.contains,
-          target: target,
-          after: after,
-        );
-
-    test('the block lands together before the target, in its own order', () {
-      expect(block({'A', 'C'}, 3, after: false), ['B', 'A', 'C', 'D', 'E']);
-    });
-
-    test('the block lands together after the target', () {
-      expect(block({'A', 'C'}, 4, after: true), ['B', 'D', 'E', 'A', 'C']);
-    });
-
-    test('a block from the back moves to the front', () {
-      expect(block({'D', 'E'}, 0, after: false), ['D', 'E', 'A', 'B', 'C']);
-    });
-
-    test('a target inside the block, or out of range, changes nothing', () {
-      final items = ['A', 'B', 'C'];
-      expect(
-        moveBlockBeside(items, moving: {'A'}.contains, target: 0, after: true),
-        same(items),
-      );
-      expect(
-        moveBlockBeside(items, moving: {'A'}.contains, target: 9, after: true),
-        same(items),
-      );
-      expect(
-        moveBlockBeside(items, moving: (_) => false, target: 1, after: true),
-        same(items),
-      );
-    });
-  });
 }

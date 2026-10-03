@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:android_tile_launcher/messages.dart';
+import 'package:android_tile_launcher/model/block_move.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/list_reorder.dart';
 import 'package:android_tile_launcher/model/mail_alert.dart';
@@ -366,11 +367,12 @@ class _HomePageState extends State<_HomePage> {
     final int to = scratch.indexWhere((PinnedTile p) => p.id == target);
     if (from == -1 || to == -1) return;
     if (_many && _group.contains(moving)) {
-      _scratch = moveBlockBeside(
+      _scratch = moveBlock(
         scratch,
-        moving: (PinnedTile p) => _group.contains(p.id),
-        target: to,
+        ids: _group,
+        target: target,
         after: after,
+        columns: SettingsScope.of(context).columns,
       );
       return;
     }

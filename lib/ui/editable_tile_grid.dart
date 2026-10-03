@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:android_tile_launcher/model/block_move.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/tile.dart';
@@ -81,10 +82,6 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   /// for a group is the middle of that tile inside the picked tiles' block.
   Offset _anchor = Offset.zero;
 
-  /// The footprint of the group being held (the single tile's own size when
-  /// none), so the insertion line is as long as what will be dropped.
-  Size? _block;
-
   /// The tile a held one is over and which edge of it the drop would be on,
   /// or null when it is over none.
   ({String id, _Edge edge})? _drop;
@@ -110,7 +107,6 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   void _dragEnded() {
     _scrollTimer?.cancel();
     _scrollTimer = null;
-    _block = null;
     _clearDrop();
     if (_holdingGroup && mounted) setState(() => _holdingGroup = false);
   }
@@ -222,7 +218,12 @@ class _EditableTileGridState extends State<EditableTileGrid> {
             children: <Widget>[
               for (final TileRect r in rects)
                 _slot(r, settings.gap.pixels, preview),
-              ?_dropLine(rects, settings.gap.pixels, constraints.maxWidth),
+              ?_dropLine(
+                rects,
+                settings.gap.pixels,
+                settings.columns,
+                constraints.maxWidth,
+              ),
             ],
           ),
         );
@@ -231,18 +232,54 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   }
 
   /// The line along the edge of the tile a held one is over, on the side it
-  /// would be dropped on; in the gutter, so it never covers a tile.
-  Widget? _dropLine(List<TileRect> rects, double gap, double gridRight) {
+  /// would be dropped on; in the gutter, so it never covers a tile. For a held
+  /// group it is the leading edge of where the whole block will really land
+  /// (the packer may slide it, see [moveBlock]), as long as the block is.
+  Widget? _dropLine(
+    List<TileRect> rects,
+    double gap,
+    int columns,
+    double maxWidth,
+  ) {
     final ({String id, _Edge edge})? drop = _drop;
     if (drop == null) return null;
-    final Size? block = _block;
-    // As long as what is being dropped, but never past the grid's sides.
+    if (_holdingGroup && widget.group.length > 1) {
+      final List<PinnedTile> order = moveBlock(
+        widget.tiles,
+        ids: widget.group,
+        target: drop.id,
+        after: drop.edge == _Edge.right || drop.edge == _Edge.bottom,
+        columns: columns,
+      );
+      final List<TileRect> landed = layoutTiles(
+        packTiles(<Tile>[
+          for (final PinnedTile p in order) p.toTile(),
+        ], columns: columns),
+        maxWidth: maxWidth,
+        columns: columns,
+        gap: gap,
+      );
+      double left = double.infinity, top = double.infinity;
+      double right = 0, bottom = 0;
+      for (final TileRect l in landed) {
+        if (!widget.group.contains(l.tile.id)) continue;
+        left = left < l.left ? left : l.left;
+        top = top < l.top ? top : l.top;
+        right = right > l.left + l.width ? right : l.left + l.width;
+        bottom = bottom > l.top + l.height ? bottom : l.top + l.height;
+      }
+      final bool across = drop.edge == _Edge.top || drop.edge == _Edge.bottom;
+      return Positioned(
+        key: const ValueKey('drop-line'),
+        left: across ? left : left - gap / 2 - _lineWidth / 2,
+        top: across ? top - gap / 2 - _lineWidth / 2 : top,
+        width: across ? right - left : _lineWidth,
+        height: across ? _lineWidth : bottom - top,
+        child: IgnorePointer(child: ColoredBox(color: TileColors.highlight)),
+      );
+    }
     for (final TileRect r in rects) {
       if (r.tile.id != drop.id) continue;
-      final double along = block == null
-          ? r.width
-          : block.width.clamp(0, gridRight - r.left);
-      final double down = block?.height ?? r.height;
       return Positioned(
         key: const ValueKey('drop-line'),
         left: drop.edge == _Edge.right
@@ -256,10 +293,10 @@ class _EditableTileGridState extends State<EditableTileGrid> {
             ? r.top - gap / 2 - _lineWidth / 2
             : r.top,
         width: drop.edge == _Edge.top || drop.edge == _Edge.bottom
-            ? along
+            ? r.width
             : _lineWidth,
         height: drop.edge == _Edge.left || drop.edge == _Edge.right
-            ? down
+            ? r.height
             : _lineWidth,
         child: IgnorePointer(child: ColoredBox(color: TileColors.highlight)),
       );
@@ -329,7 +366,6 @@ class _EditableTileGridState extends State<EditableTileGrid> {
     final TileRect? held = widget.group.contains(id)
         ? preview.where((TileRect p) => p.tile.id == id).firstOrNull
         : null;
-    final Size blockSize = _boundsOf(preview);
     final Offset anchor = held == null
         ? Offset(r.width / 2, r.height / 2)
         : Offset(held.left + held.width / 2, held.top + held.height / 2);
@@ -373,7 +409,6 @@ class _EditableTileGridState extends State<EditableTileGrid> {
               delay: EditableTileGrid.pickUpDelay,
               onDragStarted: () {
                 _anchor = anchor;
-                _block = held == null ? null : blockSize;
                 if (widget.group.contains(id)) {
                   setState(() => _holdingGroup = true);
                 }

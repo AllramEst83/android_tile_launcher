@@ -24,7 +24,8 @@ lib/
     ready_script.dart        # readyScript(now, events, todos, unread): the lines the READY. screen types (intro) and prints (body)
     mail_alert.dart          # MailAlertMode (off / every 15 min), MailRef (a notification's payload), MailAlertCursor, planMailAlerts: which unread mail is new since the last look
     mail_cache.dart          # mailListingToJson / mailListingFromJson: the inbox listing (headers only) kept between runs, per account
-    list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder; moveBlockBeside<T>: the same for a whole picked set as one block
+    block_move.dart          # moveBlock / blockFootprint: drop a picked set as one block, slid to where the packer keeps it whole
+    list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder
     styled_text.dart         # TvColor, StyledRun (text + colours + underline + tall + mosaic + link), mergeRuns, plainText
     tv_mosaic.dart           # tvPictureFor(hash): texttv.nu's block-graphics GIFs rebuilt and looked up by CRC-32 (no downloads)
     text_tv_html.dart        # parseTextTvHtml: a page's HTML as styled rows (null if not the shape expected, so the plain text is the fallback)

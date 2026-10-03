@@ -24,32 +24,3 @@ List<T> moveBeside<T>(
   next.insert(after ? targetNow + 1 : targetNow, item);
   return next;
 }
-
-/// Moves every item for which [moving] is true to sit together, as one block,
-/// right beside the item at [target] (just before it, or just after it if
-/// [after]). The block keeps its own order and so does everything else.
-/// Pure; a [target] that is itself moving, or out of range, or nothing
-/// moving, returns [items] unchanged.
-List<T> moveBlockBeside<T>(
-  List<T> items, {
-  required bool Function(T item) moving,
-  required int target,
-  required bool after,
-}) {
-  if (target < 0 || target >= items.length || moving(items[target])) {
-    return items;
-  }
-  final List<T> block = <T>[
-    for (final T item in items)
-      if (moving(item)) item,
-  ];
-  if (block.isEmpty) return items;
-  final T anchor = items[target];
-  final List<T> next = <T>[
-    for (final T item in items)
-      if (!moving(item)) item,
-  ];
-  final int at = next.indexOf(anchor);
-  next.insertAll(after ? at + 1 : at, block);
-  return next;
-}
