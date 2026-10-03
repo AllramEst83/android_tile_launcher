@@ -1274,6 +1274,103 @@ void main() {
     });
   });
 
+  group('Gmail inbox', () {
+    tearDown(() => server.stop());
+
+    final mails = [
+      for (var i = 1; i <= 7; i++)
+        FakeImapMessage(
+          uid: 100 + i,
+          subject: '"Message $i"',
+          date: 'Sat, 26 Sep 2026 08:30:00 +0000',
+          address: 'a$i@example.com',
+        ),
+    ];
+
+    void gmail() {
+      server
+        ..capabilities = 'IMAP4rev1 MOVE UIDPLUS X-GM-EXT-1'
+        ..hasAllMail = true
+        // What Gmail calls the inbox is not all that the INBOX folder holds.
+        ..searchResults = {101, 103, 105, 106, 107}
+        ..starredResults = {106}
+        ..unreadResults = {107};
+    }
+
+    test('lists what Gmail calls the inbox, from All Mail', () async {
+      await boot(mails);
+      gmail();
+      await setUp();
+
+      final result =
+          await mail.latest(count: 3, withStarred: true) as MailMessages;
+
+      expect(server.received, contains('UID SEARCH X-GM-RAW "in:inbox"'));
+      // Newest first, the starred one listed apart, 102 and 104 not inbox.
+      expect([for (final m in result.messages) m.uid], [-107, -105, -103]);
+      expect([for (final m in result.starred) m.uid], [-106]);
+      expect(
+        result.messages.every((m) => m.folder == '[Gmail]/All Mail'),
+        isTrue,
+      );
+      expect(result.total, 5);
+      expect(result.unread, 1);
+      expect(result.nextOffset, 3);
+      expect(result.messages.first.serverUid, 107);
+    });
+
+    test('the next page carries on from where the last ended', () async {
+      await boot(mails);
+      gmail();
+      await setUp();
+
+      final rest = await mail.latest(
+        count: 3,
+        offset: 3,
+        withStarred: true,
+      ) as MailMessages;
+
+      expect([for (final m in rest.messages) m.uid], [-101]);
+      expect(rest.starred, isEmpty);
+      expect(rest.nextOffset, isNull);
+    });
+
+    test('without the starred listing the page is plain inbox order', () async {
+      await boot(mails);
+      gmail();
+      await setUp();
+
+      final result = await mail.latest(count: 3) as MailMessages;
+
+      expect([for (final m in result.messages) m.uid], [-107, -106, -105]);
+      expect(result.starred, isEmpty);
+    });
+
+    test('a server that is not Gmail reads the INBOX folder', () async {
+      await boot(mails);
+      await setUp();
+
+      final result = await mail.latest(count: 3) as MailMessages;
+
+      expect([for (final m in result.messages) m.uid], [107, 106, 105]);
+      expect(server.received.any((c) => c.contains('X-GM-RAW')), isFalse);
+    });
+
+    test(
+      'when Gmail will not answer the INBOX folder is read instead',
+      () async {
+        await boot(mails);
+        gmail();
+        server.rejectGmailRaw = true;
+        await setUp();
+
+        final result = await mail.latest(count: 3) as MailMessages;
+
+        expect([for (final m in result.messages) m.uid], [107, 106, 105]);
+      },
+    );
+  });
+
   group('mailFoldersFrom', () {
     Mailbox box(String path, List<MailboxFlag> flags) => Mailbox(
       encodedName: path.split('/').last,

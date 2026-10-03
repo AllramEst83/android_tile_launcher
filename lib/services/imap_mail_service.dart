@@ -137,6 +137,17 @@ class ImapMailService implements MailService {
     if (saved == null) return const MailNotSetUp();
 
     final outcome = await _session<MailMessages>(saved, (client) async {
+      if (folder == null) {
+        // On Gmail the inbox is what Gmail itself calls the inbox, not what
+        // its IMAP INBOX folder happens to list.
+        final gmail = await _gmailInbox(
+          client,
+          count: count,
+          offset: offset,
+          withStarred: withStarred,
+        );
+        if (gmail != null) return gmail;
+      }
       final box = await _select(client, folder);
       final total = box.messagesExists;
       var page = <MailMessage>[];
@@ -181,6 +192,96 @@ class ImapMailService implements MailService {
       _Done(:final value) => value,
       _Failed(:final reason) => MailUnavailable(reason),
     };
+  }
+
+  /// Gmail's own inbox, or null if this is not Gmail (or it would not answer,
+  /// in which case the plain INBOX folder is read instead).
+  ///
+  /// Gmail's IMAP `INBOX` folder is not always what the Gmail app shows: mail
+  /// that Gmail has filed in the inbox can be missing from it. Gmail's search
+  /// extension `X-GM-RAW` takes Gmail's own query language, and run over
+  /// All Mail `in:inbox` is exactly the app's inbox, every tab included. The
+  /// messages come back from All Mail, so they carry its path as their
+  /// `folder` (and the negative id that goes with that).
+  Future<MailMessages?> _gmailInbox(
+    ImapClient client, {
+    required int count,
+    required int offset,
+    required bool withStarred,
+  }) async {
+    if (!client.serverInfo.supports('X-GM-EXT-1')) return null;
+    try {
+      final boxes = await client.listMailboxes(recursive: true);
+      final allMail = boxes
+          .where((b) => b.hasFlag(MailboxFlag.all) && !b.isNotSelectable)
+          .firstOrNull;
+      if (allMail == null) return null;
+      await client.selectMailboxByPath(allMail.encodedPath);
+
+      Future<List<int>> find(String query) async {
+        final found = await client.uidSearchMessages(
+          searchCriteria: 'X-GM-RAW "$query"',
+          responseTimeout: timeout,
+        );
+        return (found.matchingSequence?.toList() ?? <int>[])
+          ..sort((a, b) => b.compareTo(a));
+      }
+
+      final inbox = await find('in:inbox');
+      final unread = (await find('in:inbox is:unread')).length;
+      final starredUids = withStarred ? await find('is:starred') : <int>[];
+      final starredSet = starredUids.toSet();
+      // With the starred listed apart none of them is also in the page.
+      final listed = withStarred
+          ? [
+              for (final uid in inbox)
+                if (!starredSet.contains(uid)) uid,
+            ]
+          : inbox;
+      final slice = listed.skip(offset).take(count).toList();
+
+      List<MailMessage> read(List<MimeMessage> fetched) => [
+        for (final message in fetched)
+          ?mailMessageFrom(message, folder: allMail.encodedPath),
+      ]..sort((a, b) => a.uid.compareTo(b.uid));
+
+      // Ids are negative (see MailMessage.folder), so the newest has the
+      // smallest.
+      final page = slice.isEmpty
+          ? <MailMessage>[]
+          : read(await _fetchUids(client, slice));
+      final starred = withStarred && offset == 0 && starredUids.isNotEmpty
+          ? read(
+              await _fetchUids(client, starredUids.take(_maxStarred).toList()),
+            )
+          : <MailMessage>[];
+      return MailMessages(
+        page,
+        total: inbox.length,
+        unread: unread,
+        starred: starred,
+        nextOffset: offset + count < listed.length ? offset + count : null,
+      );
+    } on ImapException {
+      return null;
+    }
+  }
+
+  /// The envelopes (with flags) of [uids] in the selected mailbox.
+  Future<List<MimeMessage>> _fetchUids(
+    ImapClient client,
+    List<int> uids,
+  ) async {
+    final sequence = MessageSequence(isUidSequence: true);
+    for (final uid in uids) {
+      sequence.add(uid);
+    }
+    final fetched = await client.uidFetchMessages(
+      sequence,
+      '(UID FLAGS ENVELOPE)',
+      responseTimeout: timeout,
+    );
+    return fetched.messages;
   }
 
   /// The most starred messages worth listing at once.

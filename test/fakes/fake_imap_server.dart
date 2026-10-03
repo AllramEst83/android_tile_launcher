@@ -110,6 +110,18 @@ class FakeImapServer {
   /// spelling of the name); `CREATE`, `RENAME` and `DELETE` change it.
   final List<String> extraFolders = [];
 
+  /// Whether a folder flagged `\All` (Gmail's All Mail) exists.
+  bool hasAllMail = false;
+
+  /// What a Gmail `X-GM-RAW` search for starred / unread inbox mail replies
+  /// (`searchResults` answers the plain `in:inbox` one); null falls back to
+  /// `searchResults`.
+  Set<int>? starredResults;
+  Set<int>? unreadResults;
+
+  /// Set to make the server refuse `X-GM-RAW` searches.
+  bool rejectGmailRaw = false;
+
   /// Whether a folder flagged `\Trash` exists.
   bool hasTrash = true;
 
@@ -186,6 +198,7 @@ class FakeImapServer {
         socket.write(
           '* LIST (\\HasNoChildren) "/" "INBOX"\r\n'
           '${hasTrash ? '* LIST (\\HasNoChildren \\Trash) "/" "$trashName"\r\n' : ''}'
+          '${hasAllMail ? '* LIST (\\HasNoChildren \\All) "/" "[Gmail]/All Mail"\r\n' : ''}'
           '${extraFolders.map((f) => '* LIST (\\HasNoChildren) "/" "$f"\r\n').join()}'
           '$tag OK LIST completed\r\n',
         );
@@ -338,7 +351,17 @@ class FakeImapServer {
       case 'SEARCH':
         // Whatever `searchResults` is set to, regardless of the actual
         // criteria — a test checks those separately, via `received`.
-        final ids = searchResults.toList()..sort();
+        final criteria = words.skip(2).join(' ');
+        if (criteria.contains('X-GM-RAW') && rejectGmailRaw) {
+          socket.write('$tag BAD X-GM-RAW is not for you\r\n');
+          return;
+        }
+        final chosen = criteria.contains('is:starred')
+            ? starredResults ?? searchResults
+            : criteria.contains('is:unread')
+            ? unreadResults ?? searchResults
+            : searchResults;
+        final ids = chosen.toList()..sort();
         socket.write(
           '* SEARCH ${ids.join(' ')}\r\n$tag OK UID SEARCH completed\r\n',
         );
