@@ -26,6 +26,11 @@ abstract final class Messages {
 
   static const String cancel = 'CANCEL';
   static const String apply = 'APPLY';
+  static const String moveMany = 'MOVE MANY';
+  static const String moveManyDone = 'DONE';
+  static const String moveManyHint =
+      'TAP TILES TO PICK THEM, THEN HOLD ONE AND DRAG.';
+  static String tilesPicked(int n) => n == 1 ? '1 TILE' : '$n TILES';
   static const String tileSize = 'SIZE';
   static const String tileColour = 'COLOUR';
 
@@ -496,7 +501,9 @@ abstract final class Messages {
       'SHADE OR QUICK SETTINGS, OR OPEN ALL APPS, BY DEFAULT).\n\n'
       'HOLD A TILE TO ENTER THE GRID EDITOR: DRAG IT SOMEWHERE ELSE, OR '
       'PICK IT TO CHANGE ITS SIZE OR COLOUR BELOW, THEN APPLY. + ADD '
-      'TILE PINS A NEW APP OR LIVE TILE; ITS OWN X UNPINS ONE.';
+      'TILE PINS A NEW APP OR LIVE TILE; ITS OWN X UNPINS ONE.\n\n'
+      'MOVE MANY (TOP RIGHT IN THE EDITOR) LETS YOU TAP SEVERAL TILES, THEN '
+      'HOLD ONE OF THEM AND DRAG: THEY ALL MOVE TOGETHER TO ONE DROP LINE.';
 
   static const String helpTilesTitle = 'LIVE TILES';
   static const String helpTilesBody =

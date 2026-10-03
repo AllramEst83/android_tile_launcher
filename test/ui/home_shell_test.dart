@@ -495,6 +495,65 @@ void main() {
     });
   });
 
+  group('grid editor: move many', () {
+    testWidgets('picked tiles move as one block to one drop point', (
+      WidgetTester tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(400, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final GridState gridState = _gridState();
+      await gridState.pin('pkg.clock');
+      await gridState.pin('pkg.maps');
+      await gridState.pin('pkg.cam');
+      await pumpShell(
+        tester,
+        FakeAppRepository(
+          apps: const [
+            AppInfo(label: 'Clock', packageName: 'pkg.clock'),
+            AppInfo(label: 'Maps', packageName: 'pkg.maps'),
+            AppInfo(label: 'Cam', packageName: 'pkg.cam'),
+          ],
+        ),
+        gridState: gridState,
+      );
+      await tester.pump();
+
+      await tester.longPress(_onHome(find.text('CLOCK')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(moveManyButtonKey));
+      await tester.pump();
+      await tester.tap(_inEditor(find.text('MAPS')));
+      await tester.pump();
+      expect(find.text(Messages.tilesPicked(2)), findsOneWidget);
+
+      final TestGesture gesture = await tester.startGesture(
+        tester.getCenter(_inEditor(find.text('CLOCK'))),
+      );
+      await tester.pump(
+        EditableTileGrid.pickUpDelay + const Duration(milliseconds: 50),
+      );
+      final Rect cam = tester.getRect(
+        _inEditor(find.byKey(const ValueKey('pkg.cam'))),
+      );
+      await gesture.moveTo(Offset(cam.right - 8, cam.center.dy));
+      await tester.pump(const Duration(milliseconds: 100));
+      // One insertion line for the whole block.
+      expect(find.byKey(const ValueKey('drop-line')), findsOneWidget);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(Messages.apply));
+      await tester.pumpAndSettle();
+
+      expect(gridState.pinned.map((p) => p.id), [
+        'pkg.cam',
+        'pkg.clock',
+        'pkg.maps',
+      ]);
+    });
+  });
+
   group('add tile', () {
     testWidgets('tapping + ADD TILE pins a clock tile onto home', (
       WidgetTester tester,

@@ -38,6 +38,7 @@ class EditableTileGrid extends StatefulWidget {
     required this.onSelect,
     required this.onDelete,
     required this.onReorder,
+    this.group = const <String>{},
   });
 
   final List<PinnedTile> tiles;
@@ -49,6 +50,11 @@ class EditableTileGrid extends StatefulWidget {
 
   /// [after] is which side of [target] the moved tile goes on.
   final void Function(String moving, String target, bool after) onReorder;
+
+  /// The tiles picked to move together (empty outside move-many). Holding
+  /// any one of them lifts all of them: one ghost, one insertion line, and
+  /// [onReorder] is told which tile was held.
+  final Set<String> group;
 
   /// How long a tile is held before it comes off the grid.
   static const Duration pickUpDelay = Duration(milliseconds: 200);
@@ -79,6 +85,10 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   /// or null when it is over none.
   ({String id, _Edge edge})? _drop;
 
+  /// Whether the held tile is one of [EditableTileGrid.group], so the rest
+  /// of the group is lifted with it.
+  bool _holdingGroup = false;
+
   @override
   void dispose() {
     _scrollTimer?.cancel();
@@ -97,7 +107,13 @@ class _EditableTileGridState extends State<EditableTileGrid> {
     _scrollTimer?.cancel();
     _scrollTimer = null;
     _clearDrop();
+    if (_holdingGroup && mounted) setState(() => _holdingGroup = false);
   }
+
+  /// A group never lands on one of its own tiles.
+  bool _blocked(String moving, String target) =>
+      moving == target ||
+      (widget.group.contains(moving) && widget.group.contains(target));
 
   /// Which edge of [r], the tile it is over, the finger is closest to: [r] is
   /// split by its two diagonals into four triangles, and the one the finger
@@ -241,7 +257,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
         services: widget.services,
         interactive: false,
       ),
-      selected: id == widget.selected,
+      selected: id == widget.selected || widget.group.contains(id),
       onTap: () => widget.onSelect(id),
       onDelete: () => widget.onDelete(id),
       deleteKey: ValueKey('delete-$id'),
@@ -253,11 +269,11 @@ class _EditableTileGridState extends State<EditableTileGrid> {
       width: r.width + pad * 2,
       height: r.height + pad * 2,
       child: DragTarget<String>(
-        onWillAcceptWithDetails: (details) => details.data != id,
+        onWillAcceptWithDetails: (details) => !_blocked(details.data, id),
         onMove: (details) {
           // Every tile under the finger is told about a move, the held one
           // included; only another tile is somewhere to go.
-          if (details.data == id) {
+          if (_blocked(details.data, id)) {
             _clearDrop();
           } else {
             _hoverOver(r, details.offset);
@@ -283,7 +299,12 @@ class _EditableTileGridState extends State<EditableTileGrid> {
             child: LongPressDraggable<String>(
               data: id,
               delay: EditableTileGrid.pickUpDelay,
-              onDragStarted: () => _heldSize = Size(r.width, r.height),
+              onDragStarted: () {
+                _heldSize = Size(r.width, r.height);
+                if (widget.group.contains(id)) {
+                  setState(() => _holdingGroup = true);
+                }
+              },
               onDragUpdate: (details) => _dragMoved(details.globalPosition),
               onDragEnd: (_) => _dragEnded(),
               // Held by its middle wherever it was grabbed, so the tile it
@@ -300,11 +321,19 @@ class _EditableTileGridState extends State<EditableTileGrid> {
                 child: SizedBox(
                   width: r.width,
                   height: r.height,
-                  child: Opacity(opacity: 0.75, child: view),
+                  child: Opacity(
+                    opacity: 0.75,
+                    child: widget.group.contains(id) && widget.group.length > 1
+                        ? _withCount(view, widget.group.length)
+                        : view,
+                  ),
                 ),
               ),
               childWhenDragging: Opacity(opacity: 0.3, child: view),
-              child: view,
+              // The rest of a lifted group fades like the held tile does.
+              child: _holdingGroup && widget.group.contains(id)
+                  ? Opacity(opacity: 0.3, child: view)
+                  : view,
             ),
           ),
         ),
@@ -312,6 +341,31 @@ class _EditableTileGridState extends State<EditableTileGrid> {
     );
   }
 }
+
+/// [view] with a badge saying how many tiles the ghost stands for.
+Widget _withCount(Widget view, int count) => Stack(
+  fit: StackFit.expand,
+  children: <Widget>[
+    view,
+    Positioned(
+      right: 4,
+      bottom: 4,
+      child: ColoredBox(
+        color: TileColors.highlight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              color: TileColors.canvas,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    ),
+  ],
+);
 
 /// Which side of a tile a held one is being dropped on.
 enum _Edge { left, right, top, bottom }

@@ -296,12 +296,19 @@ class _HomePageState extends State<_HomePage> {
   List<PinnedTile>? _scratch;
   String? _selected;
 
+  /// Move-many: tapping a tile picks it into [_group] instead of selecting
+  /// it, and the group is moved as one block.
+  bool _many = false;
+  final Set<String> _group = <String>{};
+
   bool get _editing => _scratch != null;
 
   void _startEditing(String id) {
     setState(() {
       _scratch = List<PinnedTile>.of(widget.pinned);
       _selected = id;
+      _many = false;
+      _group.clear();
     });
   }
 
@@ -309,6 +316,8 @@ class _HomePageState extends State<_HomePage> {
     setState(() {
       _scratch = null;
       _selected = null;
+      _many = false;
+      _group.clear();
     });
   }
 
@@ -317,6 +326,8 @@ class _HomePageState extends State<_HomePage> {
     setState(() {
       _scratch = null;
       _selected = null;
+      _many = false;
+      _group.clear();
     });
     // The pin/order/size/colour changes already show on screen; only the
     // save to disk is still pending, and there is no error surface here for
@@ -324,11 +335,29 @@ class _HomePageState extends State<_HomePage> {
     unawaited(widget.gridState.replaceAll(result));
   }
 
-  void _select(String id) => setState(() => _selected = id);
+  void _select(String id) => setState(() {
+    if (!_many) {
+      _selected = id;
+    } else if (!_group.remove(id)) {
+      _group.add(id);
+    }
+  });
+
+  void _toggleMany() => setState(() {
+    _many = !_many;
+    _group.clear();
+    if (_many) {
+      // Starts from the tile already selected, if any.
+      final String? current = _selected;
+      if (current != null) _group.add(current);
+      _selected = null;
+    }
+  });
 
   void _delete(String id) => setState(() {
     _scratch!.removeWhere((PinnedTile p) => p.id == id);
     if (_selected == id) _selected = null;
+    _group.remove(id);
   });
 
   void _reorder(String moving, String target, bool after) => setState(() {
@@ -336,6 +365,15 @@ class _HomePageState extends State<_HomePage> {
     final int from = scratch.indexWhere((PinnedTile p) => p.id == moving);
     final int to = scratch.indexWhere((PinnedTile p) => p.id == target);
     if (from == -1 || to == -1) return;
+    if (_many && _group.contains(moving)) {
+      _scratch = moveBlockBeside(
+        scratch,
+        moving: (PinnedTile p) => _group.contains(p.id),
+        target: to,
+        after: after,
+      );
+      return;
+    }
     _scratch = moveBeside(scratch, from: from, target: to, after: after);
   });
 
@@ -389,7 +427,11 @@ class _HomePageState extends State<_HomePage> {
       final PinnedTile? selectedTile = _find(scratch, _selected);
       return Column(
         children: <Widget>[
-          _EditorBar(onCancel: _cancelEditing),
+          _EditorBar(
+            onCancel: _cancelEditing,
+            many: _many,
+            onToggleMany: _toggleMany,
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(TileMetrics.margin),
@@ -401,14 +443,19 @@ class _HomePageState extends State<_HomePage> {
                 onSelect: _select,
                 onDelete: _delete,
                 onReorder: _reorder,
+                group: _group,
               ),
             ),
           ),
           TileInspector(
-            label: selectedTile == null
+            label: _many
+                ? (_group.isEmpty
+                      ? Messages.moveManyHint
+                      : Messages.tilesPicked(_group.length))
+                : selectedTile == null
                 ? ''
                 : selectedTile.label ?? widget.labelFor(selectedTile.id),
-            tile: selectedTile,
+            tile: _many ? null : selectedTile,
             onApply: _applyEditing,
             onSizeSelected: _resize,
             onColourSelected: _recolor,
@@ -478,10 +525,19 @@ class _HomePageState extends State<_HomePage> {
   }
 }
 
+/// Key so tests can find the editor's move-many switch.
+const Key moveManyButtonKey = ValueKey<String>('move-many');
+
 class _EditorBar extends StatelessWidget {
-  const _EditorBar({required this.onCancel});
+  const _EditorBar({
+    required this.onCancel,
+    required this.many,
+    required this.onToggleMany,
+  });
 
   final VoidCallback onCancel;
+  final bool many;
+  final VoidCallback onToggleMany;
 
   @override
   Widget build(BuildContext context) {
@@ -496,6 +552,17 @@ class _EditorBar extends StatelessWidget {
           InkWell(
             onTap: onCancel,
             child: Text(Messages.cancel, style: style),
+          ),
+          const Spacer(),
+          InkWell(
+            key: moveManyButtonKey,
+            onTap: onToggleMany,
+            child: Text(
+              many ? Messages.moveManyDone : Messages.moveMany,
+              style: many
+                  ? style?.copyWith(color: TileColors.highlight)
+                  : style,
+            ),
           ),
         ],
       ),
