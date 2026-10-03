@@ -10,6 +10,7 @@ import 'package:android_tile_launcher/services/attachment_download_service.dart'
 import 'package:android_tile_launcher/services/contacts_repository.dart';
 import 'package:android_tile_launcher/services/mail_service.dart';
 import 'package:android_tile_launcher/ui/compose_sheet.dart';
+import 'package:android_tile_launcher/ui/haptics.dart';
 import 'package:android_tile_launcher/ui/mail_filter_sheet.dart';
 import 'package:android_tile_launcher/ui/mail_folder_sheet.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
@@ -1394,6 +1395,23 @@ class _MailSheetState extends State<_MailSheet> {
           : _selecting
           ? () => _toggleSelected(m.uid)
           : () => _open(m),
+      // Holding a message does what SELECT then a tap does: starts picking,
+      // with this one ticked. While picking it ticks or unticks it, as a tap.
+      onLongPress: _busy
+          ? null
+          : () {
+              haptic(context, Haptic.press);
+              if (_selecting) {
+                _toggleSelected(m.uid);
+              } else {
+                setState(() {
+                  _selecting = true;
+                  _selected
+                    ..clear()
+                    ..add(m.uid);
+                });
+              }
+            },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(

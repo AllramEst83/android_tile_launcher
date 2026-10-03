@@ -2074,4 +2074,54 @@ void main() {
       expect(find.byKey(mailFolderFieldKey), findsOneWidget);
     });
   });
+
+  group('long press', () {
+    testWidgets('starts selecting with that message ticked', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      expect(find.byKey(mailCheckboxKey(11)), findsNothing);
+
+      await tester.longPress(find.byKey(mailMessageKey(11)));
+      await tester.pump();
+
+      expect(find.text(Messages.mailSelectedCount(1)), findsOneWidget);
+      expect(find.byKey(mailCheckboxKey(11)), findsOneWidget);
+      expect(find.byKey(mailCheckboxKey(12)), findsOneWidget);
+      // Nothing was opened.
+      expect(mail.reads, isEmpty);
+    });
+
+    testWidgets('while selecting, a long press ticks and unticks', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.longPress(find.byKey(mailMessageKey(11)));
+      await tester.pump();
+
+      await tester.longPress(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+      expect(find.text(Messages.mailSelectedCount(2)), findsOneWidget);
+
+      await tester.longPress(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+      expect(find.text(Messages.mailSelectedCount(1)), findsOneWidget);
+    });
+
+    testWidgets('then the bulk buttons work as after SELECT', (
+      WidgetTester tester,
+    ) async {
+      final FakeMailService mail = _service();
+      await _open(tester, mail);
+      await tester.longPress(find.byKey(mailMessageKey(12)));
+      await tester.pump();
+
+      await tester.tap(find.byKey(mailBulkReadKey));
+      await tester.pumpAndSettle();
+
+      expect(mail.marks, <(int, bool, int?)>[(12, true, 77)]);
+    });
+  });
 }
