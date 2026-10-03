@@ -9,7 +9,7 @@ enum SceneAnimation {
   flower('FLOWER', 'lottie/plant.lottie', 1.4),
   calmAndEasy('CALM AND EASY', 'lottie/calm_and_easy.lottie', 1.0),
   retroVinyl('RETRO VINYL', 'lottie/retro_vinyl.lottie', 1.8),
-  rainyDay('RAINY DAY', 'lottie/rainy_day.lottie', 1.1),
+  rainyDay('RAINY DAY', 'lottie/rainy_day.lottie', 1.3),
   cockroach('COCKROACH', 'lottie/cockroach.lottie', 1.0),
   octopus('OCTOPUS', 'lottie/octopus.lottie', 1.0),
   dinosaur('DINOSAUR', 'lottie/dinosaur.lottie', 1.0),

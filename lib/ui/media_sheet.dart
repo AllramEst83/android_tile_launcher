@@ -102,6 +102,7 @@ class _MediaSheetBodyState extends State<_MediaSheetBody> {
               width: 160,
               height: 160,
               fit: BoxFit.cover,
+              gaplessPlayback: true,
               errorBuilder: (context, error, stackTrace) =>
                   const SizedBox(width: 160, height: 160),
             ),

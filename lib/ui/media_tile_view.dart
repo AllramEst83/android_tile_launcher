@@ -133,6 +133,7 @@ class _NowPlayingView extends StatelessWidget {
             width: 56,
             height: 56,
             fit: BoxFit.cover,
+            gaplessPlayback: true,
             // A session's art can be any format a music app chose to send;
             // nothing here can fix a bad decode, so it just disappears
             // rather than crashing the tile.

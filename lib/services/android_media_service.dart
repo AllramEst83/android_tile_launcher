@@ -2,12 +2,13 @@ import 'dart:async';
 
 import 'package:android_tile_launcher/model/media_snapshot.dart';
 import 'package:android_tile_launcher/services/media_service.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/services.dart';
 
 /// [MediaService] backed by the Kotlin `MediaChannelHandler`. The only file
 /// that knows about the channel.
 class AndroidMediaService implements MediaService {
-  const AndroidMediaService({
+  AndroidMediaService({
     this.channel = const MethodChannel(channelName),
     this.timeout = const Duration(seconds: 5),
   });
@@ -19,6 +20,17 @@ class AndroidMediaService implements MediaService {
 
   /// Only guards against a reply that never comes.
   final Duration timeout;
+
+  /// The last art handed out. Every read gets fresh bytes from Android, and
+  /// [Image.memory] treats new bytes as a new image — decoding it again and
+  /// blinking — so while the art is unchanged the same instance is returned.
+  Uint8List? _lastArtwork;
+
+  Uint8List? _stable(Uint8List? fresh) {
+    final Uint8List? last = _lastArtwork;
+    if (fresh != null && last != null && listEquals(fresh, last)) return last;
+    return _lastArtwork = fresh;
+  }
 
   @override
   Future<MediaSnapshot> now() async {
@@ -37,7 +49,7 @@ class AndroidMediaService implements MediaService {
         isPlaying: map['isPlaying'] as bool? ?? false,
         album: map['album'] as String?,
         appLabel: map['appLabel'] as String?,
-        artwork: map['artwork'] as Uint8List?,
+        artwork: _stable(map['artwork'] as Uint8List?),
       );
     } on PlatformException {
       return const MediaUnavailable('COULD NOT READ IT');

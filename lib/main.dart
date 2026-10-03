@@ -126,7 +126,7 @@ Future<void> main() async {
           permissions: const AndroidPermissionService(),
         ),
         link: const AndroidLinkService(),
-        media: const AndroidMediaService(),
+        media: AndroidMediaService(),
         todos: todoList,
         mailNotifier: mailNotifier,
         mailAlertScheduler: mailAlertScheduler,
