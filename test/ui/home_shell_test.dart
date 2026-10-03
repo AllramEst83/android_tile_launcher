@@ -528,12 +528,15 @@ void main() {
       await tester.pump();
       expect(find.text(Messages.tilesPicked(2)), findsOneWidget);
 
+      final int tilesBefore = tester.widgetList(find.byType(TileView)).length;
       final TestGesture gesture = await tester.startGesture(
         tester.getCenter(_inEditor(find.text('CLOCK'))),
       );
       await tester.pump(
         EditableTileGrid.pickUpDelay + const Duration(milliseconds: 50),
       );
+      // The ghost shows both picked tiles, not just the one held.
+      expect(tester.widgetList(find.byType(TileView)).length, tilesBefore + 2);
       final Rect cam = tester.getRect(
         _inEditor(find.byKey(const ValueKey('pkg.cam'))),
       );

@@ -77,9 +77,9 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   Timer? _scrollTimer;
   Offset _pointer = Offset.zero;
 
-  /// The size of the tile being held. The ghost is anchored by its middle, so
-  /// the finger is that far in from the ghost's top-left corner.
-  Size _heldSize = Size.zero;
+  /// Where the finger sits in the ghost: the middle of the held tile, which
+  /// for a group is the middle of that tile inside the picked tiles' block.
+  Offset _anchor = Offset.zero;
 
   /// The tile a held one is over and which edge of it the drop would be on,
   /// or null when it is over none.
@@ -125,7 +125,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   _Edge _edgeOf(TileRect r, Offset ghostTopLeft) {
     final RenderObject? grid = _gridKey.currentContext?.findRenderObject();
     if (grid is! RenderBox || !grid.attached) return _Edge.left;
-    final Offset finger = ghostTopLeft + _heldSize.center(Offset.zero);
+    final Offset finger = ghostTopLeft + _anchor;
     final Offset local = grid.globalToLocal(finger);
     final double dx = (local.dx - r.left) / r.width - 0.5;
     final double dy = (local.dy - r.top) / r.height - 0.5;
@@ -190,6 +190,19 @@ class _EditableTileGridState extends State<EditableTileGrid> {
           columns: settings.columns,
           gap: settings.gap.pixels,
         );
+        // What a held group would look like once dropped: just its own tiles,
+        // packed together as they will land.
+        final List<TileRect> preview = widget.group.length > 1
+            ? layoutTiles(
+                packTiles(<Tile>[
+                  for (final PinnedTile p in widget.tiles)
+                    if (widget.group.contains(p.id)) p.toTile(),
+                ], columns: settings.columns),
+                maxWidth: constraints.maxWidth,
+                columns: settings.columns,
+                gap: settings.gap.pixels,
+              )
+            : const <TileRect>[];
         return SizedBox(
           key: _gridKey,
           height: gridHeight(
@@ -202,7 +215,8 @@ class _EditableTileGridState extends State<EditableTileGrid> {
             // The line in the outermost gutter sticks out past the grid.
             clipBehavior: Clip.none,
             children: <Widget>[
-              for (final TileRect r in rects) _slot(r, settings.gap.pixels),
+              for (final TileRect r in rects)
+                _slot(r, settings.gap.pixels, preview),
               ?_dropLine(rects, settings.gap.pixels),
             ],
           ),
@@ -242,14 +256,9 @@ class _EditableTileGridState extends State<EditableTileGrid> {
     return null;
   }
 
-  /// [gap]'s a tile's drop area reaches past its own edges, meeting its
-  /// neighbours' halfway across the gutter, so hovering the gutter itself —
-  /// not just the tile beyond it — already shows a marker.
-  Widget _slot(TileRect r, double gap) {
-    final Tile tile = r.tile;
+  Widget _viewOf(Tile tile) {
     final String id = tile.id;
-    final double pad = gap / 2;
-    final Widget view = TileView(
+    return TileView(
       colour: tile.colour,
       content: tileContent(
         tile,
@@ -262,6 +271,52 @@ class _EditableTileGridState extends State<EditableTileGrid> {
       onDelete: () => widget.onDelete(id),
       deleteKey: ValueKey('delete-$id'),
     );
+  }
+
+  /// The picked tiles laid out as they will land, each at its own place in
+  /// [preview].
+  Widget _groupGhost(List<TileRect> preview) {
+    double right = 0;
+    double bottom = 0;
+    for (final TileRect p in preview) {
+      right = right < p.left + p.width ? p.left + p.width : right;
+      bottom = bottom < p.top + p.height ? p.top + p.height : bottom;
+    }
+    return SizedBox(
+      width: right,
+      height: bottom,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          for (final TileRect p in preview)
+            Positioned(
+              left: p.left,
+              top: p.top,
+              width: p.width,
+              height: p.height,
+              child: _viewOf(p.tile),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// [gap]'s a tile's drop area reaches past its own edges, meeting its
+  /// neighbours' halfway across the gutter, so hovering the gutter itself —
+  /// not just the tile beyond it — already shows a marker.
+  Widget _slot(TileRect r, double gap, List<TileRect> preview) {
+    final Tile tile = r.tile;
+    final String id = tile.id;
+    final double pad = gap / 2;
+    // The ghost: the held tile alone, or, for a picked tile, the whole group
+    // laid out as it will land, held by this tile's middle.
+    final TileRect? held = widget.group.contains(id)
+        ? preview.where((TileRect p) => p.tile.id == id).firstOrNull
+        : null;
+    final Offset anchor = held == null
+        ? Offset(r.width / 2, r.height / 2)
+        : Offset(held.left + held.width / 2, held.top + held.height / 2);
+    final Widget view = _viewOf(tile);
 
     return Positioned(
       left: r.left - pad,
@@ -300,7 +355,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
               data: id,
               delay: EditableTileGrid.pickUpDelay,
               onDragStarted: () {
-                _heldSize = Size(r.width, r.height);
+                _anchor = anchor;
                 if (widget.group.contains(id)) {
                   setState(() => _holdingGroup = true);
                 }
@@ -311,22 +366,17 @@ class _EditableTileGridState extends State<EditableTileGrid> {
               // goes beside is the one under the middle of the ghost, which
               // is where the eye puts it, not under the corner it was
               // picked up by.
-              dragAnchorStrategy: (draggable, context, position) =>
-                  Offset(r.width / 2, r.height / 2),
+              dragAnchorStrategy: (draggable, context, position) => anchor,
               // The feedback widget renders in the root Overlay, outside
               // this tree's Material ancestor -- TileView's InkWell needs
               // its own.
               feedback: Material(
                 type: MaterialType.transparency,
-                child: SizedBox(
-                  width: r.width,
-                  height: r.height,
-                  child: Opacity(
-                    opacity: 0.75,
-                    child: widget.group.contains(id) && widget.group.length > 1
-                        ? _withCount(view, widget.group.length)
-                        : view,
-                  ),
+                child: Opacity(
+                  opacity: 0.75,
+                  child: held == null
+                      ? SizedBox(width: r.width, height: r.height, child: view)
+                      : _groupGhost(preview),
                 ),
               ),
               childWhenDragging: Opacity(opacity: 0.3, child: view),
@@ -341,31 +391,6 @@ class _EditableTileGridState extends State<EditableTileGrid> {
     );
   }
 }
-
-/// [view] with a badge saying how many tiles the ghost stands for.
-Widget _withCount(Widget view, int count) => Stack(
-  fit: StackFit.expand,
-  children: <Widget>[
-    view,
-    Positioned(
-      right: 4,
-      bottom: 4,
-      child: ColoredBox(
-        color: TileColors.highlight,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          child: Text(
-            '$count',
-            style: TextStyle(
-              color: TileColors.canvas,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-    ),
-  ],
-);
 
 /// Which side of a tile a held one is being dropped on.
 enum _Edge { left, right, top, bottom }
