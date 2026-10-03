@@ -81,6 +81,10 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   /// for a group is the middle of that tile inside the picked tiles' block.
   Offset _anchor = Offset.zero;
 
+  /// The footprint of the group being held (the single tile's own size when
+  /// none), so the insertion line is as long as what will be dropped.
+  Size? _block;
+
   /// The tile a held one is over and which edge of it the drop would be on,
   /// or null when it is over none.
   ({String id, _Edge edge})? _drop;
@@ -106,6 +110,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   void _dragEnded() {
     _scrollTimer?.cancel();
     _scrollTimer = null;
+    _block = null;
     _clearDrop();
     if (_holdingGroup && mounted) setState(() => _holdingGroup = false);
   }
@@ -217,7 +222,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
             children: <Widget>[
               for (final TileRect r in rects)
                 _slot(r, settings.gap.pixels, preview),
-              ?_dropLine(rects, settings.gap.pixels),
+              ?_dropLine(rects, settings.gap.pixels, constraints.maxWidth),
             ],
           ),
         );
@@ -227,11 +232,17 @@ class _EditableTileGridState extends State<EditableTileGrid> {
 
   /// The line along the edge of the tile a held one is over, on the side it
   /// would be dropped on; in the gutter, so it never covers a tile.
-  Widget? _dropLine(List<TileRect> rects, double gap) {
+  Widget? _dropLine(List<TileRect> rects, double gap, double gridRight) {
     final ({String id, _Edge edge})? drop = _drop;
     if (drop == null) return null;
+    final Size? block = _block;
+    // As long as what is being dropped, but never past the grid's sides.
     for (final TileRect r in rects) {
       if (r.tile.id != drop.id) continue;
+      final double along = block == null
+          ? r.width
+          : block.width.clamp(0, gridRight - r.left);
+      final double down = block?.height ?? r.height;
       return Positioned(
         key: const ValueKey('drop-line'),
         left: drop.edge == _Edge.right
@@ -245,15 +256,25 @@ class _EditableTileGridState extends State<EditableTileGrid> {
             ? r.top - gap / 2 - _lineWidth / 2
             : r.top,
         width: drop.edge == _Edge.top || drop.edge == _Edge.bottom
-            ? r.width
+            ? along
             : _lineWidth,
         height: drop.edge == _Edge.left || drop.edge == _Edge.right
-            ? r.height
+            ? down
             : _lineWidth,
         child: IgnorePointer(child: ColoredBox(color: TileColors.highlight)),
       );
     }
     return null;
+  }
+
+  static Size _boundsOf(List<TileRect> rects) {
+    double right = 0;
+    double bottom = 0;
+    for (final TileRect p in rects) {
+      right = right < p.left + p.width ? p.left + p.width : right;
+      bottom = bottom < p.top + p.height ? p.top + p.height : bottom;
+    }
+    return Size(right, bottom);
   }
 
   Widget _viewOf(Tile tile) {
@@ -276,15 +297,10 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   /// The picked tiles laid out as they will land, each at its own place in
   /// [preview].
   Widget _groupGhost(List<TileRect> preview) {
-    double right = 0;
-    double bottom = 0;
-    for (final TileRect p in preview) {
-      right = right < p.left + p.width ? p.left + p.width : right;
-      bottom = bottom < p.top + p.height ? p.top + p.height : bottom;
-    }
+    final Size bounds = _boundsOf(preview);
     return SizedBox(
-      width: right,
-      height: bottom,
+      width: bounds.width,
+      height: bounds.height,
       child: Stack(
         clipBehavior: Clip.none,
         children: <Widget>[
@@ -313,6 +329,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
     final TileRect? held = widget.group.contains(id)
         ? preview.where((TileRect p) => p.tile.id == id).firstOrNull
         : null;
+    final Size blockSize = _boundsOf(preview);
     final Offset anchor = held == null
         ? Offset(r.width / 2, r.height / 2)
         : Offset(held.left + held.width / 2, held.top + held.height / 2);
@@ -356,6 +373,7 @@ class _EditableTileGridState extends State<EditableTileGrid> {
               delay: EditableTileGrid.pickUpDelay,
               onDragStarted: () {
                 _anchor = anchor;
+                _block = held == null ? null : blockSize;
                 if (widget.group.contains(id)) {
                   setState(() => _holdingGroup = true);
                 }
