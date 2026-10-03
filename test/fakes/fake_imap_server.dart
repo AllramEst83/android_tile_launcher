@@ -104,7 +104,7 @@ class FakeImapServer {
 
   /// What the server says it can do. Real ones differ: Gmail has `MOVE`, an
   /// older server may only have `UIDPLUS`.
-  String capabilities = 'IMAP4rev1 MOVE UIDPLUS';
+  String capabilities = 'IMAP4rev1 MOVE UIDPLUS IDLE';
 
   /// Folders besides INBOX and Trash, as `LIST` reports them (the server's own
   /// spelling of the name); `CREATE`, `RENAME` and `DELETE` change it.
@@ -118,6 +118,18 @@ class FakeImapServer {
   /// `searchResults`.
   Set<int>? starredResults;
   Set<int>? unreadResults;
+
+  /// The socket and tag of an `IDLE` in progress, if any.
+  Socket? _idleSocket;
+  String? _idleTag;
+
+  /// Tells a client that is idling that a message arrived.
+  void pushNewMessage() {
+    _idleSocket?.write('* ${inbox.length + 1} EXISTS\r\n');
+  }
+
+  /// Whether a client is idling now.
+  bool get idling => _idleTag != null;
 
   /// Set to make the server refuse `X-GM-RAW` searches.
   bool rejectGmailRaw = false;
@@ -176,6 +188,13 @@ class FakeImapServer {
   }
 
   void _handle(Socket socket, String line) {
+    if (line == 'DONE' && _idleTag != null) {
+      received.add('DONE');
+      socket.write('$_idleTag OK IDLE terminated\r\n');
+      _idleTag = null;
+      _idleSocket = null;
+      return;
+    }
     final space = line.indexOf(' ');
     if (space < 0) return;
     final tag = line.substring(0, space);
@@ -202,6 +221,10 @@ class FakeImapServer {
           '${extraFolders.map((f) => '* LIST (\\HasNoChildren) "/" "$f"\r\n').join()}'
           '$tag OK LIST completed\r\n',
         );
+      case 'IDLE':
+        _idleTag = tag;
+        _idleSocket = socket;
+        socket.write('+ idling\r\n');
       case 'CREATE':
         extraFolders.add(_quoted(rest).first);
         socket.write('$tag OK CREATE completed\r\n');

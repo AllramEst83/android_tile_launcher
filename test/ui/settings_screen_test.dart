@@ -885,6 +885,46 @@ void main() {
       expect(find.text(Messages.settingsMailAlertsDenied), findsOneWidget);
     });
 
+    testWidgets('INSTANT also asks to be left out of battery saving', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+
+      await _tap(tester, settingsKey('mail-alerts-instant'));
+
+      expect(rig.notifier.permissionRequests, 1);
+      expect(rig.scheduler.allowAsked, 1);
+      expect(rig.settings.settings.mailAlerts, MailAlertMode.instant);
+      expect(rig.scheduler.applied, <MailAlertMode>[MailAlertMode.instant]);
+      expect(find.text(Messages.settingsMailAlertsInstantNote), findsOneWidget);
+    });
+
+    testWidgets('INSTANT still turns on when battery saving is not lifted', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig(
+        scheduler: FakeMailAlertScheduler()..allowed = false,
+      );
+      await rig.open(tester);
+
+      await _tap(tester, settingsKey('mail-alerts-instant'));
+
+      expect(rig.settings.settings.mailAlerts, MailAlertMode.instant);
+      expect(find.text(Messages.settingsMailAlertsBattery), findsOneWidget);
+    });
+
+    testWidgets('EVERY 15 MIN asks nothing about battery saving', (
+      WidgetTester tester,
+    ) async {
+      final _Rig rig = _Rig();
+      await rig.open(tester);
+
+      await _tap(tester, settingsKey('mail-alerts-periodic'));
+
+      expect(rig.scheduler.allowAsked, 0);
+    });
+
     testWidgets('switching them off stops the background look', (
       WidgetTester tester,
     ) async {

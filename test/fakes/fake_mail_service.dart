@@ -101,6 +101,31 @@ class FakeMailService implements MailService {
     return folderChangeResult;
   }
 
+  /// What `waitForChange` answers, in turn; when they are used up it waits
+  /// for `cancel` and says quiet.
+  final List<MailWait> waits = <MailWait>[];
+  int waitCalls = 0;
+
+  /// When set, the next `waitForChange` answers when this does (and the gate
+  /// is used up).
+  Completer<MailWait>? waitGate;
+
+  @override
+  Future<MailWait> waitForChange({
+    Duration timeout = const Duration(minutes: 25),
+    Future<void>? cancel,
+  }) async {
+    waitCalls++;
+    final Completer<MailWait>? gate = waitGate;
+    if (gate != null) {
+      waitGate = null;
+      return gate.future;
+    }
+    if (waits.isNotEmpty) return waits.removeAt(0);
+    await cancel;
+    return MailWait.quiet;
+  }
+
   /// What `folders` answers.
   List<MailFolder> folderList = const <MailFolder>[];
 

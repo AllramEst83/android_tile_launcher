@@ -152,6 +152,12 @@ class CachedMailService implements MailService {
   }
 
   @override
+  Future<MailWait> waitForChange({
+    Duration timeout = const Duration(minutes: 25),
+    Future<void>? cancel,
+  }) => inner.waitForChange(timeout: timeout, cancel: cancel);
+
+  @override
   Future<List<MailFolder>> folders() => inner.folders();
 
   @override

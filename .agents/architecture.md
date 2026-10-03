@@ -99,8 +99,10 @@ lib/
     mail_notifier.dart       # abstract MailNotifier: show(alerts) / requestPermission / isPermitted
     local_mail_notifier.dart # MailNotifier on flutter_local_notifications (the only file that knows it); taps and the notification that started the app
     mail_alert_runner.dart   # MailAlertRunner.check(): one fresh look at the inbox, the cursor in LocalStore 'mail_alert_cursor', a notification per new unread message
-    mail_alert_scheduler.dart  # MailAlertScheduler.apply(mode): WorkManager (workmanager, the only file that knows it) runs a look about every 15 minutes
+    mail_alert_scheduler.dart  # MailAlertScheduler.apply(mode): WorkManager (workmanager) runs a look about every 15 minutes; instant also starts a foreground service (flutter_foreground_task, type specialUse) -- this is the only file that knows either package
     mail_alert_worker.dart   # mailAlertDispatcher: what the background isolate runs (builds its own services; reads the mode from the saved settings)
+    mail_idle_loop.dart      # MailIdleLoop: look, wait for the server to report a change (IMAP IDLE), look again; backs off 30 s..5 min when the connection fails
+    mail_alert_service.dart  # mailAlertServiceCallback: the foreground service's task handler, which runs a MailIdleLoop (the instant mode)
     mail_alert_links.dart    # MailAlertLinks: a tapped notification on its way to HomeShell, which opens that email in the mail sheet
     mail_tile_source.dart    # MailTileSource: the newest ten + the moment they were read
     media_service.dart       # abstract MediaService: now() -> MediaSnapshot; playPause/next/previous; openAccessSettings() (no runtime dialog exists for this one)

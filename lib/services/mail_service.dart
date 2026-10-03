@@ -54,6 +54,14 @@ abstract interface class MailService {
   /// the label and keeps the mail in All Mail). Never throws.
   Future<MailFolderResult> deleteFolder(String folder);
 
+  /// Waits with the connection open (IMAP IDLE) until the server reports that
+  /// the mailbox changed, [timeout] has passed or [cancel] completes. Gmail's
+  /// All Mail is watched on Gmail, else the inbox. Never throws.
+  Future<MailWait> waitForChange({
+    Duration timeout = const Duration(minutes: 25),
+    Future<void>? cancel,
+  });
+
   /// The account's folders worth showing, in the order to show them. Empty if
   /// there is no account or the server could not be asked. Never throws.
   Future<List<MailFolder>> folders();

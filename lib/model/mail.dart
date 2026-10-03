@@ -70,6 +70,18 @@ enum MailFolderKind {
   other,
 }
 
+/// What waiting for the mailbox to change came to.
+enum MailWait {
+  /// The server reported a change (new mail, most likely).
+  changed,
+
+  /// The time was up with nothing reported.
+  quiet,
+
+  /// The wait could not be made or the connection was lost.
+  failed,
+}
+
 sealed class MailFolderResult {
   const MailFolderResult();
 }

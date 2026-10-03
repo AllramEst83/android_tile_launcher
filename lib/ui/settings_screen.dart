@@ -573,7 +573,17 @@ class _SettingsScreenState extends State<SettingsScreen>
         return;
       }
     }
+    bool unrestricted = true;
+    if (mode == MailAlertMode.instant) {
+      unrestricted = await widget.services.mailAlertScheduler
+          .allowRunningInBackground();
+      if (!mounted) return;
+    }
     _change(_current.copyWith(mailAlerts: mode));
+    // After the change, which clears the message line.
+    if (!unrestricted) {
+      setState(() => _message = Messages.settingsMailAlertsBattery);
+    }
     await widget.services.mailAlertScheduler.apply(mode);
   }
 
@@ -621,6 +631,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           onSelect: (MailAlertMode m) => unawaited(_setMailAlerts(m)),
         ),
         const _Note(text: Messages.settingsMailAlertsNote),
+        if (_current.mailAlerts == MailAlertMode.instant)
+          const _Note(text: Messages.settingsMailAlertsInstantNote),
         const SizedBox(height: TileMetrics.gutter),
         _Label(text: Messages.settingsMailAccount),
         Text(

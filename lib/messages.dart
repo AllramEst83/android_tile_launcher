@@ -190,10 +190,24 @@ abstract final class Messages {
       'A notification for each new unread email.';
   static String mailAlertMoreTitle(int n) => '$n MORE NEW EMAILS';
   static const String mailAlertMoreBody = 'Open the launcher to read them.';
+  static const String mailAlertServiceChannel = 'Watching for mail';
+  static const String mailAlertServiceChannelNote =
+      'Shown while the launcher keeps a connection to your mail server open for instant new-mail alerts.';
+  static const String mailAlertServiceTitle = 'Watching for new mail';
+  static const String mailAlertServiceText =
+      'The launcher keeps a connection to your mail server open.';
   static const String settingsMailAlerts = 'NEW MAIL ALERTS';
+  static const String settingsMailAlertsInstantNote =
+      'INSTANT KEEPS A CONNECTION TO THE MAIL SERVER OPEN, SO NEW MAIL IS '
+      'ANNOUNCED AT ONCE. ANDROID SHOWS A PERMANENT NOTIFICATION FOR IT, AND '
+      'MAY STOP IT UNLESS BATTERY SAVING IS TURNED OFF FOR THE LAUNCHER.';
+  static const String settingsMailAlertsBattery =
+      'BATTERY SAVING MAY STOP INSTANT ALERTS. TURN IT OFF FOR THE LAUNCHER IN '
+      'ANDROID\'S SETTINGS IF THEY STOP.';
   static const String settingsMailAlertsNote =
-      'A NOTIFICATION FOR NEW UNREAD EMAIL, CHECKED ABOUT EVERY 15 MINUTES (THE '
-      'SHORTEST ANDROID ALLOWS IN THE BACKGROUND). TAP ONE TO OPEN THAT EMAIL.';
+      'A NOTIFICATION FOR NEW UNREAD EMAIL. EVERY 15 MIN IS A CHECK IN THE '
+      'BACKGROUND (THE SHORTEST ANDROID ALLOWS). TAP A NOTIFICATION TO OPEN THAT '
+      'EMAIL.';
   static const String settingsMailAlertsDenied =
       'ALLOW NOTIFICATIONS FOR THE LAUNCHER IN ANDROID\'S SETTINGS FIRST.';
   static const String mailLoadingMore = 'LOADING MORE...';
@@ -495,8 +509,8 @@ abstract final class Messages {
       'CONTACT — CALL, TEXT OR OPEN WHATSAPP FOR ONE PERSON.\n'
       'MAIL — THE INBOX AND THE ACCOUNT\'S OTHER FOLDERS (THE FOLDER '
       'BUTTON; MANAGE THERE TO CREATE, RENAME OR DELETE YOUR OWN); SCROLL FOR OLDER MAIL, TAP A MESSAGE TO READ IT, SELECT TO '
-      'STAR, MARK OR DELETE. SETTINGS CAN ALERT YOU TO NEW MAIL; TAP THE '
-      'NOTIFICATION TO OPEN THAT EMAIL.\n'
+      'STAR, MARK OR DELETE. SETTINGS CAN ALERT YOU TO NEW MAIL (EVERY 15 MIN, '
+      'OR INSTANT); TAP THE NOTIFICATION TO OPEN THAT EMAIL.\n'
       'TEXT TV — HEADLINE PAGES, THE OLD TELETEXT WAY.\n'
       'CALC — A CALCULATOR AND UNIT/CURRENCY CONVERTER.\n'
       'ALARM — THE NEXT ALARM DUE; SETS TIMERS AND ALARMS THROUGH THE '

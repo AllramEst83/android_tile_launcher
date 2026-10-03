@@ -13,7 +13,12 @@ import 'package:enough_mail/enough_mail.dart'
         ContentDisposition,
         ContentInfo,
         ImapClient,
+        ImapConnectionLostEvent,
+        ImapEvent,
         ImapException,
+        ImapExpungeEvent,
+        ImapFetchEvent,
+        ImapMessagesExistEvent,
         MailAddress,
         Mailbox,
         MailboxFlag,
@@ -370,6 +375,73 @@ class ImapMailService implements MailService {
 
   @override
   Future<MailMessages?> cachedInbox() async => null;
+
+  @override
+  Future<MailWait> waitForChange({
+    Duration timeout = const Duration(minutes: 25),
+    Future<void>? cancel,
+  }) async {
+    final MailAccount? saved;
+    try {
+      saved = await _accounts.load();
+    } on LocalStoreException {
+      return MailWait.failed;
+    }
+    if (saved == null) return MailWait.failed;
+
+    final outcome = await _session<MailWait>(saved, (client) async {
+      if (!client.serverInfo.supportsIdle) return MailWait.failed;
+      // Where mail is announced from: on Gmail, All Mail (the inbox listing
+      // is read from there too), else the inbox.
+      Mailbox? watched;
+      if (client.serverInfo.supports('X-GM-EXT-1')) {
+        final boxes = await client.listMailboxes(recursive: true);
+        watched = boxes
+            .where((b) => b.hasFlag(MailboxFlag.all) && !b.isNotSelectable)
+            .firstOrNull;
+      }
+      if (watched != null) {
+        await client.selectMailboxByPath(watched.encodedPath);
+      } else {
+        await client.selectInbox();
+      }
+
+      final done = Completer<MailWait>();
+      final heard = client.eventBus.on<ImapEvent>().listen((event) {
+        if (done.isCompleted) return;
+        if (event is ImapConnectionLostEvent) {
+          done.complete(MailWait.failed);
+        } else if (event is ImapMessagesExistEvent ||
+            event is ImapFetchEvent ||
+            event is ImapExpungeEvent) {
+          done.complete(MailWait.changed);
+        }
+      });
+      unawaited(
+        cancel?.then((_) {
+          if (!done.isCompleted) done.complete(MailWait.quiet);
+        }),
+      );
+      try {
+        await client.idleStart();
+        return await done.future.timeout(
+          timeout,
+          onTimeout: () => MailWait.quiet,
+        );
+      } finally {
+        await heard.cancel();
+        try {
+          await client.idleDone();
+        } on Object {
+          // The connection is closed right after either way.
+        }
+      }
+    });
+    return switch (outcome) {
+      _Done(:final value) => value,
+      _Failed() => MailWait.failed,
+    };
+  }
 
   /// Runs [change] on the account's folders; it answers null when it went
   /// through, else why it did not. Never throws.

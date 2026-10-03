@@ -28,6 +28,14 @@
          for when the setting is switched on. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- The INSTANT setting keeps a connection to the mail server open from a
+         foreground service (with the permanent notification Android requires
+         for one), and asks once to be left out of battery saving so Android
+         does not stop it. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- The weather tile fetches forecasts (SMHI, Open-Meteo)... -->
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -128,6 +136,19 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+        </service>
+        <!-- The service flutter_foreground_task runs the instant mail watch
+             in. The type is "special use": there is no ready-made type for
+             "keeps a mail connection open", and the data-sync type is cut to
+             six hours a day on Android 15. The service name is the package's
+             and must not change. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a connection to the user's own mail server open to announce new email at once" />
         </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

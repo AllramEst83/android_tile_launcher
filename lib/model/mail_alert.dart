@@ -8,7 +8,12 @@ enum MailAlertMode {
 
   /// A check in the background about every 15 minutes (the shortest interval
   /// Android allows for background work).
-  periodic('EVERY 15 MIN');
+  periodic('EVERY 15 MIN'),
+
+  /// A connection to the mail server kept open all the time (IMAP IDLE, in a
+  /// foreground service with its own permanent notification), so the server
+  /// reports new mail the moment it arrives.
+  instant('INSTANT');
 
   const MailAlertMode(this.label);
 

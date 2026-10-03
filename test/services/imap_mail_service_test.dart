@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:android_tile_launcher/model/mail.dart';
 import 'package:android_tile_launcher/model/mail_format.dart';
 import 'package:android_tile_launcher/services/imap_mail_service.dart';
@@ -1369,6 +1371,87 @@ void main() {
         expect([for (final m in result.messages) m.uid], [107, 106, 105]);
       },
     );
+  });
+
+  group('waiting for a change', () {
+    tearDown(() => server.stop());
+
+    Future<void> idling() async {
+      for (var i = 0; i < 200 && !server.idling; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+
+    test('says changed when the server reports a new message', () async {
+      await boot(const []);
+      await setUp();
+
+      final waiting = mail.waitForChange(timeout: const Duration(seconds: 5));
+      await idling();
+      expect(server.idling, isTrue);
+      server.pushNewMessage();
+
+      expect(await waiting, MailWait.changed);
+      // And it ended the IDLE properly before hanging up.
+      expect(server.received, contains('DONE'));
+    });
+
+    test('says quiet when nothing happens in the time given', () async {
+      await boot(const []);
+      await setUp();
+
+      final result = await mail.waitForChange(
+        timeout: const Duration(milliseconds: 300),
+      );
+
+      expect(result, MailWait.quiet);
+      expect(server.received, contains('DONE'));
+    });
+
+    test('says quiet at once when cancelled', () async {
+      await boot(const []);
+      await setUp();
+      final cancel = Completer<void>();
+
+      final waiting = mail.waitForChange(
+        timeout: const Duration(seconds: 30),
+        cancel: cancel.future,
+      );
+      await idling();
+      cancel.complete();
+
+      expect(await waiting.timeout(const Duration(seconds: 3)), MailWait.quiet);
+    });
+
+    test('watches All Mail on Gmail', () async {
+      await boot(const []);
+      server
+        ..capabilities = 'IMAP4rev1 MOVE UIDPLUS IDLE X-GM-EXT-1'
+        ..hasAllMail = true;
+      await setUp();
+
+      final waiting = mail.waitForChange(timeout: const Duration(seconds: 5));
+      await idling();
+      server.pushNewMessage();
+      await waiting;
+
+      expect(server.received.any((c) => c.startsWith('SELECT')), isTrue);
+    });
+
+    test('a server without IDLE is a failure', () async {
+      await boot(const []);
+      server.capabilities = 'IMAP4rev1 MOVE UIDPLUS';
+      await setUp();
+
+      expect(await mail.waitForChange(), MailWait.failed);
+    });
+
+    test('without an account it fails without connecting', () async {
+      await boot(const []);
+
+      expect(await mail.waitForChange(), MailWait.failed);
+      expect(server.connections, 0);
+    });
   });
 
   group('mailFoldersFrom', () {
