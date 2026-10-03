@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:android_tile_launcher/messages.dart';
-import 'package:android_tile_launcher/model/block_move.dart';
 import 'package:android_tile_launcher/model/c64_colour.dart';
 import 'package:android_tile_launcher/model/list_reorder.dart';
 import 'package:android_tile_launcher/model/mail_alert.dart';
@@ -366,17 +365,19 @@ class _HomePageState extends State<_HomePage> {
     final int from = scratch.indexWhere((PinnedTile p) => p.id == moving);
     final int to = scratch.indexWhere((PinnedTile p) => p.id == target);
     if (from == -1 || to == -1) return;
-    if (_many && _group.contains(moving)) {
-      _scratch = moveBlock(
-        scratch,
-        ids: _group,
-        target: target,
-        after: after,
-        columns: SettingsScope.of(context).columns,
-      );
-      return;
-    }
     _scratch = moveBeside(scratch, from: from, target: to, after: after);
+  });
+
+  /// The picked tiles dropped as one block: [order] is every tile's id in its
+  /// new place.
+  void _moveGroup(List<String> order) => setState(() {
+    final Map<String, PinnedTile> byId = <String, PinnedTile>{
+      for (final PinnedTile p in _scratch!) p.id: p,
+    };
+    _scratch = <PinnedTile>[
+      for (final String id in order)
+        if (byId[id] != null) byId[id]!,
+    ];
   });
 
   void _resize(TileSize size) => _updateSelected((p) => p.copyWith(size: size));
@@ -445,6 +446,7 @@ class _HomePageState extends State<_HomePage> {
                 onSelect: _select,
                 onDelete: _delete,
                 onReorder: _reorder,
+                onMoveGroup: _moveGroup,
                 group: _group,
               ),
             ),

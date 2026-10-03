@@ -24,7 +24,6 @@ lib/
     ready_script.dart        # readyScript(now, events, todos, unread): the lines the READY. screen types (intro) and prints (body)
     mail_alert.dart          # MailAlertMode (off / every 15 min), MailRef (a notification's payload), MailAlertCursor, planMailAlerts: which unread mail is new since the last look
     mail_cache.dart          # mailListingToJson / mailListingFromJson: the inbox listing (headers only) kept between runs, per account
-    block_move.dart          # moveBlock / blockFootprint: drop a picked set as one block, slid to where the packer keeps it whole
     list_reorder.dart        # moveBeside<T>: pure move of an item to just before/after another, for drag-to-reorder
     styled_text.dart         # TvColor, StyledRun (text + colours + underline + tall + mosaic + link), mergeRuns, plainText
     tv_mosaic.dart           # tvPictureFor(hash): texttv.nu's block-graphics GIFs rebuilt and looked up by CRC-32 (no downloads)
@@ -174,6 +173,7 @@ lib/
     weather_icon.dart        # WeatherIcon: 12x12 pixel-block sky pictures, drawn from bitmaps in the tile's ink
     device_tile_view.dart    # DeviceTileContentView: battery and free storage, each a label + value + flat bar
     state_tile_view.dart     # StateTileContentView: label + a state string ([ON], [VIBRATE]...), nullable onTap
+    block_drop.dart          # nearestBlockDrop: where a held group of picked tiles lands whole, nearest the ghost's top-left
     editable_tile_grid.dart  # the grid editor's canvas: Draggable/DragTarget per tile, tap to select, delete badge; `group` = move-many picks (holding one lifts all, one ghost with a count, one drop line)
     tile_inspector.dart      # the editor's panel: label + Apply always, size/colour pickers while a tile is selected
     add_tile_sheet.dart      # "+ ADD TILE": every system kind not already pinned, one instance each

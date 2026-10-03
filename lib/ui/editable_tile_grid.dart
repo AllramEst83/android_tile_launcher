@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:android_tile_launcher/model/block_move.dart';
 import 'package:android_tile_launcher/model/pinned_tile.dart';
 import 'package:android_tile_launcher/model/settings.dart';
 import 'package:android_tile_launcher/model/tile.dart';
 import 'package:android_tile_launcher/model/tile_layout.dart';
 import 'package:android_tile_launcher/services/tile_services.dart';
+import 'package:android_tile_launcher/ui/block_drop.dart';
 import 'package:android_tile_launcher/ui/settings_scope.dart';
 import 'package:android_tile_launcher/ui/theme.dart';
 import 'package:android_tile_launcher/ui/tile_grid.dart';
@@ -39,6 +39,7 @@ class EditableTileGrid extends StatefulWidget {
     required this.onSelect,
     required this.onDelete,
     required this.onReorder,
+    this.onMoveGroup,
     this.group = const <String>{},
   });
 
@@ -51,6 +52,9 @@ class EditableTileGrid extends StatefulWidget {
 
   /// [after] is which side of [target] the moved tile goes on.
   final void Function(String moving, String target, bool after) onReorder;
+
+  /// A held group was dropped: every tile's id, in its new order.
+  final ValueChanged<List<String>>? onMoveGroup;
 
   /// The tiles picked to move together (empty outside move-many). Holding
   /// any one of them lifts all of them: one ghost, one insertion line, and
@@ -86,6 +90,72 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   /// or null when it is over none.
   ({String id, _Edge edge})? _drop;
 
+  /// Where a held group would land right now: the whole new order and the
+  /// box the block covers, or null when none is held over the grid.
+  BlockDrop? _groupDrop;
+
+  /// The grid's last layout, for working out a group's landing spot.
+  ({int columns, double gap, double width}) _metrics = (
+    columns: 4,
+    gap: 0,
+    width: 0,
+  );
+
+  bool _isGroupDrag(String moving) =>
+      widget.onMoveGroup != null &&
+      widget.group.length > 1 &&
+      widget.group.contains(moving);
+
+  /// The block lands where it can stay whole nearest the held ghost's
+  /// top-left, wherever over the grid it is, so the line and the ghost stay
+  /// together instead of the line being tied to the tile under the finger.
+  BlockDrop? _landingFor(Offset ghostTopLeft) {
+    final RenderObject? grid = _gridKey.currentContext?.findRenderObject();
+    if (grid is! RenderBox || !grid.attached) return null;
+    final Offset local = grid.globalToLocal(ghostTopLeft);
+    return nearestBlockDrop(
+      widget.tiles,
+      widget.group,
+      toLeft: local.dx,
+      toTop: local.dy,
+      columns: _metrics.columns,
+      maxWidth: _metrics.width,
+      gap: _metrics.gap,
+    );
+  }
+
+  void _hoverGroup(Offset ghostTopLeft) {
+    final BlockDrop? next = _landingFor(ghostTopLeft);
+    final BlockDrop? last = _groupDrop;
+    if (next == null ||
+        (last != null &&
+            last.left == next.left &&
+            last.top == next.top &&
+            last.width == next.width &&
+            last.height == next.height &&
+            _sameOrder(last.order, next.order))) {
+      return;
+    }
+    setState(() => _groupDrop = next);
+  }
+
+  static bool _sameOrder(List<PinnedTile> a, List<PinnedTile> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
+  }
+
+  void _dropGroup(Offset ghostTopLeft) {
+    final BlockDrop? landing = _landingFor(ghostTopLeft) ?? _groupDrop;
+    if (mounted) setState(() => _groupDrop = null);
+    if (landing == null) return;
+    widget.onMoveGroup!(<String>[
+      for (final PinnedTile p in landing.order) p.id,
+    ]);
+  }
+
   /// Whether the held tile is one of [EditableTileGrid.group], so the rest
   /// of the group is lifted with it.
   bool _holdingGroup = false;
@@ -108,7 +178,12 @@ class _EditableTileGridState extends State<EditableTileGrid> {
     _scrollTimer?.cancel();
     _scrollTimer = null;
     _clearDrop();
-    if (_holdingGroup && mounted) setState(() => _holdingGroup = false);
+    if (mounted && (_holdingGroup || _groupDrop != null)) {
+      setState(() {
+        _holdingGroup = false;
+        _groupDrop = null;
+      });
+    }
   }
 
   /// A group never lands on one of its own tiles.
@@ -185,6 +260,11 @@ class _EditableTileGridState extends State<EditableTileGrid> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        _metrics = (
+          columns: settings.columns,
+          gap: settings.gap.pixels,
+          width: constraints.maxWidth,
+        );
         final List<TileRect> rects = layoutTiles(
           placed,
           maxWidth: constraints.maxWidth,
@@ -216,14 +296,20 @@ class _EditableTileGridState extends State<EditableTileGrid> {
             // The line in the outermost gutter sticks out past the grid.
             clipBehavior: Clip.none,
             children: <Widget>[
+              // Under the tiles: a held group can also be dropped on the
+              // gaps between and around them, not only on a tile.
+              Positioned.fill(
+                child: DragTarget<String>(
+                  onWillAcceptWithDetails: (d) => _isGroupDrag(d.data),
+                  onMove: (d) => _hoverGroup(d.offset),
+                  onAcceptWithDetails: (d) => _dropGroup(d.offset),
+                  builder: (context, candidate, rejected) =>
+                      const SizedBox.expand(),
+                ),
+              ),
               for (final TileRect r in rects)
                 _slot(r, settings.gap.pixels, preview),
-              ?_dropLine(
-                rects,
-                settings.gap.pixels,
-                settings.columns,
-                constraints.maxWidth,
-              ),
+              ?_dropLine(rects, settings.gap.pixels),
             ],
           ),
         );
@@ -234,50 +320,24 @@ class _EditableTileGridState extends State<EditableTileGrid> {
   /// The line along the edge of the tile a held one is over, on the side it
   /// would be dropped on; in the gutter, so it never covers a tile. For a held
   /// group it is the leading edge of where the whole block will really land
-  /// (the packer may slide it, see [moveBlock]), as long as the block is.
-  Widget? _dropLine(
-    List<TileRect> rects,
-    double gap,
-    int columns,
-    double maxWidth,
-  ) {
-    final ({String id, _Edge edge})? drop = _drop;
-    if (drop == null) return null;
-    if (_holdingGroup && widget.group.length > 1) {
-      final List<PinnedTile> order = moveBlock(
-        widget.tiles,
-        ids: widget.group,
-        target: drop.id,
-        after: drop.edge == _Edge.right || drop.edge == _Edge.bottom,
-        columns: columns,
-      );
-      final List<TileRect> landed = layoutTiles(
-        packTiles(<Tile>[
-          for (final PinnedTile p in order) p.toTile(),
-        ], columns: columns),
-        maxWidth: maxWidth,
-        columns: columns,
-        gap: gap,
-      );
-      double left = double.infinity, top = double.infinity;
-      double right = 0, bottom = 0;
-      for (final TileRect l in landed) {
-        if (!widget.group.contains(l.tile.id)) continue;
-        left = left < l.left ? left : l.left;
-        top = top < l.top ? top : l.top;
-        right = right > l.left + l.width ? right : l.left + l.width;
-        bottom = bottom > l.top + l.height ? bottom : l.top + l.height;
-      }
-      final bool across = drop.edge == _Edge.top || drop.edge == _Edge.bottom;
+  /// (see [nearestBlockDrop]), as long as the block is.
+  Widget? _dropLine(List<TileRect> rects, double gap) {
+    final BlockDrop? landing = _groupDrop;
+    if (landing != null) {
+      // One line on the block's leading edge: its left side when it sits
+      // beside something, its top when it starts a row.
+      final bool beside = landing.left > gap;
       return Positioned(
         key: const ValueKey('drop-line'),
-        left: across ? left : left - gap / 2 - _lineWidth / 2,
-        top: across ? top - gap / 2 - _lineWidth / 2 : top,
-        width: across ? right - left : _lineWidth,
-        height: across ? _lineWidth : bottom - top,
+        left: beside ? landing.left - gap / 2 - _lineWidth / 2 : landing.left,
+        top: beside ? landing.top : landing.top - gap / 2 - _lineWidth / 2,
+        width: beside ? _lineWidth : landing.width,
+        height: beside ? landing.height : _lineWidth,
         child: IgnorePointer(child: ColoredBox(color: TileColors.highlight)),
       );
     }
+    final ({String id, _Edge edge})? drop = _drop;
+    if (drop == null) return null;
     for (final TileRect r in rects) {
       if (r.tile.id != drop.id) continue;
       return Positioned(
@@ -377,8 +437,13 @@ class _EditableTileGridState extends State<EditableTileGrid> {
       width: r.width + pad * 2,
       height: r.height + pad * 2,
       child: DragTarget<String>(
-        onWillAcceptWithDetails: (details) => !_blocked(details.data, id),
+        onWillAcceptWithDetails: (details) =>
+            _isGroupDrag(details.data) || !_blocked(details.data, id),
         onMove: (details) {
+          if (_isGroupDrag(details.data)) {
+            _hoverGroup(details.offset);
+            return;
+          }
           // Every tile under the finger is told about a move, the held one
           // included; only another tile is somewhere to go.
           if (_blocked(details.data, id)) {
@@ -389,6 +454,10 @@ class _EditableTileGridState extends State<EditableTileGrid> {
         },
         onLeave: (_) => _clearDrop(id),
         onAcceptWithDetails: (details) {
+          if (_isGroupDrag(details.data)) {
+            _dropGroup(details.offset);
+            return;
+          }
           final _Edge edge = _edgeOf(r, details.offset);
           _clearDrop();
           widget.onReorder(

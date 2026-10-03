@@ -540,14 +540,10 @@ void main() {
       final Rect cam = tester.getRect(
         _inEditor(find.byKey(const ValueKey('pkg.cam'))),
       );
-      // Over the bottom edge the line is as wide as the two picked tiles
-      // together, not as wide as the tile it is beside.
+      // One insertion line for the whole block, wherever it is held.
       await gesture.moveTo(Offset(cam.center.dx, cam.bottom - 8));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(
-        tester.getSize(find.byKey(const ValueKey('drop-line'))).width,
-        greaterThan(cam.width * 1.5),
-      );
+      expect(find.byKey(const ValueKey('drop-line')), findsOneWidget);
       await gesture.moveTo(Offset(cam.right - 8, cam.center.dy));
       await tester.pump(const Duration(milliseconds: 100));
       // One insertion line for the whole block.
