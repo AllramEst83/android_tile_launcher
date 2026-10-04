@@ -10,6 +10,8 @@ The sibling repo `../android_terminal_launcher` already solves some of these pro
 
 ## Next, in order
 
+1. **Move Text TV into its own app.** Inventory, decisions, phased to-do list and improvements: [.agents/text-tv-extraction.md](.agents/text-tv-extraction.md). Nothing moved yet; answer its decisions D1–D5 first.
+
 ---
 
 ## Deliberately different from the terminal launcher
